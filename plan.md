@@ -19,7 +19,9 @@
 ### 0.1 — Le projet en un paragraphe
 
 Une boîte à outils installable par n'importe quelle entreprise, qui assiste un
-technicien de support IT dans son diagnostic. Le principe est le chargement de
+technicien de support IT dans son travail quotidien : le **diagnostic des
+incidents** et l'**instruction des demandes** (ouverture de flux, création de
+VLAN, comptes et partages…). Le principe est le chargement de
 contexte à la demande : au lieu de tout précharger, l'outil identifie de quel
 domaine relève le problème, ne charge que le périmètre de travail correspondant,
 puis ne va chercher que les sections d'information nécessaires. L'objectif est
@@ -34,7 +36,8 @@ l'**assistance**, pas l'automatisation.
 | **Contexte entreprise** | Les informations propres à l'installation cliente : topologie, serveurs, applications. Rempli par le client à partir d'un gabarit fourni. |
 | **Gabarit** | Le fichier `contexte.exemple.md` d'un domaine, structure vide que le client remplit. |
 | **Section** | Une unité adressable du contexte entreprise, référencée par un index en tête de fichier. |
-| **Ticket** | Une demande traitée, conservée avec son symptôme initial. |
+| **Nature** | Ce qu'est un cas : **incident** (« ça ne marche plus » — un état antérieur s'est dégradé) ou **demande** (« je veux que » — un état cible, rien de cassé). Déterminée par le triage, avant le domaine. |
+| **Ticket** | Un cas traité — incident ou demande — conservé avec son expression initiale. |
 | **Base de connaissances** | Les tickets résolus et publiés, indexés pour être retrouvés au ticket suivant. |
 
 ### 0.3 — Le flux, en toutes lettres
@@ -43,24 +46,32 @@ Ce projet a un schéma de routage. Voici son contenu sous forme textuelle.
 
 1. **`/support`** — le technicien décrit son problème. C'est l'unique porte
    d'entrée humaine.
-2. **Triage** — raisonnement seul, sans appel externe. Extrait les signaux du
-   texte et propose un ou plusieurs domaines.
+2. **Triage** — raisonnement seul, sans appel externe. Détermine d'abord la
+   **nature** (incident ou demande), puis extrait les signaux du texte et
+   propose un ou plusieurs domaines.
 3. **Validation du triage** — *uniquement si le cas est ambigu*. Le technicien
    ajoute ou retire des domaines. Si le cas est net, cette étape est sautée.
-4. **Recherche en base de connaissances** — `search_kb(tags)`. Avant tout
-   chargement d'outil, on regarde si un cas similaire existe. Un retour vide est
-   le cas **nominal** des premières semaines, pas une erreur : la base démarre
-   vide.
-5. Deux branches :
-   - **Cas similaire trouvé** → une solution candidate, qui repasse quand même
-     par le diagnostic.
-   - **Aucun cas** → chargement, en deux temps :
-     - **`load_skill(domains)`** — récupère le ou les périmètres de travail.
-     - **`get_context(sections)`** — récupère les sections précises que le skill
-       chargé réclame.
-     - Si une section manque, **question au technicien** plutôt que de charger
-       davantage.
-6. **Diagnostic** — lecture seule, aucun appel, aucune modification.
+4. **Chargement**, en deux temps :
+   - **`load_skill(domains)`** — récupère le ou les périmètres de travail.
+   - **`get_context(sections)`** — récupère les sections précises que le skill
+     chargé réclame. En deux moments : les sections `requis` de l'en-tête,
+     d'office et tout de suite ; les sections `selon-cas`, plus tard, en cours
+     d'instruction, au moment où leur signal apparaît.
+   - Si une section manque, **question au technicien** plutôt que de charger
+     davantage.
+5. **Instruction du cas** — lecture seule, aucun appel de modification. Pour
+   un **incident** : le diagnostic. Pour une **demande** : l'étude — prérequis
+   vérifiés dans le contexte, informations manquantes collectées, une question
+   à la fois. *Une exception de flux* : si l'instruction révèle que le cas
+   relève d'un autre domaine, retour à l'étape 4 — re-triage sur les signaux
+   découverts, nouveau `load_skill`. Voir « L'escalade de domaine » au
+   périmètre E.
+6. **Recherche en base de connaissances** — `search_kb(tags)`, **une fois le
+   cas instruit** (diagnostic posé, ou demande étudiée). On interroge la base
+   avec des signaux vérifiés, pas avec l'expression vague du départ : un cas
+   similaire trouvé apporte une solution déjà éprouvée au plan d'action. Un
+   retour vide est le cas **nominal** des premières semaines, pas une erreur :
+   la base démarre vide.
 7. **Plan d'action proposé** — le technicien valide ou corrige.
 8. **Actions correctives** — exécutées par l'humain, hors du système.
 9. **Clôture du ticket** — `save_ticket()`, avec le symptôme initial conservé.
@@ -78,6 +89,24 @@ d'action, la publication.
 
 > Ces points ont été discutés et tranchés. Les rouvrir demande un argument
 > nouveau, pas une préférence.
+
+**Le support couvre deux natures de cas : l'incident et la demande.** Le
+support réel ne s'arrête pas aux incidents — ouverture de flux, création de
+VLAN, comptes, partages sont le quotidien d'un technicien. Le triage détermine
+la **nature avant le domaine**, sur un signal simple : « ça ne marche plus »
+(un état antérieur s'est dégradé) contre « je veux que » (un état cible, rien
+de cassé). Le flux tient tel quel : l'étape d'instruction est un diagnostic
+pour un incident, une étude pour une demande — mêmes appels MCP, mêmes points
+de validation. Chaque domaine sépare `skill.md` (comportement et diagnostic)
+de `demandes.md`, chargé seulement si nature = demande : un ticket incident ne
+paie pas les tokens de la procédure de création de VLAN.
+
+**La recherche en base se fait le diagnostic posé, pas avant.** Une version
+antérieure du flux cherchait avant le chargement, sur le symptôme brut — tout
+en imposant qu'un cas trouvé repasse par le diagnostic complet : le raccourci
+était illusoire. Chercher après le diagnostic interroge la base avec des
+signaux vérifiés, et le cas trouvé sert là où il a de la valeur : une solution
+déjà éprouvée au moment du plan d'action.
 
 **`/support` est l'unique commande humaine.** Une commande par domaine
 (`/network`, `/ad`) a été envisagée puis écartée : si le technicien tape
@@ -104,6 +133,28 @@ tard, après une cinquantaine de tickets réels.
 **Le serveur MCP reste bête.** L'intelligence dans les skills, pas dans le code.
 Un serveur trop malin rend impossible de savoir si une erreur vient du modèle ou
 du serveur.
+
+**Le contexte est un accélérateur, pas un prérequis.** L'outil fonctionne
+sur une installation au contexte vide : chaque section remplie est une
+question que l'IA n'aura pas à poser ; chaque section vide devient une
+question au technicien — plus lent, jamais faux. Le danger n'est pas le
+contexte absent, c'est le contexte **périmé**, qui donne des diagnostics faux
+avec assurance. Conséquences : aucune section obligatoire, l'installation ne
+bloque jamais sur un contexte vide (elle signale l'état de remplissage), et
+la réponse du technicien à une question journalisée est le **contenu
+candidat** de la section manquante — le contexte se remplit par l'usage,
+comme la base de connaissances. Si le terrain contredit le contexte en cours
+d'instruction, le signaler au plan d'action, à destination du référent.
+
+**Les tâches déterministes sont du code, jamais du raisonnement.** Construire
+un chemin de fichier, générer un identifiant, horodater, reconstruire un index :
+sur chacune de ces opérations le modèle peut se tromper, alors qu'un script ne
+le peut pas. Le constat d'origine est concret : à l'usage d'un skill, l'IA
+s'est déjà trompée de chemin en créant un ticket. Règle : l'IA ne manipule
+jamais un chemin ni un identifiant — les cinq appels MCP encapsulent toutes les
+écritures, et le serveur résout lui-même où et sous quel nom écrire. C'est le
+complément de « le serveur reste bête » : bête ne veut pas dire absent.
+L'intelligence dans les skills, le déterminisme dans le code.
 
 **Pas d'historique de tickets à ce stade.** Fabriquer un faux corpus a été
 écarté : on peut inventer des causes, pas des symptômes. Un corpus fabriqué
@@ -215,6 +266,13 @@ architecture/
   H-deploiement.md
 ```
 
+**Deux couches de documents, dans cet ordre.** `conception/` est l'atelier :
+c'est là que les questions d'un périmètre se débattent et se répondent — ses
+fichiers sont les livrables listés dans les sections A à H. `architecture/` est
+le résultat : le plan d'architecture technique d'un périmètre s'écrit à partir
+de sa conception, une fois celle-ci stabilisée. On conçoit dans `conception/`,
+on fige dans `architecture/`.
+
 **Ces documents ne sont pas livrés.** `plan.md`, `conception/` et `architecture/`
 vivent dans le dépôt du projet. Ils n'appartiennent ni à `produit/` ni à
 `installation/` — les deux arborescences définies au périmètre H ne contiennent
@@ -257,15 +315,36 @@ n'importe quelle entreprise.
   Recommandation : plat. La hiérarchie ajoute une question à chaque
   interrogation du manifeste sans rien résoudre.
 
+**Un domaine se définit par des signaux, pas par des composants.** « Le réseau,
+c'est les switchs et le VPN » ne permet pas de trier ; « le problème dépend du
+chemin d'accès et non du service » le permet. Chaque domaine déclare dans la
+taxonomie ses **signaux discriminants** : des faits observables dans le texte
+du ticket, binaires et vérifiables. Le triage ne fait que constater lesquels
+sont présents — ni intuition humaine, ni intuition de modèle. C'est ce qui rend
+son raisonnement montrable (périmètre E : « timeout + uniquement via VPN →
+réseau » est une liste de signaux cochés), et c'est ce qui rend ses erreurs
+corrigibles : un ticket mal classé désigne un signal à corriger dans la
+taxonomie, pas une impression à rediscuter. Quand aucun signal discriminant
+n'est présent dans la description, le triage demande le signal manquant au
+technicien au lieu de deviner — c'est la porte asymétrique du périmètre E.
+
 **Méthode.** Pour chaque paire de domaines voisins, écrire deux symptômes
 ambigus. « Lenteur applicative » et « timeout à la connexion » appartiennent à
 qui ? Ces exemples deviennent le jeu de test du triage au périmètre E.
 
 **Livrable.** `conception/taxonomie.md` — un domaine par section : ce qu'il
-couvre, ce qu'il ne couvre pas, ses voisins, les symptômes ambigus avec eux.
+couvre, ce qu'il ne couvre pas, **ses signaux discriminants**, ses voisins, les
+symptômes ambigus avec eux.
 
 **Critère de sortie.** Tout symptôme de support IT courant tombe dans au moins
 un domaine, et les cas à cheval sont explicitement listés.
+
+**Décisions.**
+
+| Question | Décision | Raison |
+| --- | --- | --- |
+| Plat ou hiérarchique ? | Plat. | Le triage propose plusieurs domaines quand c'est ambigu ; une hiérarchie forcerait à choisir un niveau avant de choisir un domaine. Un domaine trop gros se scindera en deux domaines plats, migration triviale. |
+| Combien de domaines en bêta ? | La taxonomie **décrit** les six domaines et leurs frontières ; seuls **réseau** et **système** ont un skill et un gabarit en bêta. Les autres s'implémentent après validation de la bêta (voir `conception/validation.md`). | Le triage doit savoir qu'un domaine existe pour répondre « hors des domaines couverts », sinon un ticket imprimante est forcé dans réseau ou système. Décrire coûte une page ; implémenter coûte un skill, un gabarit et leur maintenance. |
 
 ---
 
@@ -296,12 +375,28 @@ cette ligne ?* Si non, couper.
 
 **Livrables.**
 
-- `conception/format-skill.md` — la structure, avec le test de valeur.
-- `produit/domaines/_template/skill.md` — le squelette vide.
-- `produit/domaines/reseau/skill.md` — le premier écrit, qui sert de référence.
+- `conception/format-skill.md` — la structure, avec le test de valeur — pour
+  les deux fichiers, `skill.md` et `demandes.md`.
+- `produit/domaines/_template/skill.md` et
+  `produit/domaines/_template/demandes.md` — les squelettes vides.
+- `produit/domaines/reseau/skill.md` et
+  `produit/domaines/reseau/demandes.md` — les premiers écrits, qui servent de
+  référence.
 
 **Critère de sortie.** Le skill réseau est écrit, et chacune de ses sections
 passe le test de valeur.
+
+**Décisions.**
+
+| Question | Décision | Raison |
+| --- | --- | --- |
+| Sections d'un skill ? | Cinq : périmètre, contexte requis (en-tête), ordre de diagnostic, règles de conduite, signaux d'escalade. | L'escalade (périmètre E) exige que « limites du domaine » soit un déclencheur avec ses signaux, pas de la documentation. |
+| Longueur cible ? | Une à deux pages, ~100 lignes maximum. | Au-delà, le gain de tokens qui justifie l'architecture s'évapore. |
+| Déclaration du contexte requis ? | En-tête YAML en tête du skill, deux niveaux : `requis` (chargé d'office) et `selon-cas` (chargé si le signal correspondant est présent). Les identifiants de sections sont **le contrat commun** entre B, C et D : le gabarit les indexe, `get_context` les résout. | Deux lecteurs, deux formats : le YAML pour le serveur (déterministe, parseable — décision 0.4 « le déterministe est du code »), la prose pour le modèle. `selon-cas` préserve l'économie de tokens. |
+| Composition de deux skills ? | Pas de fusion. Discriminer d'abord — éliminer un des deux domaines au plus vite avec les signaux de la taxonomie — puis suivre l'ordre du skill survivant, l'autre en référence. | On ne définit pas de règle de fusion d'ordres contradictoires ; on fait en sorte que la situation ne dure pas. |
+| Rythme des questions ? | **Règle d'or : une question à la fois.** Poser une question, attendre la réponse, décider de la suite avec elle. Jamais de liste de questions. Vaut pour le diagnostic comme pour l'étude d'une demande. | Chaque réponse change la question suivante ; une batterie de questions est à moitié répondue et à moitié du vent. C'est le pendant conversationnel de l'ordre de diagnostic. |
+| Où vivent les demandes d'un domaine ? | Dans un fichier séparé, `demandes.md`, à côté de `skill.md` — chargé seulement si le triage a déterminé nature = demande. Une entrée par demande courante : prérequis, informations à collecter, vérifications de contexte, gabarit de plan d'action. | Économie de tokens : un incident ne paie pas la procédure de création de VLAN. Le YAML de `demandes.md` déclare ses sections de contexte comme celui de `skill.md`. |
+| Une persona en tête de skill ? | Une seule ligne de cadrage (« Tu es l'ingénieur réseau de l'équipe support ; ton périmètre s'arrête où commence l'Escalade »), pas davantage. Le comportement se pilote par contraintes, pas par identité. | Les études convergent : les personas n'améliorent pas la performance des modèles récents. Ce qui active le bon registre : le vocabulaire du domaine, les contraintes, les données chargées. |
 
 ---
 
@@ -317,9 +412,11 @@ produit/
   domaines/
     reseau/
       skill.md                  ← générique, livré
+      demandes.md               ← générique, livré — chargé si nature = demande
       contexte.exemple.md       ← gabarit à remplir
     systeme/
       skill.md
+      demandes.md
       contexte.exemple.md
   contexte-general.exemple.md   ← transverse, chargé en plus
 ```
@@ -346,8 +443,10 @@ sinon on obtient quatre versions divergentes en six mois.
 - L'index en tête de fichier : quel format ? Sans lui, un skill demande à
   l'aveugle, ou conclut qu'une information manque alors qu'elle est deux
   sections plus bas.
-- Que fait l'outil si une section obligatoire est vide au démarrage ? Refus,
-  avertissement, ou dégradation silencieuse.
+- ~~Que fait l'outil si une section obligatoire est vide au démarrage ?~~
+  **Tranchée en 0.4** : il n'y a pas de section obligatoire. Section vide =
+  question au technicien, jamais un refus ni une dégradation silencieuse — et
+  la réponse journalisée est le contenu candidat de la section.
 - Comment une section se met-elle à jour, et qui en est responsable ? Sans
   réponse, le contexte devient obsolète en un an et personne ne s'en aperçoit.
   **Depuis H1, ce n'est plus une question d'hygiène mais un rôle à nommer** :
@@ -359,11 +458,23 @@ sinon on obtient quatre versions divergentes en six mois.
 - `conception/format-contexte.md` — structure, convention d'index, règles de
   mise à jour, et convention de nommage du contexte rempli côté
   `installation/`.
+- `produit/domaines/_template/contexte.exemple.md` — le squelette, avec les
+  règles d'écriture d'un gabarit en commentaires.
 - `produit/domaines/reseau/contexte.exemple.md` et
   `produit/contexte-general.exemple.md`.
 
 **Critère de sortie.** Une personne extérieure remplit le contexte réseau en
 lisant uniquement le gabarit.
+
+**Décisions.**
+
+| Question | Décision | Raison |
+| --- | --- | --- |
+| Quelles sections ? | Celles que les en-têtes YAML des skills déclarent (contrat B→C), plus `contacts-escalade` et `referents` au transverse. Rien de plus. | Ne pas deviner : le journal des questions révélera les manques réels. |
+| Format de l'index ? | **Dérivé, jamais écrit à la main.** Chaque section est délimitée par un titre `## <id> — <titre lisible>` ; le serveur construit l'index en scannant les titres. | Un index manuel diverge (double vérité, interdite par F2). Scanner des titres est du code déterministe (0.4). Moins de mécanique à maintenir pour le client. |
+| Section vide ? | Pas de section obligatoire (0.4). Vide = question au technicien, réponse journalisée = contenu candidat. | Le contexte est un accélérateur, pas un prérequis. |
+| Qui met à jour ? | Un référent nommé par domaine dans `general/referents`. Trois canaux : les plans d'action de demandes (dernière étape), les mises à jour formulées à la clôture, le référent pour ce qui change hors outil. | « Qui met à jour » a besoin d'un nom écrit, pas d'une bonne intention. |
+| Consignes de remplissage ? | Dans le gabarit, en commentaires HTML `<!-- -->` ; le serveur les retire de ce que `get_context` renvoie. Pas d'exemples ressemblant à du vrai — placeholders `<...>` uniquement. | Le gabarit reste auto-porteur sans que les consignes coûtent des tokens à l'usage ; un exemple réaliste finit copié-collé et pris pour du vrai. |
 
 ---
 
@@ -386,11 +497,30 @@ Deux écritures distinctes : un ticket est enregistré dès la clôture, publié
 seulement après validation. Les tickets clôturés non publiés sont justement ceux
 qui montrent où le diagnostic a échoué — les perdre serait dommage.
 
+**`get_context` est appelable plusieurs fois par ticket.** Le chargement du
+contexte a deux moments (voir 0.3) : les sections `requis` juste après
+`load_skill`, les sections `selon-cas` en cours d'instruction, quand leur
+signal apparaît. Le contrat doit être conçu pour des appels répétés — un
+`get_context` à appel unique forcerait à tout charger d'avance et détruirait
+l'économie de tokens que `selon-cas` existe pour préserver. L'étape
+d'instruction du flux interdit les appels *de modification*, pas les lectures.
+
+**Frontière IA / code — décision posée en 0.4, à traduire dans le contrat.**
+Le modèle ne fournit jamais de chemin, d'identifiant ni d'horodatage :
+`save_ticket` et `publish_kb` reçoivent du contenu, et le serveur décide seul
+où et sous quel nom il s'écrit. Conséquence sur les signatures : aucun appel
+n'expose de paramètre de chemin. Une erreur de chemin devient ainsi
+structurellement impossible côté modèle, au lieu d'être une discipline de
+skill.
+
 **Les questions posées sont un livrable, pas un défaut.** Chaque question au
 technicien signale un trou dans le gabarit. Si l'on répond trois fois « le proxy
 c'est celui-ci », c'est que le gabarit réseau doit avoir une section proxy.
 Journaliser ces questions dès le début : c'est ainsi que le périmètre C se
-complète sans avoir à tout deviner d'avance.
+complète sans avoir à tout deviner d'avance. Le journal suit les mêmes règles
+que les tickets (périmètre F) : un fichier par question dans
+`installation/journal/`, jamais un fichier unique partagé que tous les
+techniciens modifieraient.
 
 **Questions à trancher.**
 
@@ -427,6 +557,14 @@ serveur sans revenir poser de question de conception.
 
 **Objectif.** Router une demande vers les bons domaines à partir d'une phrase.
 
+**La nature avant le domaine.** Premier verdict du triage : incident ou
+demande. Le signal est observable — « ça ne marche plus » (un état antérieur
+s'est dégradé) contre « je veux que » (un état cible, rien de cassé). Ce
+verdict décide du fichier chargé (`skill.md` ou `demandes.md`) ; en cas de
+doute (« le VPN ne marche pas pour le nouveau » — incident ou compte jamais
+créé ?), même règle que pour les domaines : question, pas supposition. Le jeu
+de test du triage inclut des demandes, pas seulement des incidents.
+
 **Porte asymétrique.** Un seul domaine avec des signaux nets : ça passe. Deux
 domaines possibles, symptôme vague, ou aucun tag qui matche : arrêt et question.
 
@@ -436,6 +574,22 @@ un réflexe au bout de deux semaines et ne filtre plus rien.
 **Montrer le raisonnement, pas la conclusion.** « Domaine : réseau. Valider ? »
 ne permet que d'acquiescer. « timeout + uniquement via VPN + depuis ce matin →
 réseau, identité en second » permet de voir ce qui a été retenu et de corriger.
+
+**L'escalade de domaine : un re-triage, pas un mécanisme nouveau.** Quand le
+diagnostic découvre que le problème n'est pas dans le domaine chargé (« le
+chemin d'accès est sain, le service ne répond que sur cette machine »), il
+vient de produire des signaux discriminants — la matière même du triage, mais
+plus fiables que la description initiale. Les mêmes règles s'appliquent donc :
+raisonnement montré (« signaux trouvés en diagnostic → système »), porte
+asymétrique (signaux nets → on charge et on continue ; ambigus → question au
+technicien), et un nouvel appel `load_skill`. Deux conséquences ailleurs :
+
+- **Périmètre B** — la section « limites explicites du domaine » d'un skill
+  n'est pas de la documentation, c'est le déclencheur de l'escalade. Un skill
+  doit savoir dire « ce n'est pas chez moi » et avec quels signaux.
+- **Périmètre F** — le ticket conserve l'historique de routage. « Parti
+  réseau, conclu système » est un cas ambigu réel : il nourrit le jeu de test
+  du triage et désigne les signaux à corriger dans la taxonomie.
 
 **Questions à trancher.**
 
@@ -462,8 +616,11 @@ périmètre A, ou s'arrête explicitement quand il ne peut pas trancher.
 **Questions à trancher.**
 
 - Schéma d'un ticket. Point non négociable : conserver le symptôme **tel
-  qu'exprimé au départ**, pas seulement la cause finale. C'est par le symptôme
-  qu'on cherchera.
+  qu'exprimé au départ**, pas seulement la cause finale. La recherche se
+  faisant le diagnostic posé (décision en 0.4), les signaux vérifiés sont la
+  clé de recherche principale — mais le symptôme initial reste indispensable :
+  il nourrit le jeu de test du triage, et il permet de vérifier qu'un cas
+  matché parle bien du même vécu.
 - Indexation : tags ou recherche sémantique. Recommandation pour commencer :
   tags. Transparent, débogable, et on voit pourquoi un cas a matché.
 - Un ticket clôturé entre-t-il automatiquement en base ? Non — la publication
@@ -491,7 +648,7 @@ qu'elles compliquent :
 
 | Question | Décision | Raison |
 | --- | --- | --- |
-| Comment amorcer la base ? | Pas d'amorçage. Elle démarre vide et se remplit en direct. `search_kb` est néanmoins implémenté dès le POC. | Un retour vide est un cas que les skills doivent gérer de toute façon ; l'implémenter tôt l'éprouve et fige la forme de l'appel. Le retarder ferait de l'étape 4 du flux une fiction pendant tout le POC. |
+| Comment amorcer la base ? | Pas d'amorçage. Elle démarre vide et se remplit en direct. `search_kb` est néanmoins implémenté dès le POC. | Un retour vide est un cas que les skills doivent gérer de toute façon ; l'implémenter tôt l'éprouve et fige la forme de l'appel. Le retarder ferait de l'étape 6 du flux une fiction pendant tout le POC. |
 | La branche « cas similaire trouvé » est-elle dans les critères de sortie du POC ? | Non. Elle reste spécifiée, et se valide en phase 2 une fois une dizaine de tickets réels accumulés. | Elle est inatteignable au démarrage. Sans le dire explicitement, on jugera le POC sur une branche qu'il ne peut pas exercer. |
 
 **Question ouverte — le vocabulaire des tags.** Les tags de la base de
@@ -580,9 +737,11 @@ produit/                          ← livré, remplacé en bloc
   domaines/
     reseau/
       skill.md
+      demandes.md
       contexte.exemple.md
     systeme/
       skill.md
+      demandes.md
       contexte.exemple.md
   contexte-general.exemple.md
   manifeste.md
@@ -594,7 +753,7 @@ installation/                     ← au client, jamais écrit par une mise à j
     systeme.md
   tickets/
   kb/
-  journal-questions.md
+  journal/                        ← une question posée = un fichier (règles de F)
 ```
 
 **Pourquoi — et le critère n'est pas le confort de mise à jour.** Le critère est
@@ -719,9 +878,10 @@ Question dérivée : un script par plateforme, ou un seul multiplateforme ?
 **H3 — Que fait exactement le script d'installation ?**
 
 Piste : vérifier les prérequis, poser l'arborescence, enregistrer le serveur MCP
-auprès du client, copier les gabarits vides, et **vérifier que le contexte est
-rempli avant de déclarer l'installation terminée**. Ce dernier point rejoint la
-question C3 : que fait l'outil si une section obligatoire est vide ?
+auprès du client, copier les gabarits vides, et **afficher l'état de
+remplissage du contexte** — sans jamais bloquer dessus : le contexte est un
+accélérateur, pas un prérequis (décision 0.4, reprise en H6). Remplir avant le
+premier ticket reste recommandé ; c'est une recommandation, pas une porte.
 
 **Conséquence de H1 : installer et initialiser sont deux opérations.** Le premier
 technicien initialise `installation/` sur le partage et remplit le contexte ; les
@@ -741,11 +901,13 @@ le client a déjà rempli l'ancien, retour arrière en cas de problème.
 Dépôt Git, archive, paquet ? Le choix conditionne H4 : un dépôt Git rend la mise
 à jour naturelle mais impose un outil de plus au client.
 
-**H6 — Que se passe-t-il au premier lancement ?**
+**H6 — Que se passe-t-il au premier lancement ? — tranchée en 0.4.**
 
-Un contexte vide donne des diagnostics faux avec assurance — pire qu'une erreur
-franche. L'installation doit-elle refuser de démarrer tant que le contexte
-minimal n'est pas rempli ?
+L'outil démarre sur un contexte vide et fonctionne en mode questions : un
+contexte vide est sûr (l'outil sait qu'il ne sait pas), c'est le contexte
+périmé qui est dangereux. L'installation ne refuse jamais de démarrer ; elle
+affiche l'état de remplissage et annonce la conséquence — davantage de
+questions posées, jamais un refus de service.
 
 ### Pièges
 
@@ -795,6 +957,12 @@ La conception est terminée quand les huit critères de sortie sont atteints. Le
 POC commence alors, sur **deux domaines** : réseau et système. Ils sont le bon
 couple parce que « lenteur » et « timeout » sont ambigus entre les deux.
 
+**Les deux natures entrent dans la bêta.** Incidents et demandes — au minimum
+ouverture de flux et création de VLAN côté réseau, création de compte ou de
+partage côté système. Les demandes sont même le meilleur banc d'essai du
+début : reproductibles à volonté, sans attendre qu'une panne veuille bien se
+produire.
+
 **Ordre de construction.** Remonter le flux plutôt que le descendre : contexte,
 puis skill, puis chargement MCP, puis diagnostic, puis clôture, puis base de
 connaissances, et le triage en dernier — il ne peut être réglé qu'une fois qu'il
@@ -811,6 +979,12 @@ main**, en conservant les deux conclusions — celle de l'humain et celle de
 l'outil. Sans cela, deux semaines de tickets réels sont perdues comme matière de
 base. Avec, on obtient en plus un jeu étiqueté pour tester le triage au
 périmètre E, sans travail supplémentaire.
+
+**La validation se rédige, elle ne se devine pas.** Un document
+`conception/validation.md` définit les portes de passage : les tests qui
+valident le POC, puis la pré-prod, puis la prod — et le moment où les domaines
+au-delà des deux de la bêta s'ajoutent. Chaque porte liste ses tests **avant**
+que la phase commence, sinon on jugera après coup, sur l'impression.
 
 **Ce qu'on ne fait pas.** Interface graphique, intégration à un outil de
 ticketing, actions automatisées, domaines au-delà des deux du POC. Chacun est une
@@ -832,10 +1006,25 @@ migration si on les découvre après.
 À trancher plus tard, volontairement non décidées ici :
 
 - Forme de la spécialisation après ~50 tickets (périmètre F).
+- Écriture automatique du contexte par l'outil. Aujourd'hui : l'outil
+  **formule** les mises à jour prêtes à appliquer (à la clôture, dans le
+  ticket, à destination du référent), l'humain les applique. Si après ~50
+  tickets le copier-coller s'avère une vraie friction, un appel d'écriture
+  dédié pourra naître — avec validation humaine. **Invariant quoi qu'il
+  arrive** : le contexte n'est jamais écrit sans validation, car une section
+  fausse est prise pour vérité terrain par tous les diagnostics suivants —
+  même raison qui interdit la publication automatique en base.
 - Vocabulaire des tags : ceux de la base de connaissances et ceux du manifeste
   sont-ils les mêmes ? (périmètres D et F, dépend de A).
 - Seuil de tolérance aux questions posées par l'IA. Si elle en pose trois par
   ticket, le gain disparaît. À calibrer sur données réelles.
+- Un cadrage au lancement de `/support` ? Trois faits servent sur presque tous
+  les tickets : qui est touché (une personne ou plusieurs), depuis quand, est-ce
+  que ça a déjà fonctionné. Formulaire systématique avant le triage, ou
+  questions posées par le triage seulement quand la description ne les contient
+  pas ? Le formulaire systématique a un coût : rempli machinalement au bout de
+  deux semaines, il consomme le budget d'attention avant de savoir si le ticket
+  en avait besoin. À trancher au périmètre E, ou sur données réelles.
 - Entrée proactive : `/support` est la porte d'entrée humaine, mais rien
   n'interdit qu'une alerte de supervision emprunte la même chaîne plus tard.
   Ne pas construire, mais ne pas coder `/support` comme s'il était le seul point
