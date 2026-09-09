@@ -133,5 +133,5 @@ technicien, pas un diagnostic mené sur deux fronts.
 
 Le format de sortie du plan d'action (à quoi ressemble la proposition finale
 au technicien) n'est pas défini ici : le définir dans chaque skill le
-dupliquerait six fois. À trancher au périmètre G (gouvernance) ou D (contrat
-MCP).
+dupliquerait six fois. **Tranché au périmètre G** : `conception/gouvernance.md`
+§4 (opérations, sur quoi, impact, retour arrière, mise à jour de contexte).

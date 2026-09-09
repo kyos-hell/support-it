@@ -1,0 +1,80 @@
+# Manifeste du produit — lu par le serveur MCP, rendu au triage.
+# Il déclare des domaines, jamais des chemins : la convention résout
+# contenu/domaines/<id>/ et installation/contexte/<id>.md ; le contexte transverse
+# est contenu/general/contexte.exemple.md (id « general »).
+# Écrit à la main, validé par « node dist/cli.js valider » contre les dossiers.
+version: 1
+
+natures:
+  incident: "« ça ne marche plus » — un état antérieur s'est dégradé"
+  demande: "« je veux que » — un état cible, rien n'est cassé"
+
+max_domaines: 2
+
+questions_rattrapage:
+  - "Qui est touché ? Une personne, un groupe corrélé à un lieu ou un lien, ou tout le monde ?"
+  - "Est-ce que ça a déjà fonctionné, et depuis quand ça ne fonctionne plus ?"
+  - "Est-ce que ça dépend d'où ou de comment on se connecte ?"
+
+domaines:
+  - id: reseau
+    libelle: Réseau
+    statut: beta
+    suit: le chemin d'accès (lien, site, VPN, wifi)
+    signaux:
+      - dépend du lieu ou du lien (marche au bureau, pas en VPN ; site A oui, site B non ; filaire oui, wifi non)
+      - tous les services touchés en même temps
+      - population corrélée à un lieu ou un lien (un étage, un site, les télétravailleurs)
+      - symptômes de transport (timeout, coupures intermittentes, lenteur sur tout)
+    tags: [vpn, dns, proxy-internet, wifi, ouverture-flux, creation-vlan]
+
+  - id: systeme
+    libelle: Système
+    statut: beta
+    suit: un service partagé, quel que soit le chemin
+    signaux:
+      - un service précis touché, les autres vont bien
+      - indépendant du chemin d'accès (mêmes symptômes en VPN, sur site, depuis tout poste)
+      - population = tous les utilisateurs du service, où qu'ils soient
+      - symptômes côté serveur (disque plein, service arrêté, certificat expiré, sauvegarde en échec)
+    tags: [virtualisation, stockage, sauvegarde, messagerie, certificat, tache-planifiee, creation-partage, restauration-fichier]
+
+  - id: poste-de-travail
+    libelle: Poste de travail
+    statut: decrit
+    suit: la machine d'un utilisateur, côté logiciel
+    signaux:
+      - suit la machine (même utilisateur sur un autre poste, pas de problème)
+      - un seul poste touché, services et réseau sains pour les autres
+      - le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
+    tags: []
+
+  - id: materiel
+    libelle: Matériel
+    statut: decrit
+    suit: un objet physique
+    signaux:
+      - symptômes physiques (rien ne s'allume, bruit, surchauffe, écran noir ou fissuré)
+      - persiste hors logiciel (avant l'OS, ou sur un environnement sain)
+      - l'échange de l'objet fait disparaître le problème
+    tags: []
+
+  - id: identite
+    libelle: Identité et annuaire
+    statut: decrit
+    suit: le compte d'une personne, quel que soit le poste
+    signaux:
+      - suit la personne (mêmes symptômes quel que soit le poste)
+      - le service répond mais refuse (mot de passe rejeté, accès refusé, compte verrouillé)
+      - corrélé à un événement de compte (changement de mot de passe, de service, retour de congés)
+    tags: []
+
+  - id: applicatif
+    libelle: Applicatif
+    statut: decrit
+    suit: une fonction d'une application qui reste accessible
+    signaux:
+      - l'accès fonctionne, c'est dedans que ça se passe mal
+      - lié à une action ou une donnée précise (tel écran, tel enregistrement)
+      - reproductible depuis tout poste et tout compte aux mêmes droits
+    tags: []

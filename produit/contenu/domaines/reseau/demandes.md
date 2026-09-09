@@ -5,6 +5,7 @@ contexte:
   requis:
     - general/sites
     - general/criticite-services
+    - general/plateformes
     - reseau/topologie
   selon-cas:
     ouverture-flux: [reseau/flux-existants, reseau/proxy-filtrage]

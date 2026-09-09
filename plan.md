@@ -52,11 +52,13 @@ Ce projet a un schéma de routage. Voici son contenu sous forme textuelle.
 3. **Validation du triage** — *uniquement si le cas est ambigu*. Le technicien
    ajoute ou retire des domaines. Si le cas est net, cette étape est sautée.
 4. **Chargement**, en deux temps :
-   - **`load_skill(domains)`** — récupère le ou les périmètres de travail.
-   - **`get_context(sections)`** — récupère les sections précises que le skill
-     chargé réclame. En deux moments : les sections `requis` de l'en-tête,
-     d'office et tout de suite ; les sections `selon-cas`, plus tard, en cours
-     d'instruction, au moment où leur signal apparaît.
+   - **`load_skill(domaines, nature)`** — récupère le ou les périmètres de
+     travail, **avec les sections `requis` de l'en-tête déjà résolues** : le
+     serveur lit l'en-tête, il n'a pas besoin que le modèle lui recopie les
+     identifiants (décision D, 2026-09-09 — le modèle peut en oublier un, le
+     code non).
+   - **`get_context(sections)`** — récupère les sections `selon-cas`, plus
+     tard, en cours d'instruction, au moment où leur signal apparaît.
    - Si une section manque, **question au technicien** plutôt que de charger
      davantage.
 5. **Instruction du cas** — lecture seule, aucun appel de modification. Pour
@@ -78,9 +80,11 @@ Ce projet a un schéma de routage. Voici son contenu sous forme textuelle.
 10. **Publication en base** — `publish_kb()`, après validation. Alimente
     l'index pour les tickets suivants.
 
-Cinq appels MCP au total, tous sur des données persistantes : `search_kb`,
-`load_skill`, `get_context`, `save_ticket`, `publish_kb`. Tout le reste est du
-raisonnement ou de l'action humaine.
+Six appels MCP au total, tous sur des données persistantes : `search_kb`,
+`load_skill`, `get_context`, `save_ticket`, `publish_kb`, et depuis le
+2026-09-09 `update_context` — l'écriture d'une section du contexte après
+validation humaine, que la section 4 prévoyait « si le copier-coller devient
+une friction ». Tout le reste est du raisonnement ou de l'action humaine.
 
 Trois points de validation humaine et pas un de plus : le triage ambigu, le plan
 d'action, la publication.
@@ -119,8 +123,10 @@ schémas présents à chaque requête, soit exactement le coût qu'on cherche à
 éviter.
 
 **Chargement en deux temps, pas en un.** Le skill est chargé d'abord, il
-déclare ensuite les sections dont il a besoin. Cela suppose un index en tête de
-chaque fichier de contexte, sans quoi l'IA demande à l'aveugle.
+déclare ensuite les sections dont il a besoin. L'index est dérivé des titres
+par le serveur (décision C), et les sections `requis` sont résolues par le
+serveur dans la réponse même de `load_skill` (décision D) : le second temps
+ne concerne que les sections `selon-cas`.
 
 **Un skill ne contient aucune donnée d'entreprise.** C'est ce qui rend le
 produit portable. Règle facile à énoncer, facile à violer le jour où l'on ajoute
@@ -151,7 +157,7 @@ un chemin de fichier, générer un identifiant, horodater, reconstruire un index
 sur chacune de ces opérations le modèle peut se tromper, alors qu'un script ne
 le peut pas. Le constat d'origine est concret : à l'usage d'un skill, l'IA
 s'est déjà trompée de chemin en créant un ticket. Règle : l'IA ne manipule
-jamais un chemin ni un identifiant — les cinq appels MCP encapsulent toutes les
+jamais un chemin ni un identifiant — les six appels MCP encapsulent toutes les
 écritures, et le serveur résout lui-même où et sous quel nom écrire. C'est le
 complément de « le serveur reste bête » : bête ne veut pas dire absent.
 L'intelligence dans les skills, le déterminisme dans le code.
@@ -176,10 +182,37 @@ décision.
 le triage répond toujours la même chose : il est correct à 100 % et n'a rien
 démontré.
 
+**Seul le serveur MCP charge les skills — jamais le mécanisme de skills de
+l'outil hôte.** Le standard ouvert *Agent Skills* (`SKILL.md` avec `name` et
+`description`, supporté par Claude Code, Codex, Copilot, Cursor, Gemini CLI et
+une quarantaine d'outils) laisse l'outil décider quand activer un skill, sur sa
+description. Dans ce projet, c'est le triage qui décide, et le skill arrive en
+contexte par la réponse de `load_skill`. Conséquences : l'en-tête YAML des
+skills est un format privé lu par notre serveur, il n'a pas à respecter le
+standard ; la seule dépendance du produit envers l'outil hôte est MCP, qui est
+supporté par tous les clients majeurs et gouverné par la Linux Foundation ;
+`/support` est un **point d'entrée de dix lignes par outil hôte** (« appelle
+`load_skill` et suis le flux »), toute l'intelligence restant derrière le
+serveur. Le corps des skills ne contient rien de spécifique à un modèle ou à
+un outil — pas de nom d'outil interne, pas de balise propriétaire.
+
+**La bêta cible Claude Code, et lui seul.** Usage interne : l'auteur et
+quelques collègues, tous sur Claude Code. Le point d'entrée `/support` est
+donc un skill Claude Code, et le script d'installation enregistre le serveur
+MCP auprès de Claude Code uniquement. La décision précédente garantit que
+d'autres outils hôtes restent possibles plus tard au prix d'un point d'entrée
+par outil, pas d'une réécriture.
+
 ### 0.5 — Où en est le projet
 
-En étude. Rien n'est implémenté, et aucun plan d'architecture technique n'est
-encore rédigé.
+**Bêta livrée (2026-09-09).** Les huit périmètres ont leur document de
+conception dans `conception/` ; le serveur MCP est écrit, construit et testé
+(`produit/serveur/`, `architecture/D-serveur-mcp.md`) ; le triage, la
+clôture, le manifeste, le point d'entrée `/support` et les deux scripts
+d'installation sont livrés dans `produit/`. Le compte rendu de ce qui a été
+fait et des décisions prises sans discussion est dans `fin-de-projet.md`.
+La suite est la porte 1 de `conception/validation.md` : tester sur des
+tickets réels et noter les points d'amélioration.
 
 Trois étapes, dans cet ordre :
 
@@ -298,6 +331,13 @@ rédiger le premier, mais l'ossature visée est : décisions retenues et leur
 raison, structures de données et formats, comportement nominal, cas limites et
 dégradés, ce que le composant ne fait pas, points de contrôle.
 
+**Décision pour la bêta (2026-09-09).** Seul D a du code, donc seul D a un
+plan d'architecture (`architecture/D-serveur-mcp.md`, qui suit l'ossature
+ci-dessus). Pour A à C et E à H, le document de conception tient lieu de
+référence d'architecture : leurs « structures » sont des fichiers markdown
+et des règles de prose, et un second document les répéterait. À revoir si
+un périmètre gagne du code (par exemple un outil pour le référent, F §4).
+
 ---
 
 ## A — Taxonomie des domaines
@@ -377,10 +417,10 @@ cette ligne ?* Si non, couper.
 
 - `conception/format-skill.md` — la structure, avec le test de valeur — pour
   les deux fichiers, `skill.md` et `demandes.md`.
-- `produit/domaines/_template/skill.md` et
-  `produit/domaines/_template/demandes.md` — les squelettes vides.
-- `produit/domaines/reseau/skill.md` et
-  `produit/domaines/reseau/demandes.md` — les premiers écrits, qui servent de
+- `produit/contenu/domaines/_template/skill.md` et
+  `produit/contenu/domaines/_template/demandes.md` — les squelettes vides.
+- `produit/contenu/domaines/reseau/skill.md` et
+  `produit/contenu/domaines/reseau/demandes.md` — les premiers écrits, qui servent de
   référence.
 
 **Critère de sortie.** Le skill réseau est écrit, et chacune de ses sections
@@ -409,17 +449,23 @@ utilisation.
 
 ```
 produit/
-  domaines/
-    reseau/
-      skill.md                  ← générique, livré
-      demandes.md               ← générique, livré — chargé si nature = demande
-      contexte.exemple.md       ← gabarit à remplir
-    systeme/
-      skill.md
-      demandes.md
-      contexte.exemple.md
-  contexte-general.exemple.md   ← transverse, chargé en plus
+  contenu/                      ← tout ce que le modèle lit, et rien d'autre
+    general/
+      contexte.exemple.md       ← transverse, chargé en plus (id « general »)
+    domaines/
+      reseau/
+        skill.md                ← générique, livré
+        demandes.md             ← générique, livré — chargé si nature = demande
+        contexte.exemple.md     ← gabarit à remplir
+      systeme/
+        skill.md
+        demandes.md
+        contexte.exemple.md
 ```
+
+*(Arborescence revue le 2026-09-09 : le contenu lu par le modèle est isolé
+sous `contenu/`, le transverse sous `contenu/general/` ; voir la décision au
+périmètre H.)*
 
 Un skill et son gabarit voyagent ensemble : ajouter un domaine, c'est ajouter un
 dossier.
@@ -458,10 +504,10 @@ sinon on obtient quatre versions divergentes en six mois.
 - `conception/format-contexte.md` — structure, convention d'index, règles de
   mise à jour, et convention de nommage du contexte rempli côté
   `installation/`.
-- `produit/domaines/_template/contexte.exemple.md` — le squelette, avec les
+- `produit/contenu/domaines/_template/contexte.exemple.md` — le squelette, avec les
   règles d'écriture d'un gabarit en commentaires.
-- `produit/domaines/reseau/contexte.exemple.md` et
-  `produit/contexte-general.exemple.md`.
+- `produit/contenu/domaines/reseau/contexte.exemple.md` et
+  `produit/contenu/general/contexte.exemple.md`.
 
 **Critère de sortie.** Une personne extérieure remplit le contexte réseau en
 lisant uniquement le gabarit.
@@ -475,6 +521,7 @@ lisant uniquement le gabarit.
 | Section vide ? | Pas de section obligatoire (0.4). Vide = question au technicien, réponse journalisée = contenu candidat. | Le contexte est un accélérateur, pas un prérequis. |
 | Qui met à jour ? | Un référent nommé par domaine dans `general/referents`. Trois canaux : les plans d'action de demandes (dernière étape), les mises à jour formulées à la clôture, le référent pour ce qui change hors outil. | « Qui met à jour » a besoin d'un nom écrit, pas d'une bonne intention. |
 | Consignes de remplissage ? | Dans le gabarit, en commentaires HTML `<!-- -->` ; le serveur les retire de ce que `get_context` renvoie. Pas d'exemples ressemblant à du vrai — placeholders `<...>` uniquement. | Le gabarit reste auto-porteur sans que les consignes coûtent des tokens à l'usage ; un exemple réaliste finit copié-collé et pris pour du vrai. |
+| Qu'est-ce qui entre dans le contexte ? (2026-09-09, premier ticket de la bêta) | Une taxonomie à trois niveaux (`format-contexte.md` §4.1) : **structure** (ce que l'entreprise possède : plateformes, abonnements, conventions, pièges, référents) et **pivots** (objets dont d'autres dépendent) entrent ; les **instances** créées ou touchées par un ticket n'entrent jamais, elles vivent dans le ticket et la base. Test : « un autre technicien, dans six mois, en aurait-il besoin avant sa première question ? » Section transverse `general/plateformes` ajoutée ; `etat` signale les sections de plus de 40 lignes. | Sans règle, l'outil proposait d'inscrire chaque VM créée : le contexte devient une CMDB illisible qui coûte des tokens à chaque ticket. Ce qui manquait n'était pas la VM, c'était « on a un Azure et un abonnement R&D avec tel piège ». |
 
 ---
 
@@ -483,7 +530,7 @@ lisant uniquement le gabarit.
 **Objectif.** Concevoir le mécanisme de chargement. C'est le contrat qui
 contraint tous les autres périmètres.
 
-**Les cinq appels.**
+**Les six appels.**
 
 | Appel | Rôle | Lit ou écrit |
 | --- | --- | --- |
@@ -492,6 +539,7 @@ contraint tous les autres périmètres.
 | `get_context(sections)` | Renvoie les sections réclamées par le skill | Lit |
 | `save_ticket()` | Enregistre le ticket clôturé | Écrit |
 | `publish_kb()` | Promeut un ticket en entrée de base | Écrit |
+| `update_context(section, contenu)` | Écrit une section du contexte, après validation humaine — ajouté le 2026-09-09 (section 4) | Écrit, avec sauvegarde |
 
 Deux écritures distinctes : un ticket est enregistré dès la clôture, publié
 seulement après validation. Les tickets clôturés non publiés sont justement ceux
@@ -551,6 +599,14 @@ techniciens modifieraient.
 **Critère de sortie.** Le contrat est assez précis pour qu'on puisse écrire le
 serveur sans revenir poser de question de conception.
 
+**Décisions.**
+
+| Question | Décision | Raison |
+| --- | --- | --- |
+| Runtime du serveur ? | Node.js, avec le SDK MCP officiel en TypeScript, transport stdio. | Claude Code tourne sur Node.js : il est déjà présent sur tout poste qui exécute l'outil hôte de la bêta. Aucun prérequis de plus pour H2. Les améliorations de prod se consignent dans `conception/validation.md`, section « Améliorations différées ». |
+| D'où vient le triage, si `/support` fait dix lignes ? | `load_skill` accepte la valeur réservée `triage`, qui renvoie `produit/contenu/general/triage.md` et le résumé du manifeste (domaines, statut, signaux). Le triage est un skill comme les autres, écrit au périmètre E. | Aucun appel nouveau pour ça, et l'intelligence reste derrière le serveur (décision 0.4). Validé par le test T-D1 de `conception/validation.md`. |
+| Un appel d'écriture du contexte ? | Oui, `update_context(section, contenu)` : une section, après oui explicite, version précédente sauvegardée dans `contexte/historique/`, date posée par le serveur. Avec un skill réservé `remplissage` (entretien hors ticket, état de remplissage joint) et `get_context` qui renvoie la consigne et le squelette du gabarit pour une section vide. | Prévu par la section 4 « si le copier-coller devient une friction » ; la bêta démarre sur un contexte vide, la friction est immédiate. L'invariant « jamais sans validation » tient par le prompt ; la sauvegarde rend une mauvaise validation récupérable. Le fichier de contexte devient le seul fichier mutable de `installation/` : limite notée en F, test à la porte 2. |
+
 ---
 
 ## E — Triage
@@ -603,6 +659,19 @@ technicien), et un nouvel appel `load_skill`. Deux conséquences ailleurs :
 
 **Livrable.** `conception/triage.md` — règles, format de la proposition, jeu de
 test issu du périmètre A.
+
+**Décisions (2026-09-09, détail dans `conception/triage.md`).** Le triage
+vit dans `produit/contenu/general/triage.md`, servi avec le manifeste par
+`load_skill(["triage"])` ; il porte aussi le flux entier. L'ambiguïté est
+définie par trois cas observables (deux domaines avec signaux, aucun signal,
+nature indécidable). Correction par ajout/retrait. Deux domaines maximum,
+refusé par le serveur au-delà. Pas de cadrage systématique au lancement :
+les questions de rattrapage ne sont posées qu'en l'absence de signal. Une
+seule question systématique, la **référence du ticket** dans l'outil de
+ticketing, demandée avant le triage si elle manque et reportée à la clôture
+(`save_ticket.reference`, aussi un tag). Un
+domaine décrit mais hors bêta se clôture avec le statut
+`hors-domaines-couverts`.
 
 **Critère de sortie.** Le triage classe correctement les symptômes ambigus du
 périmètre A, ou s'arrête explicitement quand il ne peut pas trancher.
@@ -687,6 +756,15 @@ renégocie pas plus tard sous la pression du confort.
 
 **Livrable.** `conception/gouvernance.md`.
 
+**Décisions (2026-09-09).** Les trois points sont tenus par `triage.md`
+(porte asymétrique), `triage.md` étape 7 et les gabarits de plan des
+`demandes.md`, et `cloture.md` (proposition sous trois conditions, oui
+explicite, `publish_kb` distinct de `save_ticket`). « Aucune action
+modifiante » est garanti à trois niveaux : le prompt, le contrat (aucun
+appel n'exécute quoi que ce soit), le mode de permission de Claude Code —
+ce dernier n'est pas imposable par le script. Le format du plan d'action,
+laissé ouvert par `format-skill.md` §9, est fixé dans `gouvernance.md` §4.
+
 ---
 
 ## H — Déploiement et distribution
@@ -734,18 +812,21 @@ bloc à chaque version ; `installation/` appartient au client et n'est jamais
 
 ```
 produit/                          ← livré, remplacé en bloc
-  domaines/
-    reseau/
-      skill.md
-      demandes.md
-      contexte.exemple.md
-    systeme/
-      skill.md
-      demandes.md
-      contexte.exemple.md
-  contexte-general.exemple.md
-  manifeste.md
   VERSION
+  install.ps1 · install.sh        ← ce qu'on lance
+  contenu/                        ← ce que le modèle lit, et rien d'autre
+    manifeste.yaml
+    general/
+      triage.md · cloture.md
+      contexte.exemple.md
+    domaines/
+      reseau/
+        skill.md · demandes.md · contexte.exemple.md
+      systeme/
+        skill.md · demandes.md · contexte.exemple.md
+  serveur/                        ← le code, seul lecteur de contenu/
+  entrees/
+    claude-code/support/SKILL.md  ← un dossier par outil hôte
 installation/                     ← au client, jamais écrit par une mise à jour
   contexte/
     general.md
@@ -866,22 +947,35 @@ points ci-dessus, plus : aucun chemin absolu, une racine configurable par
 arborescence, et rien d'écrit hors de `installation/`. C'est exactement le piège
 nommé plus bas : « le POC tourne chez moi » n'est pas « c'est installable ».
 
-**H2 — Quel langage pour le script d'installation ?**
+**H2 — Quel langage pour le script d'installation ? — tranchée.**
 
 Contrainte réelle : le poste d'un technicien de support IT. PowerShell est
 présent partout sous Windows, bash partout sous Linux, Python nulle part par
 défaut. Un script Python impose un prérequis de plus à installer avant de
 pouvoir installer.
 
-Question dérivée : un script par plateforme, ou un seul multiplateforme ?
+Décision : **deux scripts, `install.ps1` et `install.sh`**, un par plateforme,
+mêmes étapes dans le même ordre, mêmes messages. Pas de script multiplateforme :
+il finit par exiger un runtime commun, ce qui ramène le prérequis qu'on refuse.
+Le serveur MCP lui-même a son propre runtime (question du périmètre D) ; le
+script d'installation vérifie sa présence et le dit, il ne l'installe pas
+silencieusement.
 
 **H3 — Que fait exactement le script d'installation ?**
 
-Piste : vérifier les prérequis, poser l'arborescence, enregistrer le serveur MCP
-auprès du client, copier les gabarits vides, et **afficher l'état de
-remplissage du contexte** — sans jamais bloquer dessus : le contexte est un
-accélérateur, pas un prérequis (décision 0.4, reprise en H6). Remplir avant le
-premier ticket reste recommandé ; c'est une recommandation, pas une porte.
+Piste : vérifier les prérequis (Claude Code, runtime du serveur MCP, accès au
+partage), poser l'arborescence, **déployer le serveur MCP** (code et
+dépendances, dans `produit/`), l'**enregistrer auprès de Claude Code**,
+**installer le point d'entrée `/support`** (skill Claude Code, décision 0.4),
+copier les gabarits vides, et **afficher l'état de remplissage du contexte** —
+sans jamais bloquer dessus : le contexte est un accélérateur, pas un prérequis
+(décision 0.4, reprise en H6). Remplir avant le premier ticket reste
+recommandé ; c'est une recommandation, pas une porte.
+
+Le script doit aussi dire quel **mode de permission** de Claude Code est
+attendu : la règle « l'IA n'exécute rien, le technicien exécute » n'est tenue
+que par le prompt ; la seule barrière réelle est le mode de permission de
+l'outil hôte, qui doit demander confirmation avant toute commande.
 
 **Conséquence de H1 : installer et initialiser sont deux opérations.** Le premier
 technicien initialise `installation/` sur le partage et remplit le contexte ; les
@@ -945,9 +1039,15 @@ tickets — sans rien lui faire perdre.
 | --- | --- | --- |
 | Où vit le contexte rempli par le client ? (tension C/H) | Deux arborescences : `produit/` livré et remplacé en bloc, `installation/` au client et jamais écrit par une mise à jour. | Un script qui n'écrit que dans `produit/` ne *peut pas* détruire le travail du client. Garantie structurelle plutôt que discipline de script. Rend aussi le contrôle « pas de donnée d'entreprise » sans exception. |
 | H1 — mono ou multi-utilisateur ? | Multi. Ce n'est pas une option : un produit installable par n'importe quelle entreprise doit tolérer cinq techniciens. Mono reste une option de POC. | La valeur principale du projet est qu'un ticket résolu par l'un serve à l'autre. |
-| H1 — local ou distant ? | Les deux arborescences sur un partage réseau, serveur MCP local sur chaque poste. | Multi-utilisateur n'implique pas distant : une seule des quatre matières a une sémantique multi-écrivains. Le partage donne l'authentification AD gratuitement, permet la dégradation hors ligne, et le distant n'économise même pas l'enregistrement par poste. Migration vers le distant possible plus tard : le contrat des cinq appels est identique. |
+| H1 — local ou distant ? | Les deux arborescences sur un partage réseau, serveur MCP local sur chaque poste. | Multi-utilisateur n'implique pas distant : une seule des quatre matières a une sémantique multi-écrivains. Le partage donne l'authentification AD gratuitement, permet la dégradation hors ligne, et le distant n'économise même pas l'enregistrement par poste. Migration vers le distant possible plus tard : le contrat des six appels est identique. |
 
-*(H2 à H6 : à remplir.)*
+| Outil hôte de la bêta ? | Claude Code uniquement. `/support` est un skill Claude Code ; le script n'enregistre le serveur MCP qu'auprès de Claude Code. | Usage interne, tous les utilisateurs sont sur Claude Code. Les skills n'étant chargés que par le serveur MCP (0.4), un autre outil hôte se rajoute plus tard avec un point d'entrée de dix lignes, sans toucher au produit. |
+| H2 — langage du script ? | `install.ps1` et `install.sh`, un par plateforme, mêmes étapes et mêmes messages. Pas de Python, pas de script multiplateforme. | Un script multiplateforme exige un runtime commun, donc un prérequis avant l'installation. |
+| H3 — contenu du script ? | Prérequis, arborescence, déploiement du serveur MCP, enregistrement auprès de Claude Code, installation de `/support`, gabarits vides, état de remplissage, mode de permission attendu. Deux modes : initialiser (premier poste) et rejoindre (postes suivants). | Voir H3 ci-dessus. Le détail (ordre, messages, cas d'erreur) est un livrable de `conception/deploiement.md`, à écrire une fois D tranché. |
+
+| Organisation de `produit/` ? | Regroupée par nature et cycle de vie : `contenu/` (tout ce que le modèle lit — manifeste, `general/` pour le transverse, `domaines/`), `serveur/` (le code), `entrees/` (un adaptateur par outil hôte), scripts et `VERSION` à la racine. Le contexte de `X` est toujours `contenu/<X>/contexte.exemple.md`, `X` valant `general` ou `domaines/<id>`. | La racine mélangeait contenu, code, scripts et adaptateurs. `general` sort de `domaines/` parce qu'il n'a pas de skill et n'est pas routable, et garde le nom de l'identifiant que les skills référencent (`general/sites`). Le contrôle « aucune donnée d'entreprise » porte sur `contenu/` exactement, sans filtre de chemin. Décidé le 2026-09-09, avant le premier commit — après, une structure de fichiers coûte cher (piège H). |
+| H4 — mise à jour ? | Remplacer `produit/` en bloc (ancien renommé à côté), relancer `install.*`. Gabarit qui gagne une section : `etat` la liste « manquante », le référent ajoute le titre à la main ; jamais de migration automatique. Renommer un `id` de section est interdit sans note de version. | Le script n'écrit jamais dans `installation/`. Une section ajoutée par script serait vide et prise pour du contenu. Détail : `conception/deploiement.md` §3. |
+| H5 — distribution ? | Archive du dossier `produit/` par version pour un client ; dépôt Git + `install.*` pour l'équipe et les collègues de la bêta. `dist/` et `node_modules/` construits à l'installation ; archive « construite » + `-SansBuild` pour un poste sans accès npm. | Un client n'installe pas Git pour recevoir des fichiers. Détail : `conception/deploiement.md` §4. |
 
 ---
 
@@ -1006,14 +1106,17 @@ migration si on les découvre après.
 À trancher plus tard, volontairement non décidées ici :
 
 - Forme de la spécialisation après ~50 tickets (périmètre F).
-- Écriture automatique du contexte par l'outil. Aujourd'hui : l'outil
-  **formule** les mises à jour prêtes à appliquer (à la clôture, dans le
-  ticket, à destination du référent), l'humain les applique. Si après ~50
-  tickets le copier-coller s'avère une vraie friction, un appel d'écriture
-  dédié pourra naître — avec validation humaine. **Invariant quoi qu'il
-  arrive** : le contexte n'est jamais écrit sans validation, car une section
-  fausse est prise pour vérité terrain par tous les diagnostics suivants —
-  même raison qui interdit la publication automatique en base.
+- ~~Écriture automatique du contexte par l'outil.~~ **Tranchée le
+  2026-09-09**, plus tôt que prévu : la bêta se teste sur un contexte vide,
+  la friction du copier-coller arrive dès le premier ticket. Un sixième
+  appel, `update_context`, écrit une section à la fois, après un oui
+  explicite sur le contenu montré, en sauvegardant la version précédente
+  (`contrat-mcp.md` §5 bis). Un skill réservé `remplissage` conduit
+  l'entretien hors ticket ; la clôture propose d'écrire les sections
+  candidates. **L'invariant tient** : le contexte n'est jamais écrit sans
+  validation, car une section fausse est prise pour vérité terrain par tous
+  les diagnostics suivants — même raison qui interdit la publication
+  automatique en base.
 - Vocabulaire des tags : ceux de la base de connaissances et ceux du manifeste
   sont-ils les mêmes ? (périmètres D et F, dépend de A).
 - Seuil de tolérance aux questions posées par l'IA. Si elle en pose trois par

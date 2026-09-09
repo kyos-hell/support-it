@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Installe la boîte à outils IA pour le support IT sur ce poste (Linux, macOS).
+# Mêmes étapes, dans le même ordre, que install.ps1 :
+#   1. prérequis (Node.js >= 18, npm ; Claude Code signalé)
+#   2. construction du serveur MCP
+#   3. validation du produit livré
+#   4. installation/ : initialiser (premier poste) ou rejoindre (existant)
+#   5. enregistrement du serveur MCP auprès de Claude Code + point d'entrée /support
+#   6. état de remplissage du contexte
+# Ne bloque jamais sur un contexte vide. N'écrase jamais un fichier de installation/.
+#
+# Usage : ./install.sh [--installation <chemin>] [--sans-claude] [--sans-build]
+set -euo pipefail
+
+PRODUIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVEUR="$PRODUIT/serveur"
+INSTALLATION=""
+SANS_CLAUDE=0
+SANS_BUILD=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --installation) INSTALLATION="$2"; shift 2 ;;
+    --sans-claude) SANS_CLAUDE=1; shift ;;
+    --sans-build) SANS_BUILD=1; shift ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "option inconnue : $1" >&2; exit 2 ;;
+  esac
+done
+if [[ -z "$INSTALLATION" ]]; then INSTALLATION="$(dirname "$PRODUIT")/installation"; fi
+mkdir -p "$INSTALLATION"
+INSTALLATION="$(cd "$INSTALLATION" && pwd)"
+
+etape() { echo; echo "[$1/6] $2"; }
+echec() { echo "ECHEC : $1" >&2; exit 1; }
+
+echo "== support-it $(head -n1 "$PRODUIT/VERSION") — installation =="
+echo "produit      : $PRODUIT"
+echo "installation : $INSTALLATION"
+
+etape 1 "Prérequis"
+command -v node >/dev/null 2>&1 || echec "Node.js introuvable. Claude Code l'installe normalement ; sinon https://nodejs.org (LTS)."
+NODE_VERSION="$(node --version | sed 's/^v//')"
+MAJOR="${NODE_VERSION%%.*}"
+[[ "$MAJOR" -ge 18 ]] || echec "Node.js $NODE_VERSION trop ancien : 18 minimum."
+echo "  node $NODE_VERSION"
+command -v npm >/dev/null 2>&1 || echec "npm introuvable (livré avec Node.js)."
+echo "  npm $(npm --version)"
+if command -v claude >/dev/null 2>&1; then
+  echo "  claude CLI présent : $(command -v claude)"
+else
+  echo "  claude CLI absent du PATH : l'enregistrement écrira directement ~/.claude.json"
+fi
+
+etape 2 "Construction du serveur MCP"
+if [[ "$SANS_BUILD" -eq 1 ]]; then
+  echo "  ignorée (--sans-build)"
+else
+  (cd "$SERVEUR" && npm install --no-audit --no-fund && npm run build) || echec "construction du serveur en échec"
+fi
+CLI="$SERVEUR/dist/cli.js"
+[[ -f "$CLI" ]] || echec "serveur non construit : $CLI absent"
+
+export SUPPORT_IT_PRODUIT="$PRODUIT"
+export SUPPORT_IT_INSTALLATION="$INSTALLATION"
+
+etape 3 "Validation du produit livré"
+node "$CLI" valider || echec "le produit livré ne passe pas la validation : ne pas installer une livraison invalide"
+
+etape 4 "Arborescence client"
+if [[ -d "$INSTALLATION/contexte" ]]; then
+  echo "  mode : REJOINDRE une installation existante (rien n'y sera écrasé)"
+else
+  echo "  mode : INITIALISER une nouvelle installation"
+fi
+node "$CLI" init || echec "initialisation de installation/ en échec"
+
+etape 5 "Claude Code : serveur MCP et point d'entrée /support"
+if [[ "$SANS_CLAUDE" -eq 1 ]]; then
+  echo "  ignorée (--sans-claude)"
+else
+  node "$CLI" enregistrer || echec "enregistrement du serveur MCP en échec"
+  node "$CLI" entree || echec "installation du point d'entrée en échec"
+fi
+
+etape 6 "État de remplissage du contexte"
+node "$CLI" etat
+
+echo
+echo "Installation terminée."
+echo "  - Remplir le contexte : $INSTALLATION/contexte/*.md (recommandé, pas obligatoire)."
+echo "  - Redémarrer Claude Code, puis taper /support suivi de la description du ticket."
+echo "  - Mode de permission : garder le mode par défaut (confirmation avant chaque commande)."
+echo "    La règle « l'IA n'exécute rien, le technicien exécute » n'est tenue que par ce mode."

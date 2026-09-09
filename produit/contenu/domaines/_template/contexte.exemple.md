@@ -21,7 +21,7 @@
         pas une documentation exhaustive. Le contexte est un cache de
         réponses.
      5. Placeholders `<...>` uniquement. Jamais d'exemple ressemblant à du
-        vrai (pas de srv-paris-01) : un exemple réaliste finit copié-collé
+        vrai (aucun nom qui pourrait exister) : un exemple réaliste finit copié-collé
         et pris pour du vrai par l'IA.
      6. Tableaux pour l'énumérable (équipements, plages, règles), prose
         courte pour le reste.

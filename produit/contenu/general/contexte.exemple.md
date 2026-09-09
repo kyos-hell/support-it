@@ -17,6 +17,23 @@
 | --- | --- | --- | --- |
 | <nom> | <ville / bâtiment> | <type de lien vers les autres sites> | <nombre> |
 
+## plateformes — Plateformes et hébergements
+
+<!-- Ce que l'entreprise possède pour héberger, pas ce qui y tourne : le
+     datacenter ou la salle serveur, la plateforme de virtualisation, les
+     clouds avec leurs tenants et abonnements, les environnements (prod,
+     R&D, test). Pour chacun : les identifiants qu'on retape sans arrêt
+     (tenant, abonnement, région, groupe de ressources par défaut), les
+     pièges connus (un abonnement homonyme actif par défaut, un outil qui
+     n'indexe pas tel type d'objet), les conventions de nommage, et par où
+     on administre. Une ligne par plateforme ou par abonnement. Les
+     ressources créées dans ces plateformes (une VM, un compte de stockage
+     de projet) n'ont rien à faire ici : elles vivent dans les tickets. -->
+
+| Plateforme | Type | Identifiants utiles | Pièges connus | Conventions | Administration |
+| --- | --- | --- | --- | --- | --- |
+| <nom usuel> | <salle serveur, hyperviseur, cloud, SaaS> | <tenant, abonnement, région, RG par défaut> | <ce qui piège un nouveau> | <nommage> | <console, outil> |
+
 ## criticite-services — Criticité des services
 
 <!-- Les services classés par impact d'une interruption : bloquant pour

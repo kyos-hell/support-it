@@ -1,0 +1,30 @@
+{
+  "name": "support-it-serveur",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serveur MCP de la boîte à outils IA pour le support IT — cinq appels, aucune intelligence.",
+  "type": "module",
+  "bin": {
+    "support-it": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "valider": "node dist/cli.js valider",
+    "etat": "node dist/cli.js etat",
+    "chemins": "node dist/cli.js chemins",
+    "test": "node dist/test/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "yaml": "^2.8.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
