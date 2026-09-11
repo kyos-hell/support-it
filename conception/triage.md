@@ -46,6 +46,18 @@ section et n'écrit (`update_context`) qu'après un oui explicite. Pendant
 un ticket, même chose sur demande explicite du technicien, puis retour au
 skill du ticket. Ajouté le 2026-09-09.
 
+## 3 ter. Points d'étape, pause et reprise — 2026-09-10
+
+Le triage est aussi le moment où le brouillon naît : dès le triage validé,
+`save_progress` enregistre référence, symptôme tel quel, nature, domaines,
+skill à charger et prochaine étape. Ensuite, chaque acquis qui coûterait à
+refaire est un point d'étape. À l'entrée, le triage reçoit du serveur la
+liste des tickets en cours : si la référence donnée y figure, ou si le
+technicien demande une reprise, `resume_ticket` remplace le triage — on ne
+retriage pas un ticket dont le domaine est déjà validé, on recharge le skill
+enregistré et on repart à la prochaine étape notée. Une passation d'un
+collègue se dit au technicien et s'enregistre au point d'étape suivant.
+
 ## 4. L'escalade
 
 Le skill chargé produit des signaux plus fiables que la description

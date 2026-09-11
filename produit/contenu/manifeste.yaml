@@ -41,40 +41,40 @@ domaines:
 
   - id: poste-de-travail
     libelle: Poste de travail
-    statut: decrit
+    statut: beta
     suit: la machine d'un utilisateur, côté logiciel
     signaux:
       - suit la machine (même utilisateur sur un autre poste, pas de problème)
       - un seul poste touché, services et réseau sains pour les autres
       - le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
-    tags: []
+    tags: [application, profil, securite, impression, mise-a-jour, installation-logiciel, preparation-poste]
 
   - id: materiel
     libelle: Matériel
-    statut: decrit
+    statut: beta
     suit: un objet physique
     signaux:
       - symptômes physiques (rien ne s'allume, bruit, surchauffe, écran noir ou fissuré)
       - persiste hors logiciel (avant l'OS, ou sur un environnement sain)
       - l'échange de l'objet fait disparaître le problème
-    tags: []
+    tags: [sav, stock, peripherique, salle-technique, garantie, remplacement-materiel, commande-materiel]
 
   - id: identite
     libelle: Identité et annuaire
-    statut: decrit
+    statut: beta
     suit: le compte d'une personne, quel que soit le poste
     signaux:
       - suit la personne (mêmes symptômes quel que soit le poste)
       - le service répond mais refuse (mot de passe rejeté, accès refusé, compte verrouillé)
       - corrélé à un événement de compte (changement de mot de passe, de service, retour de congés)
-    tags: []
+    tags: [synchronisation, droits-acces, compte-service, verrouillage, mfa, creation-compte, depart-collaborateur, attribution-droits]
 
   - id: applicatif
     libelle: Applicatif
-    statut: decrit
+    statut: beta
     suit: une fonction d'une application qui reste accessible
     signaux:
       - l'accès fonctionne, c'est dedans que ça se passe mal
       - lié à une action ou une donnée précise (tel écran, tel enregistrement)
       - reproductible depuis tout poste et tout compte aux mêmes droits
-    tags: []
+    tags: [editeur, integration, environnement, acces-applicatif, parametrage, habilitation-applicative, mise-a-jour-applicative]

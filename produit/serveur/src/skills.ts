@@ -1,9 +1,10 @@
 // load_skill : renvoie un périmètre de travail, ses sections requises déjà
-// résolues, et sa table selon-cas. Valeurs réservées : triage, cloture.
+// résolues, et sa table selon-cas. Valeurs réservées : triage, cloture, remplissage.
 import fs from "node:fs";
 import path from "node:path";
 import { chemins, type Racines } from "./config.js";
 import { etatRemplissage, obtenirSections, rendreEtat, rendreSections } from "./contexte.js";
+import { listerBrouillons, rendreListe } from "./encours.js";
 import { lireManifeste, rendreManifeste, trouverDomaine, type Manifeste } from "./manifeste.js";
 import { lireDocument, sansCommentaires } from "./markdown.js";
 
@@ -53,7 +54,10 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste): string {
   if (!fs.existsSync(fichier)) throw new ErreurSkill(`fichier produit manquant : ${path.basename(fichier)}`);
   const corps = sansCommentaires(lireDocument(fs.readFileSync(fichier, "utf8")).corps).trim();
   if (nom === "triage") {
-    return `${corps}\n\n---\n\n# Manifeste des domaines\n\n${rendreManifeste(m)}`;
+    return (
+      `${corps}\n\n---\n\n# Manifeste des domaines\n\n${rendreManifeste(m)}` +
+      `\n\n---\n\n# Tickets en cours (calculé à l'instant)\n\n${rendreListe(listerBrouillons(r))}`
+    );
   }
   if (nom === "remplissage") {
     return `${corps}\n\n---\n\n# État de remplissage du contexte (calculé à l'instant)\n\n${rendreEtat(etatRemplissage(r))}`;

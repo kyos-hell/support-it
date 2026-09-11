@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Ligne de commande du produit : tout ce que les scripts d'installation
 // délèguent au code pour n'avoir qu'une implémentation (décision 0.4).
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assurerInstallation, chemins, lireVersion, racines } from "./config.js";
 import { etatRemplissage, gabaritsLivres } from "./contexte.js";
+import { ageJours, JOURS_BROUILLON_ANCIEN, listerBrouillons } from "./encours.js";
 import { rendreConstats, valider } from "./validation.js";
 
 const r = racines();
@@ -19,7 +21,9 @@ Usage : node dist/cli.js <commande>
 
   chemins      Affiche les deux racines résolues (produit, installation).
   valider      Contrôles de livraison : manifeste, contrat B/C, longueurs, données d'entreprise.
-  init         Initialise installation/ : dossiers et gabarits copiés — n'écrase jamais un fichier existant.
+  tester       Test de fumée du serveur construit (écrit seulement dans un dossier temporaire).
+  init         Initialise installation/ : dossiers et gabarits copiés — n'écrase jamais un fichier existant ;
+               note la version du produit dans installation/VERSION et annonce une mise à jour.
   etat         État de remplissage du contexte, par fichier et par section.
   enregistrer  Enregistre le serveur MCP dans ~/.claude.json (portée utilisateur), avec sauvegarde.
   entree       Installe le point d'entrée /support dans ~/.claude/skills/support/.
@@ -27,7 +31,19 @@ Usage : node dist/cli.js <commande>
 Variables : SUPPORT_IT_PRODUIT, SUPPORT_IT_INSTALLATION (défauts : le dossier produit/ du serveur, et installation/ à côté).`);
 }
 
+/** installation/VERSION : la version du produit qui a initialisé ou mis à jour cette installation. */
+function versionInstallation(): string | null {
+  const f = path.join(r.installation, "VERSION");
+  try {
+    return fs.readFileSync(f, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function init(): void {
+  const avant = versionInstallation();
+  const version = lireVersion(r);
   assurerInstallation(r);
   const copies: string[] = [];
   const gardes: string[] = [];
@@ -40,10 +56,26 @@ function init(): void {
     fs.copyFileSync(g.fichier, cible);
     copies.push(cible);
   }
+  fs.writeFileSync(path.join(r.installation, "VERSION"), `${version}\n`, "utf8");
   console.log(`installation : ${r.installation}`);
+  if (avant === null) console.log(`  mode : ${gardes.length ? "REJOINDRE" : "INITIALISER"} — produit ${version}`);
+  else if (avant !== version) console.log(`  mode : MISE À JOUR ${avant} → ${version}`);
+  else console.log(`  mode : REJOINDRE — déjà en ${version}`);
   for (const f of copies) console.log(`  copié   ${f}`);
   for (const f of gardes) console.log(`  gardé   ${f} (existant, non touché)`);
-  console.log(`  dossiers : contexte/, tickets/, kb/, journal/`);
+  if (!copies.length) console.log("  aucun nouveau gabarit à copier");
+  console.log(`  dossiers : contexte/, en-cours/, tickets/, kb/, journal/`);
+}
+
+/** Lance le test de fumée du serveur construit : n'écrit que dans un dossier temporaire. */
+function tester(): number {
+  const smoke = path.join(path.dirname(fileURLToPath(import.meta.url)), "test", "smoke.js");
+  if (!fs.existsSync(smoke)) {
+    console.error(`test de fumée absent : ${smoke} (serveur non construit ?)`);
+    return 1;
+  }
+  const res = spawnSync(process.execPath, [smoke], { stdio: "inherit", env: { ...process.env, SUPPORT_IT_PRODUIT: r.produit } });
+  return res.status ?? 1;
 }
 
 function etat(): number {
@@ -61,6 +93,12 @@ function etat(): number {
     if (e.enPlus.length) console.log(`             en plus (inconnues du gabarit) : ${e.enPlus.join(", ")}`);
     if (e.volumineuses.length) console.log(`             VOLUMINEUSES (> 40 lignes, inventaire à élaguer ?) : ${e.volumineuses.join(", ")}`);
     vides += e.vides.length;
+  }
+  const brouillons = listerBrouillons(r);
+  console.log(`Tickets en cours : ${brouillons.length}`);
+  for (const b of brouillons) {
+    const age = ageJours(b);
+    console.log(`  ${(b.reference ?? "—").padEnd(14)} ${b.id}  ${b.technicien}  ${b.etape}  ${age} j${age >= JOURS_BROUILLON_ANCIEN ? "  ANCIEN : à clôturer ou reprendre" : ""}`);
   }
   console.log(
     vides === 0
@@ -124,6 +162,9 @@ switch (commande) {
     code = constats.some((x) => x.niveau === "erreur") ? 1 : 0;
     break;
   }
+  case "tester":
+    code = tester();
+    break;
   case "init":
     init();
     break;

@@ -13,8 +13,10 @@
 | `plan.md` | L'étude, mise à jour : statut, décisions D à H, notes 0.3 / 0.4 / 2.1 | À jour |
 | `conception/` | Un document par périmètre, A à H, plus `validation.md` et `retours-beta.md` | Complet |
 | `architecture/D-serveur-mcp.md` | Le seul plan d'architecture : le seul composant qui a du code | Écrit |
-| `produit/` | Tout ce qui s'installe : manifeste, triage, clôture, deux domaines, gabarits, point d'entrée, serveur, scripts | Construit, validé, testé |
+| `produit/` | Tout ce qui s'installe : manifeste, triage, clôture, deux domaines (six depuis la bêta v2, §9), gabarits, point d'entrée, serveur, scripts | Construit, validé, testé |
 | `fin-de-projet.md` | Ce document | |
+| `etat-d-avancement.md` | Pour une IA ou un humain qui reprend le projet : où on en est, les invariants et où ils sont tenus, la liste à suivre par type de modification, les pièges déjà rencontrés | Ajouté le 2026-09-10 |
+| `CLAUDE.md` | Chargé automatiquement par Claude Code : ordre de lecture et règles non négociables | Ajouté le 2026-09-10 |
 
 Rien n'est commité : tout est dans l'arbre de travail, prêt à l'être.
 
@@ -23,17 +25,22 @@ Rien n'est commité : tout est dans l'arbre de travail, prêt à l'être.
 ```
 technicien ──/support──▶ Claude Code ──stdio──▶ serveur support-it (Node.js)
                           │                        │
-                          │  6 outils MCP          ├── lit  produit/   (livré, remplacé en bloc)
+                          │  8 outils MCP          ├── lit  produit/   (livré, remplacé en bloc)
                           │                        └── lit/écrit installation/ (au client, jamais écrasé)
                           ▼
                    skills en contexte
 ```
 
+Le schéma complet du flux, avec la reprise, les points d'étape, la pause,
+l'écriture du contexte et la branche de remplissage, est dans
+`architecture/schema/routage_support_v3.svg` (la v2 est gardée pour
+l'historique).
+
 **Le point d'entrée** `~/.claude/skills/support/SKILL.md` fait dix lignes :
 « appelle `load_skill(["triage"])` et suis ce qu'il renvoie ». Toute
 l'intelligence est derrière le serveur, dans des fichiers markdown.
 
-**Les six appels**, dans l'ordre d'un ticket :
+**Les huit appels**, dans l'ordre d'un ticket :
 
 | Appel | Renvoie ou écrit |
 | --- | --- |
@@ -41,8 +48,10 @@ l'intelligence est derrière le serveur, dans des fichiers markdown.
 | `load_skill([domaine(s)], nature)` | Le skill (`skill.md` ou `demandes.md`), **ses sections `requis` déjà résolues**, sa table `selon-cas` ; erreurs explicites pour domaine inconnu, hors bêta, nature absente, plus de deux domaines |
 | `get_context([domaine/section…])` | Par section : `ok` (contenu), `vide` (dont « identique au gabarit » et « fichier absent »), `inconnue` — jamais une erreur globale |
 | `search_kb(tags)` | Cas de `installation/kb/` triés par tags communs ; base vide = message nominal |
-| `load_skill(["cloture"])` puis `save_ticket(…)` | `installation/tickets/<id>.md` + un fichier par question dans `installation/journal/` ; id fabriqué par le serveur |
+| `load_skill(["cloture"])` puis `save_ticket(…)` | `installation/tickets/<id>.md` + un journal par ticket dans `installation/journal/` (s'il y a eu des questions) ; id fabriqué par le serveur |
 | `publish_kb(ticket_id)` | Copie dans `installation/kb/`, refus si absent ou déjà publié |
+| `save_progress(id?, etape, …)` | Point d'étape : crée le brouillon du ticket dès le triage validé (`installation/en-cours/<id>.md`), puis le met à jour par fusion à chaque acquis ; enregistre la passation si le technicien change |
+| `resume_ticket(ticket?)` | Liste des tickets en cours, ou brouillon + marche à suivre pour reprendre là où il en était, sans retrianger ; le triage reçoit la même liste |
 | `update_context(section, contenu)` | Écrit une section du contexte après un oui explicite : consignes et titre conservés, date posée, version précédente dans `contexte/historique/`, fichier créé depuis le gabarit s'il manque. Servi par le skill `remplissage` (`load_skill(["remplissage"])`, avec l'état de remplissage) et par la clôture |
 
 **Le serveur** : `produit/serveur/`, TypeScript, SDK MCP officiel, stdio.
@@ -103,7 +112,14 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 20 | `install.ps1` en UTF-8 avec BOM, vérifié par `valider` | deploiement §2 | PowerShell 5.1 cassait sur les guillemets français. |
 | 22 | Référence du ticket externe : demandée avant le triage, champ `reference` de `save_ticket`, en-tête + titre + tag, pas dans le nom de fichier | triage §2, contrat-mcp §4, base-connaissances §2 | Trou signalé par toi le 2026-09-09 : le technicien part d'un ticket de son outil, l'IA n'y accède pas mais doit le reporter. |
 | 23 | Sixième appel `update_context` + skill `remplissage` + consigne du gabarit renvoyée par `get_context` sur section vide — demandé par toi, forme choisie par moi | contrat-mcp §5 bis, gouvernance §2, plan §4 | La bêta se joue à vide : remplir par conversation est le chemin le plus court, et le plan le prévoyait. Une section à la fois, oui explicite, sauvegarde avant écriture. |
+| 26 | Taxonomie du brouillon : un champ, une nature, une limite imposée par le serveur ; corps du fichier réduit à l'état — demandé par toi après le premier brouillon réel (29 Ko) | contrat-mcp §5 ter, base-connaissances §2 bis, architecture D | Le modèle écrivait un récit et le fichier doublait tout ; un acquis est une ligne qu'un repreneur utilise sans relire la conversation, et une contrainte mécanique vaut mieux qu'une consigne. |
+| 25 | Pause, reprise, passation : brouillon par ticket dans `en-cours/`, `save_progress` (fusion) et `resume_ticket`, clôture sous le même id avec brouillon retiré, liste des tickets en cours jointe au triage — demandé par toi le 2026-09-10, forme choisie par moi | contrat-mcp §5 ter, plan 0.3 et D, base-connaissances §2 bis, triage §3 ter, architecture D | L'état d'un ticket ne vivait que dans la conversation. Deux appels séparés plutôt qu'un `save_ticket` à statut « en cours » ; suppression du brouillon plutôt qu'archivage ; un point d'étape par acquis. |
 | 24 | Taxonomie du contexte à trois niveaux (structure, pivots, instances), section `general/plateformes`, signal « volumineuse » dans `etat` — demandé par toi après le premier ticket | format-contexte §4.1, plan C | Le contexte reçoit ce que l'entreprise possède, pas ce que chaque ticket crée ; sinon il devient une CMDB qui coûte des tokens à chaque ticket. |
+| 27 | Le cloud n'est pas un domaine mais une plateforme (`general/plateformes`) — demandé par toi le 2026-09-11 après discussion | plan A, taxonomie §7, retours-beta | Le triage reconnaît ce que le problème suit ; l'hébergement n'est pas un signal et transperce tous les domaines. L'incident Entra avait sa cause on-prem. |
+| 28 | Bêta v2 : les quatre domaines décrits passent en bêta le 2026-09-11 (skill, demandes, gabarit chacun ; 44 sections) — demandé par toi, contenu écrit par moi | manifeste, `contenu/domaines/`, taxonomie, validation §2, format-contexte §6, fin-de-projet §9 | Le deuxième ticket réel avait besoin d'identité. Sections tirées du listing du 2026-09-11 (niveau 1–2 seulement) ; les trois sections transverses envisagées (bastions, conventions, outillage) ne sont pas ajoutées : elles toucheraient toutes les installations. |
+| 29 | Le test de fumée rejoue le cas « domaine décrit, hors bêta » sur une copie temporaire du produit avec un domaine synthétique | `test/smoke.ts`, architecture D §7 | Le produit livré n'a plus de domaine `decrit` ; la branche du serveur doit rester testée pour les domaines futurs. |
+| 30 | Scripts d'installation : test de fumée à l'étape 3 (`tester`, `-SansTest`), `installation/VERSION` écrit par `init` avec le mode « MISE À JOUR x → y », `.gitattributes` pour les fins de ligne, bit exécutable de `install.sh`, `valider` refuse un `.sh` avec CR — demandé par toi le 2026-09-11 (« je n'installe qu'à travers ces scripts ») | deploiement §2 et H4, outillage, validation T-H1/T-H2 | `valider` prouvait que le produit était bien formé, pas que le serveur répondait sur le poste ; un `clone` Windows avec `autocrlf` aurait cassé `install.sh` dans une archive H5 ; une mise à jour silencieuse ne disait pas d'où l'on venait. |
+| 31 | Journal : un fichier par ticket (`journal/<id>.md`, sections candidates en en-tête) au lieu d'un fichier par question — demandé par toi le 2026-09-11 | base-connaissances §1 et §3, contrat-mcp §4, architecture D §3 | Onze fichiers pour deux tickets, redondants avec la section `questions` du ticket ; illisible à 50 tickets. La règle d'origine visait un journal *commun* mutable, pas un fichier par ticket écrit une fois. Les `-qNN` existants ne sont pas migrés. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -129,7 +145,11 @@ deux scripts verts sur une installation temporaire.
 - **Multi-utilisateur non testé** : le code respecte les règles (racines
   configurables, création exclusive, index reconstruit), mais un partage
   réel n'a pas été exercé. Porte 2.
-- **Le fichier de contexte est la seule matière mutable** : deux
+- **Les points d'étape sont une discipline de prompt** : si le modèle oublie
+  un `save_progress`, ce qui a été dit depuis le dernier est perdu à la
+  fermeture de la session. T-P9 compte les oublis ; c'est le premier chiffre
+  à regarder sur cette fonction.
+- **Le contexte et les brouillons sont les deux matières mutables** : deux
   `update_context` simultanés sur le même fichier depuis deux postes ne sont
   pas protégés par un verrou ; `historique/` garde la version écrasée. Test
   à la porte 2. L'architecture cible est écrite : concurrence optimiste par
@@ -155,7 +175,7 @@ deux scripts verts sur une installation temporaire.
    L'installation se crée dans `installation/` à côté de `produit/`
    (ignoré par Git). Pour un autre emplacement : `-Installation <chemin>`.
 2. Redémarrer Claude Code. Vérifier avec `/mcp` que `support-it` est là
-   avec six outils.
+   avec huit outils.
 3. Remplir au moins `installation/contexte/general.md` (sites, référents) et
    deux ou trois sections de `reseau.md` — ou ne rien remplir, pour voir
    l'outil poser ses questions.
@@ -174,3 +194,45 @@ Une semaine de tickets réels, puis une session pour dépouiller
 `retours-beta.md` : corriger les skills sur ce qui a été observé, faire
 monter les tags libres au manifeste, décider si le référent a besoin d'un
 outil, et écrire les tests de la porte 2.
+
+---
+
+## 9. Bêta v2 — 0.2.0-beta, 2026-09-11
+
+**Ce qui change.** Quatre domaines passent de « décrit » à « bêta » :
+`poste-de-travail`, `materiel`, `identite`, `applicatif`. Pour chacun :
+`skill.md` (cinq à six crans, escalade vers les cinq autres), `demandes.md`
+(deux ou trois demandes), `contexte.exemple.md` (cinq ou six sections de
+niveau 1–2). Le manifeste porte leurs tags ; `valider` passe à zéro erreur
+(six avertissements de longueur, tous sous 110 lignes) ; le test de fumée
+charge les six domaines en incident et en demande.
+
+| Domaine | Demandes | Sections de contexte |
+| --- | --- | --- |
+| identité | `creation-compte`, `depart-collaborateur`, `attribution-droits` | `annuaires`, `synchronisation`, `authentification`, `groupes-droits`, `cycle-de-vie`, `comptes-service` |
+| poste de travail | `installation-logiciel`, `preparation-poste` | `parc`, `deploiement`, `applications-standard`, `profils`, `securite-poste`, `impression` |
+| matériel | `remplacement-materiel`, `commande-materiel` | `parc-materiel`, `fournisseurs-sav`, `stock`, `peripheriques`, `salles-techniques` |
+| applicatif | `habilitation-applicative`, `mise-a-jour-applicative` | `catalogue`, `responsables`, `editeurs-support`, `integrations`, `environnements`, `acces-applicatifs` |
+
+**Ce qui a été décidé** : décisions 27 à 29 du tableau §4 (le cloud est une
+plateforme ; les quatre domaines ; le domaine décrit synthétique du test).
+
+**Ce qui n'est pas fait.**
+
+- Aucun des quatre domaines n'a été joué sur un ticket réel : T-A1, T-A2,
+  T-B1, T-B5, T-B6, T-B7 sont à jouer (`validation.md` §7, ligne du
+  2026-09-11). Les crans de diagnostic et les sections sont des hypothèses
+  de support IT générique ; le premier ticket de chaque domaine dira ce qui
+  manque.
+- `creation-vm` côté système, avec la plateforme en prérequis : attend
+  « une demande par fichier », `demandes.md` système étant à sa limite.
+- Les trois sections transverses envisagées (bastions, conventions,
+  outillage) : non ajoutées, voir `format-contexte.md` §6.
+- Le triage reçoit désormais six domaines à quatre signaux : c'est la
+  limite basse du goulot décrit en `plan.md` §5 ; T-A1 sur les dix lignes
+  dira si le triage tient encore.
+
+**Pour une installation existante** : remplacer `produit/` (H4), relancer
+`install.*` — `init` en mode « rejoindre » copie les quatre nouveaux
+gabarits sans toucher aux fichiers existants ; `etat` les montrait
+« ABSENT » avant. Rien n'est migré.

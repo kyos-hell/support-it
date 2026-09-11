@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Installe la boîte à outils IA pour le support IT sur ce poste (Linux, macOS).
+# Installe ou met à jour la boîte à outils IA pour le support IT sur ce poste (Linux, macOS).
 # Mêmes étapes, dans le même ordre, que install.ps1 :
 #   1. prérequis (Node.js >= 18, npm ; Claude Code signalé)
 #   2. construction du serveur MCP
-#   3. validation du produit livré
-#   4. installation/ : initialiser (premier poste) ou rejoindre (existant)
+#   3. validation du produit livré, puis test de fumée du serveur construit
+#   4. installation/ : initialiser (premier poste), rejoindre (existant) ou mettre à jour (nouvelle version)
 #   5. enregistrement du serveur MCP auprès de Claude Code + point d'entrée /support
 #   6. état de remplissage du contexte
 # Ne bloque jamais sur un contexte vide. N'écrase jamais un fichier de installation/.
+# Mise à jour : remplacer produit/ (ou git pull), relancer ce script — les nouveaux
+# gabarits sont copiés, les fichiers remplis ne sont pas touchés.
 #
-# Usage : ./install.sh [--installation <chemin>] [--sans-claude] [--sans-build]
+# Usage : ./install.sh [--installation <chemin>] [--sans-claude] [--sans-build] [--sans-test]
 set -euo pipefail
 
 PRODUIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,13 +19,15 @@ SERVEUR="$PRODUIT/serveur"
 INSTALLATION=""
 SANS_CLAUDE=0
 SANS_BUILD=0
+SANS_TEST=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --installation) INSTALLATION="$2"; shift 2 ;;
     --sans-claude) SANS_CLAUDE=1; shift ;;
     --sans-build) SANS_BUILD=1; shift ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --sans-test) SANS_TEST=1; shift ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "option inconnue : $1" >&2; exit 2 ;;
   esac
 done
@@ -34,7 +38,8 @@ INSTALLATION="$(cd "$INSTALLATION" && pwd)"
 etape() { echo; echo "[$1/6] $2"; }
 echec() { echo "ECHEC : $1" >&2; exit 1; }
 
-echo "== support-it $(head -n1 "$PRODUIT/VERSION") — installation =="
+VERSION="$(head -n1 "$PRODUIT/VERSION" | tr -d '[:space:]')"
+echo "== support-it $VERSION — installation =="
 echo "produit      : $PRODUIT"
 echo "installation : $INSTALLATION"
 
@@ -64,15 +69,15 @@ CLI="$SERVEUR/dist/cli.js"
 export SUPPORT_IT_PRODUIT="$PRODUIT"
 export SUPPORT_IT_INSTALLATION="$INSTALLATION"
 
-etape 3 "Validation du produit livré"
+etape 3 "Validation du produit livré et test de fumée"
 node "$CLI" valider || echec "le produit livré ne passe pas la validation : ne pas installer une livraison invalide"
+if [[ "$SANS_TEST" -eq 1 ]]; then
+  echo "  test de fumée ignoré (--sans-test)"
+else
+  node "$CLI" tester || echec "le test de fumée échoue sur ce poste : ne pas installer un serveur qui ne répond pas"
+fi
 
 etape 4 "Arborescence client"
-if [[ -d "$INSTALLATION/contexte" ]]; then
-  echo "  mode : REJOINDRE une installation existante (rien n'y sera écrasé)"
-else
-  echo "  mode : INITIALISER une nouvelle installation"
-fi
 node "$CLI" init || echec "initialisation de installation/ en échec"
 
 etape 5 "Claude Code : serveur MCP et point d'entrée /support"
@@ -87,8 +92,9 @@ etape 6 "État de remplissage du contexte"
 node "$CLI" etat
 
 echo
-echo "Installation terminée."
-echo "  - Remplir le contexte : $INSTALLATION/contexte/*.md (recommandé, pas obligatoire)."
-echo "  - Redémarrer Claude Code, puis taper /support suivi de la description du ticket."
+echo "Installation terminée ($VERSION)."
+echo "  - Remplir le contexte : $INSTALLATION/contexte/*.md (recommandé, pas obligatoire),"
+echo "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
+echo "  - Redémarrer Claude Code, vérifier /mcp (support-it, huit outils), puis taper /support suivi du ticket."
 echo "  - Mode de permission : garder le mode par défaut (confirmation avant chaque commande)."
 echo "    La règle « l'IA n'exécute rien, le technicien exécute » n'est tenue que par ce mode."

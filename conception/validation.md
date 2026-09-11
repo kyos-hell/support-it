@@ -51,11 +51,17 @@ les candidats listés, ou pose la question qui tranche ; il ne conclut
 **jamais** sur un domaine unique sans signal. Verdict par ligne ; le test
 est vert à dix sur dix.
 
-**T-A2 — Hors des domaines couverts.** Entrée : trois symptômes pointant
-vers un domaine décrit mais hors bêta (« mon écran est fissuré », « mon
-mot de passe est refusé partout », « le module facturation affiche un total
-faux »). Attendu : « hors des domaines couverts pour l'instant », avec le
-domaine reconnu nommé, jamais un routage forcé vers réseau ou système.
+**T-A2 — Hors des domaines couverts.** Entrée, jusqu'à la bêta v2 : trois
+symptômes pointant vers un domaine décrit mais hors bêta (« mon écran est
+fissuré », « mon mot de passe est refusé partout », « le module facturation
+affiche un total faux »). Depuis la bêta v2 (2026-09-11), ces trois
+symptômes sont **couverts** (matériel, identité, applicatif) et le test
+devient : trois symptômes qui ne tombent dans aucun des six domaines
+(« la téléphonie fixe est coupée », « mon badge n'ouvre plus la porte »,
+« la machine à café est en panne »). Attendu : « hors des domaines
+couverts », jamais un routage forcé. Le cas « domaine déclaré `decrit` au
+manifeste » n'existe plus dans le produit livré : le test de fumée (T-D3)
+le rejoue sur un manifeste temporaire.
 
 **T-A3 — La nature avant le domaine.** Entrée : cinq phrases d'incident
 (« ça ne marche plus »), cinq de demande (« je veux que »), deux ambiguës
@@ -70,8 +76,9 @@ texte d'un ticket, binaire. Un signal qui demande une interprétation
 
 ### 2.2 Format des skills (périmètre B)
 
-Couvre `produit/contenu/domaines/reseau/{skill,demandes}.md` et
-`produit/contenu/domaines/systeme/{skill,demandes}.md`.
+Couvre `produit/contenu/domaines/<id>/{skill,demandes}.md` pour les six
+domaines : `reseau`, `systeme` (bêta 1), `poste-de-travail`, `materiel`,
+`identite`, `applicatif` (bêta v2, 2026-09-11).
 
 **T-B1 — Le test de valeur.** Relecture ligne à ligne : *l'IA ferait-elle
 autrement sans cette ligne ?* Toute ligne qui explique une notion que le
@@ -104,6 +111,14 @@ testeur qui répond comme un technicien. Trois scénarios par skill :
 | système | Le partage compta ne répond plus pour tous, le reste va bien | Étape 0 puis entrée au cran 3 |
 | système | Tous les services d'un serveur sont morts | Entrée au cran 1, journal lu dès le premier cran en défaut |
 | système | Une seule personne n'accède pas au partage | Vérification autre poste puis autre compte **avant** tout cran, puis escalade |
+| poste de travail | Profil temporaire à l'ouverture de session | Cran 1 puis chargement de `poste-de-travail/profils`, pas de saut au cran 4 |
+| poste de travail | Vingt postes plantent depuis ce matin | Étape 0 charge `poste-de-travail/deploiement` avant tout cran |
+| matériel | « Mon PC ne s'allume plus » | Cran 1 (alimentation) validé par échange de câble et de prise avant toute autre hypothèse |
+| matériel | Odeur de brûlé sur un poste | Arrêt, isolement, `general/contacts-escalade` **avant** tout diagnostic |
+| identité | Compte verrouillé toutes les heures | Cran 1 : source des verrouillages recherchée **avant** de proposer le déverrouillage |
+| identité | « Le VPN rejette mon mot de passe » (depuis réseau) | Cran 2 : test sur le service de référence de `identite/authentification` ; jamais de mot de passe demandé |
+| applicatif | Un total faux sur une facture | Cran 1 (reproduction autre compte, autre poste) avant le cran 3 ; donnée lue, jamais modifiée |
+| applicatif | L'ERP est lent pour tout le monde | Cran 2 : toute l'application → escalade **système** annoncée, pas de cran 3 |
 
 Pour chaque scénario, quatre verdicts : **une seule question par message**
 (compter), **aucun cran sauté** (ordre), **aucune commande exécutée par
@@ -113,13 +128,18 @@ qui n'étaient pas dans le contexte fictif).
 
 **T-B6 — Conduite en demande, sur table.** Même dispositif avec
 `demandes.md`. Un scénario par demande : `ouverture-flux`, `creation-vlan`,
-`creation-partage`, `restauration-fichier`. Attendu : prérequis vérifiés
-avant collecte, collecte une question à la fois, vérifications contre le
-contexte nommées, plan d'action qui suit le gabarit — avec **impact**,
-**retour arrière** et **mise à jour du contexte en dernière étape** (sauf
-restauration, qui n'en a pas). Plus un scénario de **demande absente** par
-domaine (« crée-moi un compte AD » côté système) : l'IA le dit, ne refuse
-pas, n'invente pas de procédure, et signale le domaine identité.
+`creation-partage`, `restauration-fichier` (bêta 1) ; `creation-compte`,
+`depart-collaborateur`, `attribution-droits`, `installation-logiciel`,
+`preparation-poste`, `remplacement-materiel`, `commande-materiel`,
+`habilitation-applicative`, `mise-a-jour-applicative` (bêta v2). Attendu :
+prérequis vérifiés avant collecte, collecte une question à la fois,
+vérifications contre le contexte nommées, plan d'action qui suit le
+gabarit — avec **impact**, **retour arrière** et **mise à jour du contexte
+en dernière étape** (sauf restauration, qui n'en a pas). Plus un scénario
+de **demande absente** par domaine (« crée-moi un compte AD » côté système ;
+« crée-moi une boîte partagée » côté identité ; « achète-moi un écran » côté
+poste de travail) : l'IA le dit, ne refuse pas, n'invente pas de procédure,
+et signale le domaine qui porte la demande.
 
 **T-B7 — Composition de deux skills.** Entrée : les deux skills chargés,
 symptôme « tout est super lent depuis ce matin ». Attendu : discrimination
@@ -128,8 +148,9 @@ mené sur deux fronts.
 
 ### 2.3 Gabarits de contexte (périmètre C)
 
-Couvre `produit/contenu/general/contexte.exemple.md` et les deux
-`contexte.exemple.md`.
+Couvre `produit/contenu/general/contexte.exemple.md` et les six
+`contexte.exemple.md` des domaines (deux en bêta 1, quatre ajoutés en bêta
+v2 le 2026-09-11).
 
 **T-C1 — Le contrat B/C dans les deux sens.** Tout identifiant déclaré dans
 un en-tête YAML a sa section dans un gabarit ; toute section d'un gabarit
@@ -166,7 +187,7 @@ par T-D3.
 **T-D2 — `valider` passe.** `node dist/cli.js valider` : zéro erreur. Les
 avertissements sont lus et acceptés ou corrigés.
 
-**T-D3 — Test de fumée.** `npm test` : six outils exactement ; `update_context` (section remplacée avec consignes et date, sauvegarde en `historique/`, fichier créé depuis le gabarit, section inconnue, domaine sans gabarit, titre dans le contenu, contenu vide) ; `remplissage` avec état calculé ; consigne et squelette du gabarit sur une section vide ; triage avec
+**T-D3 — Test de fumée.** `npm test` : huit outils exactement ; `save_progress` et `resume_ticket` (création avec symptôme obligatoire, fusion par id, rattachement par référence sans écraser sa casse, liste, reprise avec marche à suivre, clôture sous le même id avec brouillon retiré et questions reprises) ; `update_context` (section remplacée avec consignes et date, sauvegarde en `historique/`, fichier créé depuis le gabarit, section inconnue, domaine sans gabarit, titre dans le contenu, contenu vide) ; `remplissage` avec état calculé ; consigne et squelette du gabarit sur une section vide ; triage avec
 manifeste ; erreurs attendues (domaine inconnu, hors bêta, nature manquante,
 trois domaines, double publication, ticket introuvable) ; sections `ok`,
 `vide` (dont « identique au gabarit » et « fichier absent »), `inconnue` ;
@@ -182,18 +203,24 @@ gabarits fraîchement copiés.
 
 **T-H1 — Les deux scripts, mêmes étapes.** `install.ps1 -SansClaude -SansBuild`
 et `install.sh --sans-claude --sans-build` sur une installation temporaire :
-six étapes affichées dans le même ordre, mêmes fichiers créés, code 0.
-`install.ps1` doit être en UTF-8 **avec BOM** (PowerShell 5.1 lit l'ANSI
-sinon et casse sur les guillemets français — trouvé le 2026-09-09).
+six étapes affichées dans le même ordre, mêmes fichiers créés (dont
+`VERSION`), test de fumée joué à l'étape 3, code 0. `install.ps1` doit être
+en UTF-8 **avec BOM** (PowerShell 5.1 lit l'ANSI sinon et casse sur les
+guillemets français — trouvé le 2026-09-09) ; `install.sh` sans CR
+(`valider` le vérifie depuis le 2026-09-11).
 
-**T-H2 — Rejoindre.** Relancer le script sur une installation existante dont
-une section a été remplie : la section est intacte, le mode affiché est
-« REJOINDRE ».
+**T-H2 — Rejoindre et mettre à jour.** Relancer le script sur une
+installation existante dont une section a été remplie : la section est
+intacte, le mode affiché est « REJOINDRE — déjà en <version> », aucun
+gabarit copié. Puis simuler une installation plus ancienne
+(`installation/VERSION` à `0.1.0-beta`, un gabarit de domaine retiré) :
+le mode affiché est « MISE À JOUR 0.1.0-beta → <version> », seul le
+gabarit manquant est copié, le reste est « gardé ».
 
 **T-H3 — Enregistrement.** Après `install.*` complet sur un poste :
 `~/.claude.json` contient `mcpServers.support-it` avec les deux racines,
 `~/.claude/skills/support/SKILL.md` existe, la sauvegarde `.support-it.bak`
-existe, et `/mcp` dans Claude Code liste `support-it` avec six outils.
+existe, et `/mcp` dans Claude Code liste `support-it` avec huit outils.
 **Non joué par l'auteur** : il modifie la configuration Claude Code du
 poste ; c'est le premier test de la porte 1, à faire par le testeur.
 
@@ -261,14 +288,30 @@ ensuite `installation/contexte/systeme.md` (titre et consignes conservés,
 date posée) et `contexte/historique/`. Puis un ticket qui produit des
 sections candidates : la clôture propose de les écrire, n'écrit que sur oui.
 
+**T-P9 — Pause et reprise (2026-09-10).** Un ticket réel : vérifier qu'un
+brouillon apparaît dans `installation/en-cours/` dès le triage validé, avec
+la référence et la prochaine étape ; qu'il est mis à jour à chaque cran
+validé et chaque réponse (relire le fichier entre deux tours) ; dire « je
+mets en pause » puis fermer la session Claude Code ; rouvrir, taper
+`/support reprends <référence>` : l'outil ré-annonce l'état en trois lignes,
+recharge le bon skill **sans retrianger**, repart à la prochaine étape
+notée. Clôturer : le ticket final a le même id, le brouillon a disparu, les
+questions posées avant la pause sont dans le ticket et le journal. Compter
+les points d'étape oubliés par le modèle : c'est la mesure de la discipline
+de prompt.
+
 ## 4. Porte 2 — pré-prod
 
 À écrire avant d'ouvrir aux collègues : partage réseau, deux techniciens
 simultanés, mise à jour de `produit/` sans perte dans `installation/`, une
 dizaine de tickets réels pour exercer la branche « cas similaire », et deux
-`update_context` sur le même fichier de contexte depuis deux postes (le
-fichier de contexte est la seule matière mutable : vérifier que
-`historique/` permet de récupérer la version écrasée).
+`update_context` sur le même fichier de contexte depuis deux postes (vérifier
+que `historique/` permet de récupérer la version écrasée), et une
+**passation réelle** : un technicien met un ticket en pause, un autre le
+reprend depuis son poste, l'avertissement « dernier point il y a n min »
+s'affiche s'il est récent, la passation figure dans le brouillon puis dans
+le ticket final. Puis deux `save_progress` simultanés sur le même brouillon
+pour observer l'écrasement, en attendant l'empreinte (architecture D §8).
 
 ## 5. Porte 3 — prod et extension aux autres domaines
 
@@ -289,6 +332,45 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
   contrainte que les modèles moins forts respectent le moins.
 - **Mode de permission** : vérifier à l'installation que l'outil hôte
   demande confirmation avant toute commande (H3).
+- **Fraîcheur du contexte — une boucle en trois temps** (discussion du
+  2026-09-11, `retours-beta.md`). Le contexte se remplit par l'usage, mais
+  rien ne l'entretient. Trois mécanismes qui se cumulent, chacun ne fait que
+  **détecter et proposer** — l'invariant tient, aucun n'écrit sans le oui du
+  technicien :
+  1. *Péremption à l'usage* : `load_skill` et `get_context` annotent une
+     section datée de plus d'un seuil (« à confirmer, datée du … ») ; le
+     skill fait confirmer la valeur au moment où il s'apprête à s'en servir ;
+     un oui repose la date sans toucher au contenu, un non passe par
+     `update_context`.
+  2. *File des candidats* : une commande CLI (`candidats`, ou une entrée de
+     `etat`) croise le journal (`section_candidate` dont la section est
+     encore vide, ou plus vieille que la question) et les
+     `mises_a_jour_contexte` des tickets jamais appliquées ; la même section
+     candidate sur deux tickets fait remonter en tête. Le skill
+     `remplissage` les propose un par un.
+  3. *Contradiction détectée en ticket* : un champ dédié du brouillon
+     (`save_progress`) reçoit une vérification qui contredit une valeur
+     chargée du contexte ; la clôture le reprend en `mises_a_jour_contexte`
+     sans compter sur la mémoire du modèle (aujourd'hui tenu par le prompt
+     de `cloture.md` seulement).
+  3 alimente 2, 1 revalide ce que 2 a écrit. Condition d'entrée : un chiffre
+  de la porte 1 — combien de candidats restent non appliqués après une
+  semaine de tickets. Une fois décidé, devient le quatrième canal de
+  `format-contexte.md` §5.
+- **Manifeste à deux niveaux** (familles puis domaines) et **une demande par
+  fichier** : le triage ne passe pas à vingt domaines avec le manifeste rendu
+  en entier (`plan.md` §5). À faire quand un troisième domaine entre en bêta,
+  pas avant.
+- **Commande `mesures`** du CLI, dès la porte 2 : questions par ticket,
+  `save_progress` oubliés (T-P9), appels par ticket, sections `vide` les plus
+  rencontrées, documents les plus cités — tout dérivé des fichiers
+  d'`installation/`. Sans elle, à dix techniciens personne ne voit l'usage.
+- **Règle de compatibilité produit / installation** : quelle version de
+  `produit/` accepte quelle version d'`installation/`, vérifiée par `install.*`
+  et `etat`. À écrire avant la première installation chez un tiers
+  (`plan.md` §5).
+- **Documentation d'entreprise** : périmètre I de `plan.md`, après la porte 1
+  et après sa mesure d'entrée.
 
 ---
 
@@ -309,5 +391,17 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
 | 2026-09-09 | T-D3 | vert | rejoué après l'ajout de `reference` : en-tête, titre, tag, recherche par référence |
 | 2026-09-09 | T-D3 | vert | rejoué après `update_context` et `remplissage` : six outils, remplacement avec consignes et date, sauvegarde, création depuis le gabarit, quatre erreurs attendues |
 | 2026-09-09 | T-D2, T-D3 | vert | rejoués après la taxonomie du contexte : `general/plateformes` déclarée et présente, signal « volumineuse » |
+| 2026-09-10 | T-D3 | vert | taxonomie du brouillon : entrée trop longue refusée sans rien écrire, corps du fichier réduit à l'état, reprise complète inchangée |
+| 2026-09-10 | T-D3 | rouge puis vert | pause et reprise : le rattachement par référence en minuscules écrasait la casse de la référence d'origine ; corrigé (la référence ne change que si elle diffère hors casse). Huit outils, clôture sous le même id, brouillon retiré |
 | 2026-09-09 | T-H2 | vert | section `sites` remplie intacte après relance, mode « REJOINDRE » affiché |
 | 2026-09-09 | T-H3 | non joué | modifie la configuration Claude Code du poste : à jouer par le testeur |
+| 2026-09-11 | T-B2 | vert | bêta v2 : identité 104/107, poste de travail 105/90, matériel 101/88, applicatif 106/93 lignes (skill/demandes) ; six avertissements « au-delà de 100 », zéro au-delà de 110 |
+| 2026-09-11 | T-B3 | vert | `valider` sur les quatre nouveaux domaines : zéro donnée d'entreprise |
+| 2026-09-11 | T-B4 | vert | `valider` : chaque clé selon-cas des quatre skills citée dans le corps, chaque tag au manifeste |
+| 2026-09-11 | T-C1, T-C4 | vert | `valider` : contrat B/C dans les deux sens sur les sept gabarits, titres `## id — titre` |
+| 2026-09-11 | T-D2 | vert | 0 erreur, 6 avertissements (longueur, acceptés) |
+| 2026-09-11 | T-D3 | vert | rejoué après la bêta v2 : six domaines chargés en incident et en demande, requis résolus, selon-cas cités, paire identité + poste de travail, `update_context` crée `identite.md` depuis le gabarit ; le cas « décrit, hors bêta » rejoué sur un manifeste temporaire |
+| 2026-09-11 | T-A1, T-A2, T-B1, T-B5, T-B6, T-B7 | à jouer | sur les quatre nouveaux domaines, par le testeur (porte 1, bêta v2) |
+| 2026-09-11 | T-H1 | vert | `install.ps1` (via `-ExecutionPolicy Bypass`) et `install.sh` sur un dossier temporaire : six étapes, `tester` vert à l'étape 3, sept gabarits + `VERSION` créés, code 0 |
+| 2026-09-11 | T-D3 | vert | journal : un fichier par ticket, en-tête `questions` et `sections_candidates`, section `q01`, deux tickets → deux fichiers ; message de `save_ticket` avec le chemin |
+| 2026-09-11 | T-H2 | vert | rejoindre : « déjà en 0.2.0-beta », sept « gardé », aucun copié ; mise à jour simulée depuis 0.1.0-beta : « MISE À JOUR 0.1.0-beta → 0.2.0-beta », seul `identite.md` copié |

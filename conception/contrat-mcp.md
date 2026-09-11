@@ -1,4 +1,4 @@
-# Contrat MCP — les six appels
+# Contrat MCP — les huit appels
 
 > Livrable du périmètre D de `plan.md`. Décisions héritées : cinq appels sur
 > des données persistantes, serveur bête, le déterministe est du code, aucun
@@ -101,9 +101,9 @@ pas. Index reconstruit à chaque appel (contrainte F, héritée de H1).
 
 | | |
 | --- | --- |
-| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides`, `conclusion`, `statut`. Optionnels : `escalades`, `signaux`, `conclusion_humaine`, `resolu_par`, `plan_action`, `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags`, `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise). |
+| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides`, `conclusion`, `statut`. Optionnels : `escalades`, `signaux`, `conclusion_humaine`, `resolu_par`, `plan_action`, `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags`, `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise), `id` (identifiant du brouillon en cours — voir §5 ter). |
 | Lit | Rien. |
-| Écrit | `installation/tickets/<id>.md` et un fichier `installation/journal/<id>-qNN.md` **par question**. |
+| Écrit | `installation/tickets/<id>.md` et, s'il y a eu des questions, **un** journal `installation/journal/<id>.md` (une section par question, sections candidates en en-tête — un fichier par ticket depuis le 2026-09-11, un par question avant). |
 
 **Comportement.** Le serveur fabrique `<id>` = `AAAAMMJJ-HHMMSS-<utilisateur>-<poste>`
 (unique sans coordination, contrainte F3 ; suffixe `-n` si collision dans la
@@ -175,15 +175,99 @@ remplissage** du gabarit (ses commentaires HTML) et son **squelette** : le
 skill sait quoi demander, et au bon niveau de détail. Coût en tokens
 seulement quand la section est vide.
 
+## 5 ter. `save_progress` et `resume_ticket` — ajoutés le 2026-09-10
+
+**Pourquoi.** L'état d'un ticket ne vivait que dans la conversation Claude
+Code : impossible de changer de ticket, de fermer la session, ou de passer
+la main à un collègue. Le brouillon d'un ticket en cours est un fichier par
+ticket dans `installation/en-cours/`, **volontairement mutable** et isolé
+pour le dire, écrit au fil de l'eau et retiré à la clôture.
+
+### `save_progress(id?, etape, …)`
+
+| | |
+| --- | --- |
+| Entrée | `etape` (obligatoire) : `triage`, `instruction`, `recherche`, `plan`, `actions`, `cloture` ou `pause`. `id` : absent au premier appel. `symptome_initial` (obligatoire à la création), `reference`, `nature`, `domaines_proposes`, `domaines_valides`, `skill_charge{domaines, nature}`, `prochaine_etape`, `plan_action` ; listes `escalades`, `signaux`, `verifications`, `questions`, `actions`, `notes`. |
+| Lit | Le brouillon existant, par `id` ou — sans `id` — par `reference`. |
+| Écrit | `installation/en-cours/<id>.md`, écriture atomique. |
+
+**Comportement.** Sans `id` et sans brouillon de même référence : création,
+identifiant fabriqué par le serveur (même forme que les tickets), technicien
+et poste relevés. Sinon **fusion** : les scalaires fournis remplacent
+(`etape`, `prochaine_etape`, `plan_action`, `nature`, domaines, skill),
+`symptome_initial` n'est posé qu'une fois, `reference` ne change que si elle
+change vraiment (pas sur une variante de casse), les listes s'**ajoutent**
+sans doublon. Si le technicien du dernier point d'étape n'est pas l'appelant,
+une **passation** est enregistrée. Réponse : id, fichier, créé / mis à jour /
+rattaché, passation éventuelle. Le fichier a l'en-tête YAML pour source de
+vérité et un corps rendu (état et prochaine étape en premier, puis symptôme,
+signaux, vérifications, questions, plan, actions, notes, passations).
+
+**Taxonomie du brouillon (2026-09-10, après le premier brouillon réel : 29 Ko,
+un récit).** Un champ, une nature, une longueur, imposée par le serveur :
+
+| Champ | Nature | Limite |
+| --- | --- | --- |
+| `signaux` | Un fait observé qui a servi au triage, sans raisonnement ni « → domaine » | 160 car. |
+| `verifications` | Un **acquis** : « cran N : commande → résultat » | 240 car. |
+| `questions` | Une **décision** du technicien : question et réponse ; la référence n'en est pas une | 300 car. chacune |
+| `actions` | Ce que le technicien a exécuté et le résultat | 240 car. |
+| `notes` | Un **piège** ou une fausse piste à ne pas refaire | 240 car. |
+| `prochaine_etape` | Ce qu'on fait en premier à la reprise | 200 car. |
+| `plan_action` | Le plan **tel que proposé**, sinon vide | libre |
+| `symptome_initial` | Le ticket tel qu'exprimé | libre |
+
+Le test d'une entrée : *un repreneur peut-il repartir avec cette ligne sans
+relire la conversation ?* Une entrée trop longue est **refusée** avec la
+règle du champ et rien n'est écrit, même les entrées valides du même appel.
+Le fichier n'écrit plus le corps en double : l'en-tête YAML est la source de
+vérité, le corps se réduit à l'état (étape, domaines, skill, prochaine
+étape, compteurs, passations) ; `resume_ticket` rend l'ensemble en clair.
+
+**Quand l'appeler** (règle de `triage.md`) : dès le triage validé, puis à
+chaque acquis qui coûterait à refaire — cran validé et résultat, réponse
+obtenue, plan validé, action rapportée — et sur « je mets en pause ».
+Toujours avec `prochaine_etape`. Discipline de prompt : à surveiller en bêta.
+
+### `resume_ticket(ticket?)`
+
+| | |
+| --- | --- |
+| Entrée | `ticket` : id ou référence (insensible à la casse) ; absent = liste. |
+| Lit | `installation/en-cours/`. |
+| Écrit | Rien — la passation s'enregistre au `save_progress` suivant. |
+
+**Comportement.** Sans argument : tableau des tickets en cours (référence,
+id, technicien, étape, dernier point, prochaine étape), brouillons de plus
+de 30 jours signalés. Avec argument : le brouillon rendu **sans son en-tête
+YAML**, précédé de la marche à suivre (ré-annoncer, recharger `load_skill`
+avec le skill enregistré sans retrianger, repartir à la prochaine étape,
+continuer avec l'id) et d'un avertissement si le dernier point d'étape est
+d'un autre technicien — renforcé s'il date de moins de dix minutes. Inconnu :
+erreur avec la liste. `load_skill(["triage"])` joint la même liste, ce qui
+permet au triage de proposer la reprise quand la référence y figure.
+
+### Effet sur `save_ticket`
+
+`save_ticket` accepte `id` : le ticket final **reprend l'identifiant du
+brouillon**, hérite de sa référence, reprend ses questions, signaux et
+escalades s'ils manquent, puis le brouillon est **retiré**. Sans `id`, le
+serveur relie par la référence s'il trouve un brouillon. C'est la seule
+suppression que le serveur fasse, et elle ne perd rien : le ticket final
+contient tout le récit. Un `id` inconnu est refusé ; un id déjà clôturé
+aussi.
+
 ## 6. Invariants du contrat
 
 - **Aucun paramètre de chemin, d'identifiant fabriqué par le modèle, ni
   d'horodatage** dans aucun appel (0.4).
 - Toute écriture se fait dans `installation/`. Tickets, journal et base :
-  création exclusive, jamais de modification. **Une seule exception** :
-  `update_context` modifie un fichier de contexte, après validation humaine,
-  et seulement après avoir copié la version précédente dans
-  `contexte/historique/`. Le serveur ne supprime jamais rien.
+  création exclusive, jamais de modification. **Deux exceptions, chacune
+  dans son dossier** : `update_context` modifie un fichier de contexte,
+  après validation humaine et copie de la version précédente dans
+  `contexte/historique/` ; `save_progress` réécrit le brouillon d'un ticket
+  en cours dans `en-cours/`, par fusion. Le serveur ne supprime qu'une
+  chose : le brouillon, à la clôture du ticket qui le remplace.
 - Le serveur ne lit aucun fichier hors des deux racines.
 - Le contrat est le même en local et sur un partage : seule la valeur de
   `SUPPORT_IT_INSTALLATION` change (H1).

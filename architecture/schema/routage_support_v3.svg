@@ -1,0 +1,134 @@
+<svg width="100%" viewBox="0 0 700 1500" role="img" xmlns="http://www.w3.org/2000/svg"><title>Routage support v3 — bêta 0.1 : reprise, points d'étape, écriture du contexte</title><desc>Flux : /support, triage (nature incident ou demande, puis domaines ; validation si ambigu ; reprise d'un ticket en cours par resume_ticket), point d'étape save_progress qui crée le brouillon, chargement du skill avec ses sections requises, get_context selon le cas avec question au technicien si section vide, instruction du cas avec boucle d'escalade vers un re-triage, points d'étape à chaque cran validé, pause et passation, recherche en base une fois le cas instruit, plan d'action validé, actions par l'humain, clôture par save_ticket sous l'id du brouillon, écriture du contexte par update_context après validation, publication par publish_kb. Branche hors ticket : remplissage du contexte.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<g style="font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+<!-- /support -->
+<rect x="220" y="40" width="260" height="56" rx="8" style="fill:rgb(241, 239, 232);stroke:rgb(95, 94, 90);stroke-width:0.5px"/>
+<text x="350" y="60" text-anchor="middle" dominant-baseline="central" style="fill:rgb(68, 68, 65);font-size:14px;font-weight:500">/support</text>
+<text x="350" y="78" text-anchor="middle" dominant-baseline="central" style="fill:rgb(95, 94, 90);font-size:12px">unique porte d'entrée · référence demandée d'abord</text>
+<!-- Remplissage (hors ticket) -->
+<rect x="60" y="40" width="140" height="56" rx="8" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/>
+<text x="130" y="60" text-anchor="middle" dominant-baseline="central" style="fill:rgb(64, 40, 120);font-size:14px;font-weight:500">Remplissage</text>
+<text x="130" y="78" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:11px">hors ticket · load_skill(remplissage)</text>
+<!-- Triage -->
+<rect x="200" y="114" width="300" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="350" y="134" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Triage</text>
+<text x="350" y="152" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">MCP · load_skill(triage) : règles + manifeste + tickets en cours</text>
+<!-- Reprise -->
+<rect x="60" y="200" width="140" height="56" rx="8" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/>
+<text x="130" y="220" text-anchor="middle" dominant-baseline="central" style="fill:rgb(64, 40, 120);font-size:14px;font-weight:500">Reprise</text>
+<text x="130" y="238" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:11px">MCP · resume_ticket(réf)</text>
+<!-- Validation du triage -->
+<rect x="400" y="200" width="250" height="56" rx="8" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/>
+<text x="525" y="220" text-anchor="middle" dominant-baseline="central" style="fill:rgb(12, 68, 124);font-size:14px;font-weight:500">Validation du triage</text>
+<text x="525" y="238" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:12px">si ambigu · ajout ou retrait de domaines</text>
+<!-- Point d'étape : brouillon créé -->
+<rect x="200" y="290" width="300" height="56" rx="8" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/>
+<text x="350" y="310" text-anchor="middle" dominant-baseline="central" style="fill:rgb(64, 40, 120);font-size:14px;font-weight:500">Point d'étape — brouillon créé</text>
+<text x="350" y="328" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:12px">MCP · save_progress → en-cours/&lt;id&gt;.md</text>
+<!-- Chargement du skill -->
+<rect x="200" y="380" width="300" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="350" y="400" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Chargement du skill</text>
+<text x="350" y="418" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">MCP · load_skill(domaines, nature) + sections requises</text>
+<!-- Chargement du contexte -->
+<rect x="400" y="470" width="250" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="525" y="490" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Contexte selon le cas</text>
+<text x="525" y="508" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">MCP · get_context(sections), répétable</text>
+<!-- Question au technicien -->
+<rect x="60" y="470" width="230" height="56" rx="8" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/>
+<text x="175" y="490" text-anchor="middle" dominant-baseline="central" style="fill:rgb(12, 68, 124);font-size:14px;font-weight:500">Question au technicien</text>
+<text x="175" y="508" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:12px">section vide · consigne du gabarit fournie</text>
+<!-- Instruction -->
+<rect x="220" y="560" width="260" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="350" y="580" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Instruction du cas</text>
+<text x="350" y="598" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">diagnostic incident · étude demande · lecture seule</text>
+<!-- Points d'étape -->
+<rect x="400" y="650" width="250" height="56" rx="8" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/>
+<text x="525" y="670" text-anchor="middle" dominant-baseline="central" style="fill:rgb(64, 40, 120);font-size:14px;font-weight:500">Points d'étape</text>
+<text x="525" y="688" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:12px">cran validé, réponse, plan, action · save_progress(id)</text>
+<!-- Pause -->
+<rect x="60" y="650" width="230" height="56" rx="8" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/>
+<text x="175" y="670" text-anchor="middle" dominant-baseline="central" style="fill:rgb(64, 40, 120);font-size:14px;font-weight:500">Pause · passation</text>
+<text x="175" y="688" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:12px">etape: pause, prochaine étape notée</text>
+<!-- Recherche base de connaissances -->
+<rect x="200" y="740" width="300" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="350" y="760" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Recherche base de connaissances</text>
+<text x="350" y="778" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">MCP · search_kb(tags), cas instruit</text>
+<!-- Cas similaire -->
+<rect x="60" y="830" width="230" height="56" rx="8" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/>
+<text x="175" y="850" text-anchor="middle" dominant-baseline="central" style="fill:rgb(8, 80, 65);font-size:14px;font-weight:500">Cas similaire</text>
+<text x="175" y="868" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:12px">solution éprouvée, pas un appel</text>
+<!-- Plan d'action -->
+<rect x="200" y="920" width="300" height="56" rx="8" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/>
+<text x="350" y="940" text-anchor="middle" dominant-baseline="central" style="fill:rgb(12, 68, 124);font-size:14px;font-weight:500">Plan d'action proposé</text>
+<text x="350" y="958" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:12px">tu valides ou tu corriges · impact, retour arrière</text>
+<!-- Actions correctives -->
+<rect x="200" y="1010" width="300" height="56" rx="8" style="fill:rgb(250, 238, 218);stroke:rgb(133, 79, 11);stroke-width:0.5px"/>
+<text x="350" y="1030" text-anchor="middle" dominant-baseline="central" style="fill:rgb(99, 56, 6);font-size:14px;font-weight:500">Actions correctives</text>
+<text x="350" y="1048" text-anchor="middle" dominant-baseline="central" style="fill:rgb(133, 79, 11);font-size:12px">hors système, par l'humain</text>
+<!-- Clôture -->
+<rect x="200" y="1100" width="300" height="56" rx="8" style="fill:rgb(241, 239, 232);stroke:rgb(95, 94, 90);stroke-width:0.5px"/>
+<text x="350" y="1120" text-anchor="middle" dominant-baseline="central" style="fill:rgb(68, 68, 65);font-size:14px;font-weight:500">Clôture du ticket</text>
+<text x="350" y="1138" text-anchor="middle" dominant-baseline="central" style="fill:rgb(95, 94, 90);font-size:12px">MCP · load_skill(cloture) puis save_ticket(id) — brouillon retiré</text>
+<!-- Écriture du contexte -->
+<rect x="400" y="1190" width="250" height="56" rx="8" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/>
+<text x="525" y="1210" text-anchor="middle" dominant-baseline="central" style="fill:rgb(12, 68, 124);font-size:14px;font-weight:500">Écriture du contexte</text>
+<text x="525" y="1228" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:12px">MCP · update_context, une section, après oui</text>
+<!-- Publication -->
+<rect x="200" y="1280" width="300" height="56" rx="8" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/>
+<text x="350" y="1300" text-anchor="middle" dominant-baseline="central" style="fill:rgb(12, 68, 124);font-size:14px;font-weight:500">Publication en base</text>
+<text x="350" y="1318" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:12px">MCP · publish_kb(id), après validation</text>
+<!-- Flèches -->
+<g fill="none" style="stroke:rgb(137, 135, 129);stroke-width:1.5px">
+<path d="M350 96 L350 110" marker-end="url(#arrow)"/>
+<path d="M350 170 L350 184 L525 184 L525 198" marker-end="url(#arrow)"/>
+<path d="M200 150 L130 150 L130 198" marker-end="url(#arrow)"/>
+<path d="M525 256 L525 274 L350 274 L350 286" marker-end="url(#arrow)"/>
+<path d="M350 170 L350 286" marker-end="url(#arrow)"/>
+<path d="M130 256 L130 408 L196 408" marker-end="url(#arrow)"/>
+<path d="M350 346 L350 376" marker-end="url(#arrow)"/>
+<path d="M350 436 L350 454 L525 454 L525 466" marker-end="url(#arrow)"/>
+<path d="M400 498 L294 498" marker-end="url(#arrow)"/>
+<path d="M350 436 L350 556" marker-end="url(#arrow)"/>
+<path d="M525 526 L525 544 L350 544"/>
+<path d="M175 526 L175 544 L350 544"/>
+<path d="M350 616 L350 634 L525 634 L525 646" marker-end="url(#arrow)"/>
+<path d="M350 616 L350 634 L175 634 L175 646" marker-end="url(#arrow)"/>
+<path d="M525 706 L525 724 L350 724"/>
+<path d="M350 616 L350 736" marker-end="url(#arrow)"/>
+<path d="M350 796 L350 814 L175 814 L175 826" marker-end="url(#arrow)"/>
+<path d="M350 796 L350 916" marker-end="url(#arrow)"/>
+<path d="M175 886 L175 904 L350 904"/>
+<path d="M350 976 L350 1006" marker-end="url(#arrow)"/>
+<path d="M350 1066 L350 1096" marker-end="url(#arrow)"/>
+<path d="M350 1156 L350 1174 L525 1174 L525 1186" marker-end="url(#arrow)"/>
+<path d="M350 1156 L350 1276" marker-end="url(#arrow)"/>
+<path d="M525 1246 L525 1264 L350 1264"/>
+</g>
+<!-- Boucles et branches (pointillés) -->
+<g fill="none" style="stroke:rgb(94, 63, 160);stroke-width:1.5px;stroke-dasharray:5 4">
+<path d="M60 678 L40 678 L40 228 L56 228" marker-end="url(#arrow)"/>
+<path d="M130 96 L130 106 L22 106 L22 1218 L396 1218" marker-end="url(#arrow)"/>
+</g>
+<g fill="none" style="stroke:rgb(15, 110, 86);stroke-width:1.5px;stroke-dasharray:5 4">
+<path d="M480 574 L672 574 L672 142 L504 142" marker-end="url(#arrow)"/>
+</g>
+<!-- Libellés des flèches -->
+<text x="440" y="178" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:11px">ambigu</text>
+<text x="260" y="228" text-anchor="middle" dominant-baseline="central" style="fill:rgb(15, 110, 86);font-size:11px">cas net</text>
+<text x="165" y="140" text-anchor="middle" dominant-baseline="central" style="fill:rgb(94, 63, 160);font-size:11px">réf. en cours</text>
+<text x="683" y="358" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 683 358)" style="fill:rgb(15, 110, 86);font-size:11px">escalade : re-triage, nouveau load_skill</text>
+<text x="33" y="450" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 33 450)" style="fill:rgb(94, 63, 160);font-size:11px">reprise, même id, passation enregistrée</text>
+<text x="11" y="660" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 11 660)" style="fill:rgb(94, 63, 160);font-size:11px">hors ticket : remplir le contexte, une section à la fois</text>
+<text x="440" y="1180" text-anchor="middle" dominant-baseline="central" style="fill:rgb(24, 95, 165);font-size:11px">sections candidates</text>
+<!-- Légende -->
+<g style="font-size:11px">
+<rect x="40" y="1380" width="14" height="14" rx="3" style="fill:rgb(241, 239, 232);stroke:rgb(95, 94, 90);stroke-width:0.5px"/><text x="60" y="1387" dominant-baseline="central" style="fill:rgb(68, 68, 65)">entrée / sortie</text>
+<rect x="160" y="1380" width="14" height="14" rx="3" style="fill:rgb(225, 245, 238);stroke:rgb(15, 110, 86);stroke-width:0.5px"/><text x="180" y="1387" dominant-baseline="central" style="fill:rgb(68, 68, 65)">automatique</text>
+<rect x="270" y="1380" width="14" height="14" rx="3" style="fill:rgb(230, 241, 251);stroke:rgb(24, 95, 165);stroke-width:0.5px"/><text x="290" y="1387" dominant-baseline="central" style="fill:rgb(68, 68, 65)">ton avis requis</text>
+<rect x="390" y="1380" width="14" height="14" rx="3" style="fill:rgb(250, 238, 218);stroke:rgb(133, 79, 11);stroke-width:0.5px"/><text x="410" y="1387" dominant-baseline="central" style="fill:rgb(68, 68, 65)">modifie l'état</text>
+<rect x="500" y="1380" width="14" height="14" rx="3" style="fill:rgb(240, 235, 250);stroke:rgb(94, 63, 160);stroke-width:0.5px"/><text x="520" y="1387" dominant-baseline="central" style="fill:rgb(68, 68, 65)">écrit dans le temps (brouillon)</text>
+<text x="40" y="1415" dominant-baseline="central" style="fill:rgb(95, 94, 90)">MCP · = appel au serveur MCP (huit appels) — les étapes sans mention ne sortent pas du modèle.</text>
+<text x="40" y="1435" dominant-baseline="central" style="fill:rgb(95, 94, 90)">Trois points de validation humaine : triage ambigu, plan d'action, publication. L'écriture du contexte est la dernière étape du plan validé.</text>
+<text x="40" y="1455" dominant-baseline="central" style="fill:rgb(95, 94, 90)">Tout ce qui est écrit vit dans installation/ : en-cours/, tickets/, journal/, kb/, contexte/ (+ historique/). Le serveur fabrique tous les identifiants.</text>
+</g>
+</g>
+</svg>

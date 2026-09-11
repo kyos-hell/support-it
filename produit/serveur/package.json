@@ -1,8 +1,8 @@
 {
   "name": "support-it-serveur",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Serveur MCP de la boîte à outils IA pour le support IT — cinq appels, aucune intelligence.",
+  "description": "Serveur MCP de la boîte à outils IA pour le support IT — huit appels, aucune intelligence.",
   "type": "module",
   "bin": {
     "support-it": "dist/cli.js"

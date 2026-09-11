@@ -44,6 +44,7 @@ export function chemins(r: Racines) {
     gabaritGeneral: path.join(contenu, "general", "contexte.exemple.md"),
     contexte: path.join(r.installation, "contexte"),
     tickets: path.join(r.installation, "tickets"),
+    enCours: path.join(r.installation, "en-cours"),
     kb: path.join(r.installation, "kb"),
     journal: path.join(r.installation, "journal"),
   };
@@ -60,7 +61,7 @@ export function lireVersion(r: Racines): string {
 /** Crée les dossiers de l'installation s'ils manquent. Seule écriture hors ticket. */
 export function assurerInstallation(r: Racines): void {
   const c = chemins(r);
-  for (const d of [c.contexte, c.tickets, c.kb, c.journal]) {
+  for (const d of [c.contexte, c.tickets, c.kb, c.journal, c.enCours]) {
     fs.mkdirSync(d, { recursive: true });
   }
 }

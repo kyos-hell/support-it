@@ -18,7 +18,7 @@ faible au plus fort :
 
 1. **Le prompt** : « toute vérification passe par le technicien », dans chaque
    skill, chaque `demandes.md`, `triage.md`. Nécessaire, pas suffisant.
-2. **Le contrat** : les six appels ne touchent ni au système d'exploitation,
+2. **Le contrat** : les huit appels ne touchent ni au système d'exploitation,
    ni au réseau, ni à un équipement. Le serveur n'a aucun outil d'exécution.
    Ce que l'IA peut faire par MCP est exhaustivement : lire du produit, lire
    du contexte, chercher en base, écrire un ticket, publier un ticket.
@@ -43,7 +43,8 @@ fraîcheur : il relit `historique/` et corrige. Invariant repris de
 
 | Rôle | Qui | Fait |
 | --- | --- | --- |
-| Technicien | Chaque utilisateur de `/support` | Valide le triage ambigu, le plan, la publication ; exécute. |
+| Technicien | Chaque utilisateur de `/support` | Valide le triage ambigu, le plan, la publication ; exécute. Tient les points d'étape (`save_progress`) ; met en pause avec la prochaine étape notée. |
+| Repreneur | Le technicien qui reprend un ticket en cours d'un collègue | Lit le brouillon (`resume_ticket`), vérifie que le collègue n'y est plus si le dernier point est récent, continue ; la passation est enregistrée dans le brouillon puis dans le ticket final. |
 | Référent de domaine | Nommé dans `general/referents` | Applique les mises à jour de contexte, parcourt le journal, garde la fraîcheur. |
 | Rédacteur du produit | L'équipe projet | Écrit skills et gabarits, lance `valider` et `npm test` avant livraison, fait monter les tags libres au manifeste. |
 

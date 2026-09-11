@@ -1,21 +1,18 @@
 // save_ticket : le serveur fabrique l'identifiant, décide du chemin, écrit le
-// ticket et un fichier par question posée. Le modèle ne fournit que du contenu.
+// ticket et, s'il y a eu des questions, un journal par ticket. Le modèle ne
+// fournit que du contenu.
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
+import { lireBrouillon, retirerBrouillon, trouverBrouillon, type QuestionPosee } from "./encours.js";
+import { fabriquerId, horodatage, idValide, poste, utilisateur } from "./ids.js";
 import { lireDocument, sections } from "./markdown.js";
+
+export { idValide, fabriquerId, type QuestionPosee };
 
 export type Statut = "resolu" | "non-resolu" | "hors-domaines-couverts" | "escalade-externe";
 export type ResoluPar = "outil" | "humain" | "les-deux";
-
-export interface QuestionPosee {
-  question: string;
-  reponse: string;
-  /** Section de contexte que la réponse pourrait remplir (« reseau/dns-dhcp »). */
-  section?: string;
-}
 
 export interface MiseAJourContexte {
   section: string;
@@ -38,6 +35,8 @@ export interface EntreeTicket {
   statut: Statut;
   tags?: string[];
   duree_minutes?: number;
+  /** Identifiant du brouillon en cours (save_progress) : le ticket final reprend cet id et le brouillon est retiré. */
+  id?: string;
   /** Référence du ticket dans l'outil de ticketing de l'entreprise (INC-12345…). */
   reference?: string;
 }
@@ -45,25 +44,12 @@ export interface EntreeTicket {
 export interface TicketEcrit {
   id: string;
   fichier: string;
-  journal: string[];
+  /** Le journal du ticket : un seul fichier, absent s'il n'y a eu aucune question. */
+  journal: { fichier: string | null; questions: number };
+  brouillon_retire: boolean;
 }
 
-const RE_ID_TICKET = /^\d{8}-\d{6}-[a-z0-9]+-[a-z0-9]+$/;
-
-function propre(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "x";
-}
-
-function horodatage(d: Date): { compact: string; iso: string } {
-  const p = (n: number) => String(n).padStart(2, "0");
-  const compact = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-  return { compact, iso: d.toISOString() };
-}
-
-export function fabriquerId(d = new Date()): string {
-  const { compact } = horodatage(d);
-  return `${compact}-${propre(os.userInfo().username)}-${propre(os.hostname())}`;
-}
+export class ErreurTicket extends Error {}
 
 export function tagsAutomatiques(e: EntreeTicket): string[] {
   const t = new Set<string>();
@@ -85,8 +71,8 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
   const entete = {
     id,
     date: iso,
-    auteur: os.userInfo().username,
-    poste: os.hostname(),
+    auteur: utilisateur(),
+    poste: poste(),
     nature: e.nature,
     statut: e.statut,
     resolu_par: e.resolu_par ?? "outil",
@@ -128,34 +114,94 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
   assurerInstallation(r);
   const c = chemins(r);
   const date = new Date();
-  let id = fabriquerId(date);
-  let fichier = path.join(c.tickets, `${id}.md`);
-  // Deux clôtures dans la même seconde sur le même poste : suffixe, jamais d'écrasement.
-  let n = 1;
-  while (fs.existsSync(fichier)) {
-    id = `${fabriquerId(date)}-${++n}`;
+  // Lien avec un brouillon en cours : par id, sinon par référence. Le ticket
+  // final reprend l'id du brouillon (continuité), et le brouillon est retiré.
+  let brouillon = e.id ? lireBrouillon(r, e.id) : e.reference ? trouverBrouillon(r, e.reference) : null;
+  if (e.id && !brouillon) throw new ErreurTicket(`brouillon inconnu : ${e.id}. Omettre id pour clôturer sans brouillon.`);
+  let id: string;
+  let fichier: string;
+  if (brouillon) {
+    id = brouillon.id;
     fichier = path.join(c.tickets, `${id}.md`);
+    if (fs.existsSync(fichier)) throw new ErreurTicket(`ticket ${id} déjà clôturé.`);
+    // Ce que le brouillon a accumulé et que la clôture n'a pas redonné n'est pas perdu.
+    e = {
+      ...e,
+      reference: e.reference ?? brouillon.reference ?? undefined,
+      signaux: fusion(e.signaux, brouillon.signaux, (x) => x.trim()),
+      questions: fusion(e.questions, brouillon.questions, (q) => q.question.trim()),
+      escalades: fusion(e.escalades, brouillon.escalades, (x) => x.trim()),
+    };
+  } else {
+    id = fabriquerId(date);
+    fichier = path.join(c.tickets, `${id}.md`);
+    // Deux clôtures dans la même seconde sur le même poste : suffixe, jamais d'écrasement.
+    let n = 1;
+    while (fs.existsSync(fichier)) {
+      id = `${fabriquerId(date)}-${++n}`;
+      fichier = path.join(c.tickets, `${id}.md`);
+    }
   }
   fs.writeFileSync(fichier, rendreTicket(id, e, date), { encoding: "utf8", flag: "wx" });
+  const brouillon_retire = brouillon ? retirerBrouillon(r, brouillon.id) : false;
 
-  const journal: string[] = [];
-  (e.questions ?? []).forEach((q, i) => {
-    const f = path.join(c.journal, `${id}-q${String(i + 1).padStart(2, "0")}.md`);
-    const entete = {
-      ticket: id,
-      date: date.toISOString(),
-      nature: e.nature,
-      domaines: e.domaines_valides,
-      section_candidate: q.section ?? null,
-    };
-    fs.writeFileSync(
-      f,
-      `---\n${YAML.stringify(entete).trimEnd()}\n---\n\n## question — Question posée\n\n${q.question.trim()}\n\n## reponse — Réponse du technicien (contenu candidat)\n\n${q.reponse.trim()}\n`,
-      { encoding: "utf8", flag: "wx" },
-    );
-    journal.push(f);
-  });
-  return { id, fichier, journal };
+  const journal = ecrireJournal(r, id, e, date);
+  return { id, fichier, journal, brouillon_retire };
+}
+
+/**
+ * Journal des questions : un fichier par ticket, `journal/<id>.md`, écrit une
+ * fois à la clôture. L'en-tête porte les sections candidates pour que le
+ * référent filtre sans ouvrir les fichiers ; le corps, une section par
+ * question. Aucun fichier s'il n'y a pas eu de question (décision du
+ * 2026-09-11 : un fichier par question éclatait le journal en dizaines de
+ * fichiers redondants avec la section `questions` du ticket).
+ */
+function ecrireJournal(r: Racines, id: string, e: EntreeTicket, date: Date): { fichier: string | null; questions: number } {
+  const c = chemins(r);
+  const questions = e.questions ?? [];
+  if (questions.length === 0) return { fichier: null, questions: 0 };
+  const candidates = [...new Set(questions.map((q) => q.section).filter((s): s is string => Boolean(s)))];
+  const entete = {
+    ticket: id,
+    date: date.toISOString(),
+    reference: e.reference ?? null,
+    nature: e.nature,
+    domaines: e.domaines_valides,
+    questions: questions.length,
+    sections_candidates: candidates,
+  };
+  const corps = questions
+    .map((q, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      return (
+        `## q${n} — Question ${i + 1}\n\n` +
+        `**Q :** ${q.question.trim()}\n\n` +
+        `**R (contenu candidat) :** ${q.reponse.trim()}\n\n` +
+        `Section candidate : ${q.section ? `\`${q.section}\`` : "aucune"}\n`
+      );
+    })
+    .join("\n");
+  const f = path.join(c.journal, `${id}.md`);
+  fs.writeFileSync(
+    f,
+    `---\n${YAML.stringify(entete).trimEnd()}\n---\n\n# Journal du ticket ${id}${e.reference ? ` — ${e.reference}` : ""}\n\n${corps}`,
+    { encoding: "utf8", flag: "wx" },
+  );
+  return { fichier: f, questions: questions.length };
+}
+
+function fusion<T>(donnes: T[] | undefined, existants: T[], cle: (x: T) => string): T[] {
+  const out = [...(donnes ?? [])];
+  const vus = new Set(out.map(cle));
+  for (const x of existants) {
+    const k = cle(x);
+    if (k && !vus.has(k)) {
+      vus.add(k);
+      out.push(x);
+    }
+  }
+  return out;
 }
 
 export interface TicketLu {
@@ -182,6 +228,3 @@ export function lireTicket(fichier: string): TicketLu {
   };
 }
 
-export function idValide(id: string): boolean {
-  return RE_ID_TICKET.test(id) || /^\d{8}-\d{6}-[a-z0-9]+-[a-z0-9]+-\d+$/.test(id);
-}

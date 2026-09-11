@@ -28,11 +28,13 @@ produit/serveur/
     manifeste.ts    lecture + rendu markdown + vocabulaire des tags
     contexte.ts     get_context, update_context, définition de « vide », état de remplissage
     skills.ts       load_skill (domaines, triage, cloture), en-tête des skills
-    tickets.ts      save_ticket : identifiant, rendu, journal
+    ids.ts          identifiants, horodatages, utilisateur et poste (partagés par tickets et brouillons)
+    encours.ts      save_progress, resume_ticket : brouillon d'un ticket en cours, fusion, liste, reprise
+    tickets.ts      save_ticket : identifiant, rendu, journal, lien avec le brouillon
     kb.ts           search_kb, publish_kb
     validation.ts   contrôles de livraison
-    index.ts        le serveur : six outils enregistrés, stdio
-    cli.ts          valider · init · etat · enregistrer · entree · chemins
+    index.ts        le serveur : huit outils enregistrés, stdio
+    cli.ts          valider · tester · init · etat · enregistrer · entree · chemins
     test/smoke.ts   test de fumée bout en bout
 ```
 
@@ -62,8 +64,25 @@ sections `symptome-initial`, `signaux`, `conclusion`, `conclusion-humaine`,
 `plan-action`, `questions`, `mises-a-jour-contexte`, chacune au format
 `## id — titre`. Relu par `lireTicket` avec `markdown.sections`.
 
-**Journal** : `<id>-qNN.md`, en-tête `ticket`, `date`, `nature`, `domaines`,
-`section_candidate`, sections `question` et `reponse`.
+**Brouillon** (`encours.rendre`) : en-tête YAML = l'objet `Brouillon` entier
+(source de vérité, relu par `lireFichier` pour fusionner), corps réduit à
+`etat` et `passations` (le corps complet doublait le fichier : 29 Ko sur le
+premier brouillon réel). `encours.rendreComplet` rend tout en clair pour
+`resume_ticket`. Fusion : scalaires remplacés s'ils sont fournis, listes
+ajoutées sans doublon (clé : le texte, ou la question), référence changée
+seulement si elle diffère hors casse. **Limites par entrée** (`LIMITES`,
+vérifiées avant toute écriture et dans le schéma zod) : signal 160,
+vérification, action, note 240, question et réponse 300, prochaine étape
+200 caractères ; refus explicite citant la règle du champ. Écriture atomique
+(`.tmp-<pid>` puis renommage).
+
+**Journal** : `journal/<id>.md`, **un par ticket**, écrit une fois à la
+clôture, absent s'il n'y a pas eu de question. En-tête `ticket`, `date`,
+`reference`, `nature`, `domaines`, `questions` (nombre),
+`sections_candidates` (liste dédoublonnée) ; corps : une section
+`## qNN — Question N` par question, avec **Q**, **R (contenu candidat)** et
+la section candidate. Jusqu'au 2026-09-11 : un fichier `<id>-qNN.md` par
+question ; les fichiers existants ne sont pas migrés.
 
 **Identifiant** : `AAAAMMJJ-HHMMSS-<utilisateur>-<poste>`, utilisateur et
 poste réduits à `[a-z0-9]{1,24}`, heure locale du poste (lisible par le
@@ -97,6 +116,12 @@ garde rien entre deux appels, tout est sur disque ou dans la conversation.
 | `update_context` sur une section inconnue des deux | Refus : on n'invente pas de section, on l'ajoute au gabarit d'abord. |
 | Deux `update_context` sur le même fichier au même instant (partage) | Non protégé dans la bêta mono-poste : le dernier écrit gagne, le premier est dans `historique/`. Architecture cible en §8 (concurrence optimiste par empreinte), à implémenter à la porte 2. |
 | Contenu fourni avec commentaires, date ou titre `##` | Commentaires et date retirés (le serveur remet les siens) ; titre refusé. |
+| `save_progress` sans id ni brouillon de même référence, sans symptôme | Refus : le symptôme initial tel qu'exprimé est la seule chose qu'on ne peut pas reconstituer plus tard. |
+| `save_progress` avec un id inconnu | Refus, avec le rappel que `resume_ticket()` liste les brouillons. |
+| Deux `save_progress` sur le même brouillon depuis deux postes | Le second écrase le premier (fusion sur l'état lu au moment de l'appel) et enregistre une passation. Un ticket ouvert appartient à un technicien à la fois ; l'avertissement « dernier point il y a n min » de `resume_ticket` est la garde. Même plan que le contexte pour la porte 2 (§8). |
+| Brouillon abandonné | Reste dans `en-cours/` ; `etat` et `resume_ticket()` le signalent au-delà de 30 jours. Clôture manuelle par `save_ticket(id, statut non-resolu)`. |
+| `save_ticket(id)` sur un brouillon déjà clôturé | Refus : le ticket final existe. |
+| Session Claude Code fermée entre deux points d'étape | Ce qui a été dit depuis le dernier `save_progress` est perdu ; c'est la raison de la règle « un point d'étape par acquis ». |
 
 ## 6. Ce que le composant ne fait pas
 
@@ -108,19 +133,26 @@ d'identité (celle du partage), pas de limite de taille.
 ## 7. Points de contrôle
 
 - `npm run build` sans erreur ; `node dist/cli.js valider` code 0 ;
-  `npm test` « smoke : OK » — les trois avant chaque livraison.
+  `npm test` « smoke : OK » — les trois avant chaque livraison. Depuis la
+  bêta v2 (2026-09-11), le smoke charge les six domaines en incident et en
+  demande, et rejoue le cas « domaine décrit, hors bêta » sur une copie
+  temporaire de `contenu/` + `VERSION` avec un domaine synthétique
+  `exemple-decrit` — le produit livré n'en a plus.
 - `node dist/cli.js chemins` sur le poste installé : les deux racines
   attendues.
-- Dans Claude Code, `/mcp` liste `support-it` avec sa version, six outils.
+- Dans Claude Code, `/mcp` liste `support-it` avec sa version, huit outils.
 - Après un premier ticket : un fichier dans `tickets/`, autant de fichiers
   dans `journal/` que de questions, rien ailleurs.
 
 ## 8. Évolution multi-utilisateur — architecture prévue, non implémentée
 
 La bêta tourne sur un seul poste : aucune écriture concurrente n'est
-possible. Le seul fichier mutable de l'installation est le contexte
-(`update_context`), et c'est le seul point à traiter au passage sur un
-partage. Décision de conception prise le 2026-09-09, à implémenter à la
+possible. Deux matières sont mutables dans l'installation : le contexte
+(`update_context`) et les brouillons en cours (`save_progress`, ajoutés le
+2026-09-10). Le même mécanisme couvre les deux au passage sur un partage :
+`resume_ticket` renverra une empreinte du brouillon, `save_progress` la
+recevra et refusera si le brouillon a changé depuis — ce qui, pour un
+ticket, signifie qu'un collègue y travaille en même temps. Décision de conception prise le 2026-09-09, à implémenter à la
 porte 2 :
 
 **Concurrence optimiste par empreinte, pas de verrou.**
@@ -146,7 +178,7 @@ contexte sont rares (un référent, quelques fois par semaine) : le cas de
 conflit sera exceptionnel, et `historique/` garde de toute façon la
 version écrasée.
 
-**Ce qui ne change pas.** La signature des six appels (un paramètre
+**Ce qui ne change pas.** La signature des huit appels (un paramètre
 optionnel en plus), le format des fichiers, les scripts. Le contrat reste
 identique en local et sur le partage (H1). Test à écrire : deux
 `update_context` sur le même fichier avec la même empreinte, le second

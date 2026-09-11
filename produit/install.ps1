@@ -1,15 +1,19 @@
 ﻿<#
 .SYNOPSIS
-  Installe la boîte à outils IA pour le support IT sur ce poste (Windows).
+  Installe ou met à jour la boîte à outils IA pour le support IT sur ce poste (Windows).
 .DESCRIPTION
   Mêmes étapes, dans le même ordre, que install.sh :
     1. prérequis (Node.js >= 18, npm ; Claude Code signalé)
     2. construction du serveur MCP
-    3. validation du produit livré
-    4. installation/ : initialiser (premier poste) ou rejoindre (existant)
+    3. validation du produit livré, puis test de fumée du serveur construit
+    4. installation/ : initialiser (premier poste), rejoindre (existant) ou mettre à jour (nouvelle version)
     5. enregistrement du serveur MCP auprès de Claude Code + point d'entrée /support
     6. état de remplissage du contexte
   Ne bloque jamais sur un contexte vide. N'écrase jamais un fichier de installation/.
+  Mise à jour : remplacer produit/ (ou git pull), relancer ce script — les nouveaux
+  gabarits sont copiés, les fichiers remplis ne sont pas touchés.
+  Si PowerShell refuse d'exécuter le script (politique d'exécution) :
+    powershell -ExecutionPolicy Bypass -File .\install.ps1
 .PARAMETER Installation
   Racine de l'arborescence client (installation/). Défaut : à côté de produit/.
   Pour un partage : -Installation \\serveur\support-it\installation
@@ -17,14 +21,21 @@
   N'enregistre ni le serveur ni /support (tests, ou poste sans Claude Code).
 .PARAMETER SansBuild
   Ne relance ni npm install ni la compilation (déjà faits).
+.PARAMETER SansTest
+  Ne lance pas le test de fumée à l'étape 3 (poste très lent, ou test déjà joué).
 #>
 param(
   [string]$Installation = "",
   [switch]$SansClaude,
-  [switch]$SansBuild
+  [switch]$SansBuild,
+  [switch]$SansTest
 )
 
 $ErrorActionPreference = "Stop"
+# Les messages du script et de node sont en UTF-8 : sans cela, la console
+# Windows affiche les accents en mojibake. Sans effet ailleurs.
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+
 $Produit = $PSScriptRoot
 $Serveur = Join-Path $Produit "serveur"
 if (-not $Installation) { $Installation = Join-Path (Split-Path $Produit -Parent) "installation" }
@@ -33,7 +44,8 @@ $Installation = [System.IO.Path]::GetFullPath($Installation)
 function Etape($n, $titre) { Write-Host ""; Write-Host "[$n/6] $titre" -ForegroundColor Cyan }
 function Echec($msg) { Write-Host "ECHEC : $msg" -ForegroundColor Red; exit 1 }
 
-Write-Host "== support-it $(Get-Content (Join-Path $Produit 'VERSION') -TotalCount 1) — installation =="
+$Version = (Get-Content (Join-Path $Produit 'VERSION') -TotalCount 1).Trim()
+Write-Host "== support-it $Version — installation =="
 Write-Host "produit      : $Produit"
 Write-Host "installation : $Installation"
 
@@ -67,16 +79,17 @@ if (-not (Test-Path $Cli)) { Echec "serveur non construit : $Cli absent" }
 $env:SUPPORT_IT_PRODUIT = $Produit
 $env:SUPPORT_IT_INSTALLATION = $Installation
 
-Etape 3 "Validation du produit livré"
+Etape 3 "Validation du produit livré et test de fumée"
 & node $Cli valider
 if ($LASTEXITCODE -ne 0) { Echec "le produit livré ne passe pas la validation : ne pas installer une livraison invalide" }
+if ($SansTest) {
+  Write-Host "  test de fumée ignoré (-SansTest)"
+} else {
+  & node $Cli tester
+  if ($LASTEXITCODE -ne 0) { Echec "le test de fumée échoue sur ce poste : ne pas installer un serveur qui ne répond pas" }
+}
 
 Etape 4 "Arborescence client"
-if (Test-Path (Join-Path $Installation "contexte")) {
-  Write-Host "  mode : REJOINDRE une installation existante (rien n'y sera écrasé)"
-} else {
-  Write-Host "  mode : INITIALISER une nouvelle installation"
-}
 & node $Cli init
 if ($LASTEXITCODE -ne 0) { Echec "initialisation de installation/ en échec" }
 
@@ -94,8 +107,9 @@ Etape 6 "État de remplissage du contexte"
 & node $Cli etat
 
 Write-Host ""
-Write-Host "Installation terminée." -ForegroundColor Green
-Write-Host "  - Remplir le contexte : $Installation\contexte\*.md (recommandé, pas obligatoire)."
-Write-Host "  - Redémarrer Claude Code, puis taper /support suivi de la description du ticket."
+Write-Host "Installation terminée ($Version)." -ForegroundColor Green
+Write-Host "  - Remplir le contexte : $Installation\contexte\*.md (recommandé, pas obligatoire),"
+Write-Host "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
+Write-Host "  - Redémarrer Claude Code, vérifier /mcp (support-it, huit outils), puis taper /support suivi du ticket."
 Write-Host "  - Mode de permission : garder le mode par défaut (confirmation avant chaque commande)."
 Write-Host "    La règle « l'IA n'exécute rien, le technicien exécute » n'est tenue que par ce mode."

@@ -103,7 +103,7 @@ connecte (identité), le poste client (poste de travail).
 
 ---
 
-## 3. Poste de travail — *décrit, hors bêta*
+## 3. Poste de travail — *implémenté en bêta v2 (2026-09-11)*
 
 **Ce qu'il couvre.** L'environnement logiciel de la machine d'un utilisateur :
 OS client, profil, mises à jour, applications installées, configuration
@@ -133,7 +133,7 @@ fonctionnement interne d'une application métier (applicatif).
 
 ---
 
-## 4. Matériel — *décrit, hors bêta*
+## 4. Matériel — *implémenté en bêta v2 (2026-09-11)*
 
 **Ce qu'il couvre.** L'objet physique : composants (disque, mémoire,
 alimentation, écran), périphériques (imprimantes, scanners, docks, casques),
@@ -159,7 +159,7 @@ système), son raccordement au-delà de la prise (réseau).
 
 ---
 
-## 5. Identité et annuaire — *décrit, hors bêta*
+## 5. Identité et annuaire — *implémenté en bêta v2 (2026-09-11)*
 
 **Ce qu'il couvre.** Le compte et ses attributs : authentification, mots de
 passe, verrouillages, groupes, droits d'accès, MFA, cycle de vie du compte
@@ -188,7 +188,7 @@ problème système.
 
 ---
 
-## 6. Applicatif — *décrit, hors bêta*
+## 6. Applicatif — *implémenté en bêta v2 (2026-09-11)*
 
 **Ce qu'il couvre.** Le fonctionnement interne des applications métier :
 erreurs fonctionnelles, données incohérentes, comportements inattendus,
@@ -226,10 +226,21 @@ sans signal. Ce jeu s'enrichit à chaque ticket réel mal classé et à chaque
 escalade constatée en diagnostic (« parti réseau, conclu système » —
 périmètre E), qui sont les seuls verdicts qui comptent.
 
-**Bêta.** Seules les lignes réseau/système sont exerçables tant que les
-autres domaines n'ont pas de skill. Un symptôme pointant vers un domaine
-décrit mais non implémenté doit produire la réponse « hors des domaines
-couverts pour l'instant », pas un routage forcé vers réseau ou système.
+**Bêta v2 (2026-09-11).** Les six domaines ont un skill : les dix lignes
+sont exerçables. La réponse « hors des domaines couverts » reste dans le
+triage pour un symptôme qui ne tombe dans aucun des six (téléphonie fixe,
+contrôle d'accès physique…) et pour tout domaine futur déclaré `decrit` au
+manifeste ; le test de fumée la rejoue sur un domaine décrit synthétique,
+puisque le produit livré n'en a plus.
+
+**Le cloud n'est pas un domaine** (tranché le 2026-09-11, `plan.md` A). Le
+triage reconnaît ce que le problème *suit* ; « c'est hébergé dans le cloud »
+n'est pas un signal du ticket, et un domaine cloud transpercerait les six
+autres (Entra est de l'identité, un VNet du réseau, une VM du système). Le
+cloud est une **plateforme** : une ligne de `general/plateformes`, au même
+rang que la salle serveur, et une colonne dans les sections qui en ont
+besoin. Preuve par la bêta : l'incident de réécriture de mot de passe se
+voyait dans le portail cloud, sa cause était un service Windows on-prem.
 
 | # | Symptôme brut | Candidats | Question qui tranche |
 | --- | --- | --- | --- |
@@ -254,3 +265,6 @@ couverts pour l'instant », pas un routage forcé vers réseau ou système.
 - Les cas à cheval sont explicitement listés : **fait**, section 7.
 - Chaque domaine a ses signaux discriminants : **fait**, à corriger sur le
   terrain.
+- Les six domaines ont un skill, des demandes et un gabarit : **fait** le
+  2026-09-11 (bêta v2). Les quatre nouveaux sont des hypothèses jusqu'au
+  premier ticket réel de chacun.

@@ -78,7 +78,9 @@ export function valider(r: Racines): Constat[] {
     const b = fs.readFileSync(ps1);
     if (!(b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf)) err("install.ps1", "doit être enregistré en UTF-8 avec BOM (PowerShell 5.1)");
   }
-  if (!fs.existsSync(path.join(r.produit, "install.sh"))) err("install.sh", "script d'installation Linux/macOS manquant");
+  const sh = path.join(r.produit, "install.sh");
+  if (!fs.existsSync(sh)) err("install.sh", "script d'installation Linux/macOS manquant");
+  else if (fs.readFileSync(sh, "utf8").includes("\r")) err("install.sh", "contient des retours chariot : fins de ligne LF obligatoires (bash refuse un script CRLF)");
   if (constats.some((x) => x.niveau === "erreur")) return constats;
 
   // 2. Manifeste contre dossiers.

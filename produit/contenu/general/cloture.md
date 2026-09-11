@@ -47,6 +47,10 @@ un champ obligatoire, **une** question, et seulement pour celui-là.
   baseline, `conclusion_humaine` et `resolu_par`.
 
 Le serveur fabrique l'identifiant et le chemin : ne jamais en proposer.
+**Si le ticket a un brouillon en cours** (`save_progress` a été appelé),
+passer son `id` à `save_ticket` : le ticket final reprend cet id, ce que le
+brouillon a accumulé (questions, signaux, escalades) est repris s'il manque,
+et le brouillon est retiré. Sans id, le serveur relie par la référence.
 
 ## Après `save_ticket` : proposer d'écrire le contexte
 

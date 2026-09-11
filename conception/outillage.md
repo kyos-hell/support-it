@@ -9,8 +9,9 @@ Tout est dans `produit/serveur/dist/cli.js`, commande `node dist/cli.js <command
 | Commande | Rôle | Qui l'appelle | Pourquoi elle existe |
 | --- | --- | --- | --- |
 | `valider` | Contrôles de livraison sur `produit/` (ci-dessous). Code de retour 1 sur erreur. | Le rédacteur avant chaque livraison ; `install.*` étape 3, qui refuse d'installer une livraison invalide. | La règle la plus facile à violer par inadvertance (donnée d'entreprise dans un skill) est la plus coûteuse à découvrir tard. |
-| `init` | Crée `installation/{contexte,tickets,kb,journal}` et copie les gabarits en `contexte/<domaine>.md` **s'ils n'existent pas**. Ne touche jamais un fichier présent. | `install.*` étape 4. | « Installer » et « rejoindre » sont la même commande, idempotente : le deuxième technicien ne peut pas réinitialiser le contexte du premier (H3). |
-| `etat` | État de remplissage : par fichier de contexte, sections remplies / vides ; sections du gabarit **manquantes** dans le fichier rempli (rapport de migration H4) ; sections en plus. | `install.*` étape 6 ; le référent quand il veut. | Le contexte est un accélérateur, pas un prérequis : on affiche, on ne bloque pas (H6). |
+| `tester` | Lance le test de fumée du serveur construit (`dist/test/smoke.js`) : les huit appels sur les six domaines, dans une installation temporaire, avec le `produit/` résolu. Code de retour du test. | `install.*` étape 3, après `valider` ; le rédacteur avant chaque livraison (`npm test` fait la même chose). | Depuis le 2026-09-11 : `valider` prouve que le produit est bien formé, pas que le serveur répond sur ce poste (version de Node, SDK installé). Un serveur qui ne démarre pas se découvrait au premier `/support`. |
+| `init` | Crée `installation/{contexte,en-cours,tickets,kb,journal}` et copie les gabarits en `contexte/<domaine>.md` **s'ils n'existent pas**. Ne touche jamais un fichier présent. Écrit `installation/VERSION` (version du produit qui a initialisé ou mis à jour) et annonce le mode : INITIALISER, REJOINDRE, ou **MISE À JOUR x → y**. | `install.*` étape 4. | « Installer », « rejoindre » et « mettre à jour » sont la même commande, idempotente : le deuxième technicien ne peut pas réinitialiser le contexte du premier (H3), et une nouvelle version ne copie que les gabarits qui manquent (H4). La version notée sert au message et, plus tard, à la règle de compatibilité (`plan.md` §5). |
+| `etat` | État de remplissage et tickets en cours (avec leur âge ; plus de 30 jours = à clôturer ou reprendre) : par fichier de contexte, sections remplies / vides ; sections du gabarit **manquantes** dans le fichier rempli (rapport de migration H4) ; sections en plus. | `install.*` étape 6 ; le référent quand il veut. | Le contexte est un accélérateur, pas un prérequis : on affiche, on ne bloque pas (H6). |
 | `enregistrer` | Écrit l'entrée `mcpServers.support-it` dans `~/.claude.json` (portée utilisateur), après sauvegarde `.support-it.bak`. Commande `node …/dist/index.js`, variables des deux racines. | `install.*` étape 5. | Le CLI `claude` n'est pas toujours sur le PATH (application de bureau) ; écrire la configuration est déterministe et vérifiable. |
 | `entree` | Copie `produit/entrees/claude-code/support/SKILL.md` dans `~/.claude/skills/support/`. | `install.*` étape 5. | Le point d'entrée `/support` est un skill Claude Code de dix lignes (0.4). |
 | `chemins` | Affiche les racines résolues. | Diagnostic. | Première question quand « ça ne charge pas » : quelles racines le serveur voit-il ? |
@@ -44,7 +45,7 @@ Avertissement (n'empêche pas) :
 ## Test de fumée
 
 `npm test` (`dist/test/smoke.js`) : lance le serveur sur une installation
-temporaire, joue les six appels dans l'ordre du flux, vérifie les erreurs
+temporaire, joue les huit appels dans l'ordre du flux, vérifie les erreurs
 attendues (domaine inconnu, hors bêta, nature manquante, trois domaines,
 double publication, ticket introuvable), l'état des sections (ok, vide,
 inconnue, fichier absent), les fichiers écrits (ticket, journal, kb) et

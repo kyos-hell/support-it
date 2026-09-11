@@ -138,13 +138,37 @@ bonne question au bon niveau de détail.
 ## 6. Gabarits de la bêta
 
 - `produit/contenu/general/contexte.exemple.md` — sections : `sites`,
-  `criticite-services`, `contacts-escalade`, `referents`.
+  `plateformes` (ajoutée le 2026-09-09 ; le cloud y vit, il n'est pas un
+  domaine — `plan.md` A), `criticite-services`, `contacts-escalade`,
+  `referents`.
 - `produit/contenu/domaines/reseau/contexte.exemple.md` — sections : `topologie`,
   `equipements`, `acces-distant`, `dns-dhcp`, `proxy-filtrage`, `wifi`,
   `flux-existants`, `plan-adressage`.
 - `produit/contenu/domaines/systeme/contexte.exemple.md` — sections : `serveurs`,
   `services`, `virtualisation`, `stockage`, `partages`, `sauvegardes`,
   `messagerie`, `certificats`, `ordonnancement`.
+
+Ajoutés en bêta v2 (2026-09-11), hypothèses jusqu'au premier ticket réel de
+chaque domaine :
+
+- `produit/contenu/domaines/identite/contexte.exemple.md` — sections :
+  `annuaires`, `synchronisation`, `authentification`, `groupes-droits`,
+  `cycle-de-vie`, `comptes-service`.
+- `produit/contenu/domaines/poste-de-travail/contexte.exemple.md` — sections :
+  `parc`, `deploiement`, `applications-standard`, `profils`,
+  `securite-poste`, `impression`.
+- `produit/contenu/domaines/materiel/contexte.exemple.md` — sections :
+  `parc-materiel`, `fournisseurs-sav`, `stock`, `peripheriques`,
+  `salles-techniques`.
+- `produit/contenu/domaines/applicatif/contexte.exemple.md` — sections :
+  `catalogue`, `responsables`, `editeurs-support`, `integrations`,
+  `environnements`, `acces-applicatifs`.
+
+Soit 44 sections (22 en bêta 1). Trois sections transverses ont été
+envisagées et **non ajoutées** (`general/acces-administration` pour les
+bastions, `general/conventions`, `general/outillage`) : deux tickets sur
+trois ont demandé un bastion, mais une section transverse touche tous les
+clients installés (H4) — à trancher avec un troisième ticket.
 
 La liste vient du contrat B→C : chaque identifiant déclaré par un skill doit
 exister dans un gabarit, et le script de validation du périmètre D vérifie
