@@ -81,7 +81,7 @@ server.registerTool(
     title: "Clôturer et enregistrer le ticket",
     description:
       "Enregistre le ticket clôturé. Le serveur fabrique l'identifiant et le chemin ; ne fournir que du contenu. " +
-      "Le symptôme initial doit être conservé tel qu'exprimé par le technicien. Chaque question posée devient un fichier du journal. " +
+      "Le symptôme initial doit être conservé tel qu'exprimé par le technicien. Les questions posées forment le journal du ticket (un fichier par ticket). " +
       "S'applique aussi aux tickets résolus à la main pendant la baseline (conclusion_humaine, resolu_par).",
     inputSchema: {
       symptome_initial: z.string().min(1).describe("Le symptôme tel qu'exprimé au départ, sans reformulation"),

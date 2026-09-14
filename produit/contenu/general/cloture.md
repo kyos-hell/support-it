@@ -24,8 +24,8 @@ un champ obligatoire, **une** question, et seulement pour celui-là.
 - Chaque **question posée** au technicien, avec sa réponse, et — quand la
   réponse est une information d'entreprise (une passerelle, un serveur, un
   prestataire) — la **section de contexte** qu'elle pourrait remplir. Le
-  serveur en fait un fichier de journal chacune : c'est ainsi que les
-  gabarits se complètent.
+  serveur en fait le journal du ticket (un fichier par ticket) : c'est
+  ainsi que les gabarits se complètent.
 - Les **mises à jour de contexte** : quand le terrain a contredit ou complété
   le contexte, formuler le contenu **prêt à coller** dans la section visée.
   **Trier avant de proposer** : le contexte reçoit ce que l'entreprise
