@@ -1,5 +1,5 @@
 // Test de fumée : lance le serveur sur une installation temporaire et joue
-// les huit appels dans l'ordre du flux, sur les six domaines livrés. Le cas
+// les neuf appels dans l'ordre du flux, sur les six domaines livrés. Le cas
 // « domaine décrit, hors bêta » n'existe plus dans le produit réel depuis la
 // bêta v2 : il est rejoué sur une copie temporaire du produit à laquelle on
 // ajoute un domaine décrit. Aucune écriture hors des dossiers temporaires.
@@ -75,8 +75,8 @@ async function main() {
   const outils = await client.listTools();
   assert.deepEqual(
     outils.tools.map((t) => t.name).sort(),
-    ["get_context", "load_skill", "publish_kb", "resume_ticket", "save_progress", "save_ticket", "search_kb", "update_context"],
-    "huit appels, ni plus ni moins",
+    ["get_context", "load_skill", "publish_kb", "read_kb", "resume_ticket", "save_progress", "save_ticket", "search_kb", "update_context"],
+    "neuf appels, ni plus ni moins",
   );
 
   // 1. Triage.
@@ -317,7 +317,9 @@ async function main() {
   assert.doesNotMatch(fs.readFileSync(path.join(installation, "en-cours", `${pid}.md`), "utf8"), /- ok$/m, "un appel refusé n'écrit rien, même les entrées valides");
   const p4 = await clientB.callTool({ name: "save_progress", arguments: { id: pid, notes: ["reprise"] } });
   assert.match(texte(p4), /étape instruction/, "la pause est levée au save_progress suivant");
-  // Recherche, plan, actions : l'étape suit ce que le serveur voit.
+  // Recherche, plan, actions : l'étape suit ce que le serveur voit. read_kb avant search_kb est refusé.
+  const lireTropTot = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
+  assert.ok(estErreur(lireTropTot) && /chercher d'abord/.test(texte(lireTropTot)), texte(lireTropTot));
   const rech = await clientB.callTool({ name: "search_kb", arguments: { tags: ["systeme", "stockage"] } });
   assert.ok(!estErreur(rech), texte(rech));
   const p5 = await clientB.callTool({ name: "save_progress", arguments: { id: pid, prochaine_etape: "proposer le plan" } });
@@ -431,12 +433,24 @@ async function main() {
   assert.match(texte(pub), /symptôme : Test de fumée : lenteur uniquement via VPN/, "la réponse de publish_kb cite ce qui a été publié");
   const rePub = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: id } });
   assert.ok(estErreur(rePub) && /déjà publié/.test(texte(rePub)));
-  const apres = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpn", "dns"] } });
-  assert.match(texte(apres), /1 cas similaire/);
-  assert.match(texte(apres), /score 1/);
-  assert.match(texte(apres), /concentrateur/);
+  const apres = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpn", "dns", "concentrateur"] } });
+  assert.match(texte(apres), /1 cas sur 1 en base, par rareté/);
+  assert.match(texte(apres), /score 2/, "D2 : deux tags communs portés par une seule entrée = 1 + 1");
+  assert.match(texte(apres), /tags communs : vpn, concentrateur \(et \d+ autre\(s\)\)/, "rendu compact : tags communs seulement");
+  assert.doesNotMatch(texte(apres), /- tags : /, "la liste complète des tags n'est plus rendue");
+  assert.match(texte(apres), /read_kb\(ticket_id\)/);
   const parRef = await clientB.callTool({ name: "search_kb", arguments: { tags: ["inc-test-42"] } });
-  assert.match(texte(parRef), /— INC-TEST-42 · score 1/);
+  assert.match(texte(parRef), /— INC-TEST-42 · score 0/, "la référence retrouve le cas mais ne pèse pas");
+  // read_kb : le cas publié, sans les questions ; refus d'un id inconnu.
+  const lu = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: id } });
+  assert.ok(!estErreur(lu), texte(lu));
+  assert.match(texte(lu), /# Cas \S+ — INC-TEST-42/);
+  assert.match(texte(lu), /## Conclusion\n\nTest : concentrateur VPN saturé/);
+  assert.match(texte(lu), /## Plan d'action\n\nTest : rien/);
+  assert.match(texte(lu), /- uniquement via VPN/);
+  assert.doesNotMatch(texte(lu), /Quelle est la passerelle/, "les questions ne sont pas renvoyées");
+  const luInconnu = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
+  assert.ok(estErreur(luInconnu) && /aucun cas publié/.test(texte(luInconnu)), texte(luInconnu));
   const rien = await clientB.callTool({ name: "search_kb", arguments: { tags: ["imprimante"] } });
   assert.match(texte(rien), /Aucun cas ne partage/);
   const inexistant = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
@@ -450,6 +464,8 @@ async function main() {
   const pubRefusee = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: idNonResolu } });
   assert.ok(estErreur(pubRefusee) && /seul un ticket résolu/.test(texte(pubRefusee)), texte(pubRefusee));
   assert.ok(!fs.existsSync(path.join(installation, "kb", `${idNonResolu}.md`)));
+  const luNonPublie = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: idNonResolu } });
+  assert.ok(estErreur(luNonPublie) && /n'est pas publié/.test(texte(luNonPublie)), texte(luNonPublie));
   // Un second brouillon, laissé en instruction : la reprise après redémarrage se teste au client C.
   await clientB.callTool({ name: "load_skill", arguments: { domaines: ["triage"] } });
   const p8 = await clientB.callTool({ name: "save_progress", arguments: { reference: "INC-SEQ-2", symptome_initial: "Test : reprise après redémarrage", nature: "incident", domaines_valides: ["reseau"] } });
@@ -470,8 +486,12 @@ async function main() {
   assert.ok(!estErreur(rep) && /load_skill\(\["reseau"\], "incident"\)/.test(texte(rep)), texte(rep));
   const dejaServie = await clientC.callTool({ name: "get_context", arguments: { sections: ["reseau/wifi"] } });
   assert.match(texte(dejaServie), /Déjà chargée/, "sections servies reconstruites depuis le brouillon");
+  const lireAvantC = await clientC.callTool({ name: "read_kb", arguments: { ticket_id: id } });
+  assert.ok(estErreur(lireAvantC) && /chercher d'abord/.test(texte(lireAvantC)), "recherche_faite reconstruit (faux) : " + texte(lireAvantC));
   const rechC = await clientC.callTool({ name: "search_kb", arguments: { tags: ["reseau"] } });
   assert.ok(!estErreur(rechC), "skills chargés reconstruits : le cas est instruit — " + texte(rechC));
+  const luC = await clientC.callTool({ name: "read_kb", arguments: { ticket_id: id } });
+  assert.ok(!estErreur(luC), texte(luC));
   const clotC = await clientC.callTool({ name: "save_ticket", arguments: { symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["reseau"], conclusion: "x", plan_action: "x", statut: "non-resolu" } });
   assert.ok(estErreur(clotC) && /charger `cloture` d'abord/.test(texte(clotC)), "brouillon courant reconstruit : " + texte(clotC));
   await clientC.callTool({ name: "load_skill", arguments: { domaines: ["systeme"], nature: "incident" } });
@@ -481,6 +501,7 @@ async function main() {
   assert.match(texte(clotC2), new RegExp(`Ticket enregistré : ${pid2}`));
   const finalC = fs.readFileSync(path.join(installation, "tickets", `${pid2}.md`), "utf8");
   assert.match(finalC, /^escalades:\n  - systeme$/m, "escalade dérivée à travers un redémarrage du serveur");
+  assert.match(finalC, new RegExp(`^cas_lus:\n  - ${id}$`, "m"), "le cas lu est noté dans le ticket");
   await clientC.close();
 
   // 8. Domaine décrit, hors bêta : refusé par load_skill, affiché tel quel au triage (produit temporaire).
@@ -500,7 +521,7 @@ async function main() {
   assert.deepEqual(ecrits.sort(), ["contexte", "en-cours", "journal", "kb", "tickets"]);
 
   fs.rmSync(installation, { recursive: true, force: true });
-  console.log("smoke : OK — huit appels, six domaines, un domaine décrit synthétique, trois sessions ; ticket", id);
+  console.log("smoke : OK — neuf appels, six domaines, un domaine décrit synthétique, trois sessions ; ticket", id);
 }
 
 main().catch((e) => {

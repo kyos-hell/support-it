@@ -81,21 +81,60 @@ a pas d'index sur disque, donc pas de désynchronisation possible (C). Les
 commentaires HTML sont retirés, la ligne « Dernière mise à jour » est
 conservée et mise en évidence : c'est le signal de péremption.
 
-## 3. `search_kb(tags, limite?)`
+## 3. `search_kb(tags)` — `limite` retirée le 2026-09-18 (D2, décision 4)
 
 | | |
 | --- | --- |
-| Entrée | `tags` : liste de tags vérifiés (1 minimum) ; `limite` : 1 à 20, défaut 5. |
+| Entrée | `tags` : liste de tags vérifiés (1 minimum). Plus de `limite` : plafond fixé par le serveur (cinq). |
 | Lit | Tous les fichiers de `installation/kb/`. |
-| Écrit | Rien. |
+| Écrit | Rien. Note en session qu'une recherche a eu lieu (l'étape du brouillon passe à `recherche`). |
 
-**Comportement.** Score = nombre de tags communs, insensible à la casse ;
-cas sans tag commun exclus ; tri par score puis date décroissante. Trois
-réponses possibles, toutes non bloquantes : base vide (cas nominal au
-démarrage), aucun cas commun, ou une liste avec identifiant, tags,
-première ligne du symptôme initial et de la conclusion. La réponse rappelle
-qu'un cas similaire se **confronte** au diagnostic posé, il ne le remplace
-pas. Index reconstruit à chaque appel (contrainte F, héritée de H1).
+**Comportement.** Une liste courte pour **choisir**, pas pour s'en servir.
+Score **pondéré par la rareté** : chaque tag commun vaut
+1 / (nombre d'entrées de la base qui le portent) ; la nature, les domaines
+et la référence ne comptent pas — ils sont sur tous les tickets d'une
+famille. `azure` porté par toutes les entrées ne départage rien ;
+`password-writeback` porté par une seule vaut 1. Cas sans tag commun
+exclus ; tri par score, puis nombre de tags communs, puis date. Rendu
+**compact** (~300 caractères par cas) : identifiant, référence, score,
+nature, domaines, les tags **communs à la recherche** seulement (+ « et N
+autres »), symptôme et conclusion tronqués à 160 caractères. Au-delà de
+cinq correspondants : « N cas partagent ces tags, 5 affichés — affiner avec
+des tags plus spécifiques ». Trois réponses possibles, toutes non
+bloquantes : base vide (cas nominal au démarrage), aucun cas commun, ou la
+liste. La réponse rappelle qu'un cas similaire se **confronte** au
+diagnostic posé, et qu'on lit le cas retenu avec `read_kb` avant d'en
+reprendre la conclusion. Index reconstruit à chaque appel (contrainte F,
+héritée de H1). Avec un brouillon courant, refusée tant qu'aucun skill de
+domaine n'a été chargé (§6, état de session).
+
+## 3 bis. `read_kb(ticket_id)` — neuvième appel, ajouté le 2026-09-18 (décision 4)
+
+| | |
+| --- | --- |
+| Entrée | `ticket_id` : l'identifiant d'un cas, tel que `search_kb` l'a renvoyé. |
+| Lit | `installation/kb/<id>.md` seulement — jamais `tickets/`. |
+| Écrit | Rien. Note en session le cas lu ; recopié dans le brouillon (`cas_lus`) puis dans le ticket. |
+
+**Pourquoi.** `search_kb` ne donnait que la première ligne du symptôme et
+de la conclusion ; une fois le bon cas repéré, le modèle n'avait aucun
+appel pour lire sa conclusion et son plan d'action, et deviner le chemin
+lui est interdit (0.4) — et impossible depuis la décision 5. La base
+servait à savoir qu'un cas existe, pas à s'en servir.
+
+**Comportement.** Renvoie ce qui sert à s'en servir, 1 à 2 Ko : le
+symptôme (extrait), les signaux retenus, la conclusion, le plan d'action.
+**Pas** les questions posées (le journal du référent, pas la solution),
+pas le ticket entier. Refus : identifiant invalide ; ticket clôturé mais
+non publié (« n'est pas une solution éprouvée ») ; identifiant inconnu
+(« ne jamais en fabriquer »). Avec un brouillon courant, refusé tant que
+`search_kb` n'a pas été appelé pour ce ticket (« chercher d'abord »). Le
+cas lu est noté : le lien « ce ticket s'est appuyé sur ce cas » existe
+enfin, l'audit (décision 8) le mesure.
+
+**Écarté.** Un paramètre `ticket_id` sur `search_kb` qui changerait
+« chercher » en « lire » : un paramètre qui change ce que fait la fonction
+est un choix du modèle sur la mécanique.
 
 ## 4. `save_ticket(…)`
 

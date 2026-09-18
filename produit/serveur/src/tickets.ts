@@ -25,7 +25,9 @@ export interface EntreeTicket {
   nature: "incident" | "demande";
   domaines_proposes: string[];
   domaines_valides: string[];
+  /** Jamais fournis par le modèle : dérivés des skills chargés et des cas lus (brouillon ∪ session). */
   escalades?: string[];
+  cas_lus?: string[];
   signaux?: string[];
   conclusion: string;
   conclusion_humaine?: string;
@@ -83,6 +85,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
     domaines_proposes: e.domaines_proposes,
     domaines_valides: e.domaines_valides,
     escalades: e.escalades ?? [],
+    cas_lus: e.cas_lus ?? [],
     signaux: e.signaux ?? [],
     tags: tagsAutomatiques(e),
     questions: (e.questions ?? []).length,
@@ -182,11 +185,12 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       questions: fusion(brouillon.questions, e.questions ?? [], (q) => q.question),
       // Ce que la session a vu depuis le dernier save_progress compte aussi.
       escalades: session ? escaladesDerivees(fusionnerEtat(etatBrouillon(brouillon), session).skills_charges) : escaladesBrouillon(brouillon),
+      cas_lus: session ? fusionnerEtat(etatBrouillon(brouillon), session).cas_lus : brouillon.cas_lus,
       // La durée est celle du brouillon (création → clôture), pas une estimation.
       duree_minutes: dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
     };
   } else {
-    e = { ...e, escalades: session ? escaladesDerivees(session.skillsCharges) : [] };
+    e = { ...e, escalades: session ? escaladesDerivees(session.skillsCharges) : [], cas_lus: session ? [...session.casLus] : [] };
     id = fabriquerId(date);
     fichier = path.join(c.tickets, `${id}.md`);
     // Deux clôtures dans la même seconde sur le même poste : suffixe, jamais d'écrasement.

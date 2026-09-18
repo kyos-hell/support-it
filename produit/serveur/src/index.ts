@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Serveur MCP « support-it » : huit appels, transport stdio, aucune
+// Serveur MCP « support-it » : neuf appels, transport stdio, aucune
 // intelligence. L'intelligence est dans les skills, le déterminisme ici.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -7,8 +7,8 @@ import { z } from "zod";
 import { lireVersion, racines } from "./config.js";
 import { ErreurContexte, ecrireSection, obtenirSections, rendreSections } from "./contexte.js";
 import { ErreurEnCours, LIMITES, etatBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
-import { ErreurKb, publier, rechercher, rendreRecherche } from "./kb.js";
-import { casInstruit, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
+import { ErreurKb, lireCas, publier, rechercher, rendreCas, rendreRecherche } from "./kb.js";
+import { casInstruit, noterCas, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
 import { ErreurSkill, chargerSkills } from "./skills.js";
 import { enregistrerTicket } from "./tickets.js";
 
@@ -90,21 +90,48 @@ server.registerTool(
     title: "Chercher un cas similaire en base de connaissances",
     description:
       "À appeler une fois le cas instruit (diagnostic posé ou demande étudiée), avec les tags vérifiés : domaine, signaux selon-cas (vpn, dns, stockage…), mots-clés libres. " +
-      "Un retour vide est le cas nominal au démarrage.",
+      "Renvoie une liste courte pour CHOISIR (au plus cinq cas, classés par rareté des tags communs, extraits tronqués) ; lire ensuite le cas retenu avec read_kb. Un retour vide est le cas nominal au démarrage.",
     inputSchema: {
       tags: z.array(z.string().min(1)).min(1).describe("Tags vérifiés du cas instruit"),
-      limite: z.number().int().min(1).max(20).optional().describe("Nombre maximal de cas renvoyés (défaut 5)"),
     },
   },
-  async ({ tags, limite }) => {
+  async ({ tags }) => {
     // Avec un brouillon courant, chercher avant d'avoir instruit le cas n'a pas de sens :
     // les tags seraient ceux du symptôme, pas du diagnostic.
     if (session.brouillonCourant && !casInstruit(session.skillsCharges)) {
       return erreur(new Error("le cas n'est pas instruit : charger le skill du domaine (load_skill) et poser le diagnostic avant de chercher un cas similaire."));
     }
-    const res = rechercher(r, tags, limite ?? 5);
+    const res = rechercher(r, tags);
     session.rechercheFaite = true;
     return texte(rendreRecherche(tags, res));
+  },
+);
+
+server.registerTool(
+  "read_kb",
+  {
+    title: "Lire un cas publié de la base de connaissances",
+    description:
+      "Renvoie, pour un cas repéré par search_kb, ce qui sert à s'en servir : la conclusion, le plan d'action, les signaux retenus (1 à 2 Ko). Pas les questions ni le ticket entier. " +
+      "Seuls les cas publiés (installation/kb/) se lisent ; un ticket clôturé non publié n'est pas une solution éprouvée. À appeler après search_kb, jamais avec un identifiant deviné.",
+    inputSchema: {
+      ticket_id: z.string().min(1).describe("Identifiant du cas, tel que renvoyé par search_kb"),
+    },
+  },
+  async ({ ticket_id }) => {
+    // Borné par l'état de session : quand un brouillon est courant, on lit un cas
+    // à l'étape recherche ou après — jamais avant d'avoir cherché.
+    if (session.brouillonCourant && !session.rechercheFaite) {
+      return erreur(new Error("chercher d'abord : read_kb lit un cas que search_kb a renvoyé pour ce ticket."));
+    }
+    try {
+      const cas = lireCas(r, ticket_id);
+      noterCas(session, cas.id);
+      return texte(rendreCas(cas));
+    } catch (e) {
+      if (e instanceof ErreurKb) return erreur(e);
+      throw e;
+    }
   },
 );
 
