@@ -73,20 +73,39 @@ Ce projet a un schéma de routage (`architecture/schema/routage_support_v3.svg`,
    avec des signaux vérifiés, pas avec l'expression vague du départ : un cas
    similaire trouvé apporte une solution déjà éprouvée au plan d'action. Un
    retour vide est le cas **nominal** des premières semaines, pas une erreur :
-   la base démarre vide.
-7. **Plan d'action proposé** — le technicien valide ou corrige.
-8. **Actions correctives** — exécutées par l'humain, hors du système.
-9. **Clôture du ticket** — `save_ticket()`, avec le symptôme initial conservé.
+   la base démarre vide. Depuis le 2026-09-18 : la recherche est une liste
+   courte pour *choisir* ; le cas retenu se lit avec **`read_kb(id)`** avant
+   d'en reprendre la conclusion (décision 4 de `plan-after-beta.md`).
+7. **Plan d'action proposé** — le technicien valide ou corrige. En séquence
+   numérotée, une commande par étape (décision 10).
+8. **Actions correctives** — exécutées par l'humain, hors du système, **une
+   commande à la fois** ; le modèle attend la sortie avant la suivante.
+9. **Clôture du ticket** — `load_skill(["cloture"])` puis `save_ticket()` :
+   le brouillon courant est la source (symptôme, domaines, plan, questions,
+   signaux, durée), les escalades sont dérivées des skills chargés.
 10. **Publication en base** — `publish_kb()`, après validation. Alimente
     l'index pour les tickets suivants.
 
-Huit appels MCP au total, tous sur des données persistantes : `search_kb`,
+Tout au long : `save_progress` à chaque acquis (le brouillon se crée dès le
+triage validé, avant le premier skill de domaine) ; l'**état de session**
+(décision 3) rend impossible un appel hors séquence quand un brouillon est
+courant. Hors ticket : `load_skill(["remplissage"])` pour le contexte,
+`load_skill(["audit"])` pour le rapport (décision 8).
+
+Neuf appels MCP au total, tous sur des données persistantes : `search_kb`,
 `load_skill`, `get_context`, `save_ticket`, `publish_kb` ; depuis le
 2026-09-09 `update_context` — l'écriture d'une section du contexte après
 validation humaine, que la section 4 prévoyait « si le copier-coller devient
 une friction » ; depuis le 2026-09-10 `save_progress` et `resume_ticket` —
-la pause, la reprise et la passation d'un ticket. Tout le reste est du
-raisonnement ou de l'action humaine.
+la pause, la reprise et la passation d'un ticket ; depuis le 2026-09-18
+`read_kb` — lire un cas publié pour s'en servir, pas seulement savoir qu'il
+existe (`plan-after-beta.md`, décision 4). Depuis la même date le serveur
+garde un **état de session** (décision 3) : il sait à quel brouillon un
+appel appartient, refuse un appel hors séquence, dérive l'étape et les
+escalades ; et les domaines, signaux, tags et sections sont des **enums**
+construits depuis le manifeste et les gabarits — le modèle coche, il ne
+rédige pas (décisions 1, 2, 9). Tout le reste est du raisonnement ou de
+l'action humaine.
 
 **Pause, reprise, passation (ajouté le 2026-09-10).** L'état d'un ticket ne
 vit plus seulement dans la conversation : un **brouillon** par ticket ouvert,
@@ -170,7 +189,7 @@ un chemin de fichier, générer un identifiant, horodater, reconstruire un index
 sur chacune de ces opérations le modèle peut se tromper, alors qu'un script ne
 le peut pas. Le constat d'origine est concret : à l'usage d'un skill, l'IA
 s'est déjà trompée de chemin en créant un ticket. Règle : l'IA ne manipule
-jamais un chemin ni un identifiant — les huit appels MCP encapsulent toutes les
+jamais un chemin ni un identifiant — les neuf appels MCP encapsulent toutes les
 écritures, et le serveur résout lui-même où et sous quel nom écrire. C'est le
 complément de « le serveur reste bête » : bête ne veut pas dire absent.
 L'intelligence dans les skills, le déterminisme dans le code.
@@ -561,17 +580,18 @@ lisant uniquement le gabarit.
 **Objectif.** Concevoir le mécanisme de chargement. C'est le contrat qui
 contraint tous les autres périmètres.
 
-**Les huit appels.**
+**Les neuf appels.**
 
 | Appel | Rôle | Lit ou écrit |
 | --- | --- | --- |
-| `search_kb(tags)` | Cherche un cas similaire | Lit |
+| `search_kb(tags)` | Cherche un cas similaire — une liste courte pour choisir, score par rareté des tags (D2, 2026-09-18) | Lit |
+| `read_kb(ticket_id)` | Lit un cas publié pour s'en servir : conclusion, plan, signaux — ajouté le 2026-09-18 (décision 4) | Lit |
 | `load_skill(domains)` | Renvoie le ou les périmètres de travail | Lit |
 | `get_context(sections)` | Renvoie les sections réclamées par le skill | Lit |
 | `save_ticket()` | Enregistre le ticket clôturé | Écrit |
 | `publish_kb()` | Promeut un ticket en entrée de base | Écrit |
 | `update_context(section, contenu)` | Écrit une section du contexte, après validation humaine — ajouté le 2026-09-09 (section 4) | Écrit, avec sauvegarde |
-| `save_progress(id?, etape, …)` | Point d'étape : crée ou met à jour le brouillon du ticket en cours — ajouté le 2026-09-10 | Écrit (brouillon, fusion) |
+| `save_progress(id?, pause?, …)` | Point d'étape : crée ou met à jour le brouillon du ticket en cours — ajouté le 2026-09-10 ; depuis le 2026-09-18 l'étape, les escalades et l'état de session sont écrits par le serveur | Écrit (brouillon, fusion) |
 | `resume_ticket(ticket?)` | Liste les tickets en cours, ou renvoie un brouillon avec la marche à suivre pour reprendre — ajouté le 2026-09-10 | Lit |
 
 Deux écritures distinctes : un ticket est enregistré dès la clôture, publié
@@ -1075,7 +1095,7 @@ tickets — sans rien lui faire perdre.
 | --- | --- | --- |
 | Où vit le contexte rempli par le client ? (tension C/H) | Deux arborescences : `produit/` livré et remplacé en bloc, `installation/` au client et jamais écrit par une mise à jour. | Un script qui n'écrit que dans `produit/` ne *peut pas* détruire le travail du client. Garantie structurelle plutôt que discipline de script. Rend aussi le contrôle « pas de donnée d'entreprise » sans exception. |
 | H1 — mono ou multi-utilisateur ? | Multi. Ce n'est pas une option : un produit installable par n'importe quelle entreprise doit tolérer cinq techniciens. Mono reste une option de POC. | La valeur principale du projet est qu'un ticket résolu par l'un serve à l'autre. |
-| H1 — local ou distant ? | Les deux arborescences sur un partage réseau, serveur MCP local sur chaque poste. | Multi-utilisateur n'implique pas distant : une seule des quatre matières a une sémantique multi-écrivains. Le partage donne l'authentification AD gratuitement, permet la dégradation hors ligne, et le distant n'économise même pas l'enregistrement par poste. Migration vers le distant possible plus tard : le contrat des huit appels est identique. |
+| H1 — local ou distant ? | Les deux arborescences sur un partage réseau, serveur MCP local sur chaque poste. | Multi-utilisateur n'implique pas distant : une seule des quatre matières a une sémantique multi-écrivains. Le partage donne l'authentification AD gratuitement, permet la dégradation hors ligne, et le distant n'économise même pas l'enregistrement par poste. Migration vers le distant possible plus tard : le contrat des neuf appels est identique. |
 
 | Outil hôte de la bêta ? | Claude Code uniquement. `/support` est un skill Claude Code ; le script n'enregistre le serveur MCP qu'auprès de Claude Code. | Usage interne, tous les utilisateurs sont sur Claude Code. Les skills n'étant chargés que par le serveur MCP (0.4), un autre outil hôte se rajoute plus tard avec un point d'entrée de dix lignes, sans toucher au produit. |
 | H2 — langage du script ? | `install.ps1` et `install.sh`, un par plateforme, mêmes étapes et mêmes messages. Pas de Python, pas de script multiplateforme. | Un script multiplateforme exige un runtime commun, donc un prérequis avant l'installation. |

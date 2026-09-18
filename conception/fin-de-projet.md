@@ -40,7 +40,7 @@ l'historique).
 « appelle `load_skill(["triage"])` et suis ce qu'il renvoie ». Toute
 l'intelligence est derrière le serveur, dans des fichiers markdown.
 
-**Les huit appels**, dans l'ordre d'un ticket :
+**Les neuf appels**, dans l'ordre d'un ticket (état du 2026-09-11 ; les changements du 2026-09-18 sont en §10) :
 
 | Appel | Renvoie ou écrit |
 | --- | --- |
@@ -48,6 +48,7 @@ l'intelligence est derrière le serveur, dans des fichiers markdown.
 | `load_skill([domaine(s)], nature)` | Le skill (`skill.md` ou `demandes.md`), **ses sections `requis` déjà résolues**, sa table `selon-cas` ; erreurs explicites pour domaine inconnu, hors bêta, nature absente, plus de deux domaines |
 | `get_context([domaine/section…])` | Par section : `ok` (contenu), `vide` (dont « identique au gabarit » et « fichier absent »), `inconnue` — jamais une erreur globale |
 | `search_kb(tags)` | Cas de `installation/kb/` triés par tags communs ; base vide = message nominal |
+| `read_kb(ticket_id)` | Le cas publié : conclusion, plan d'action, signaux — ajouté le 2026-09-18 (§10) |
 | `load_skill(["cloture"])` puis `save_ticket(…)` | `installation/tickets/<id>.md` + un journal par ticket dans `installation/journal/` (s'il y a eu des questions) ; id fabriqué par le serveur |
 | `publish_kb(ticket_id)` | Copie dans `installation/kb/`, refus si absent ou déjà publié |
 | `save_progress(id?, etape, …)` | Point d'étape : crée le brouillon du ticket dès le triage validé (`installation/en-cours/<id>.md`), puis le met à jour par fusion à chaque acquis ; enregistre la passation si le technicien change |
@@ -120,6 +121,16 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 29 | Le test de fumée rejoue le cas « domaine décrit, hors bêta » sur une copie temporaire du produit avec un domaine synthétique | `test/smoke.ts`, architecture D §7 | Le produit livré n'a plus de domaine `decrit` ; la branche du serveur doit rester testée pour les domaines futurs. |
 | 30 | Scripts d'installation : test de fumée à l'étape 3 (`tester`, `-SansTest`), `installation/VERSION` écrit par `init` avec le mode « MISE À JOUR x → y », `.gitattributes` pour les fins de ligne, bit exécutable de `install.sh`, `valider` refuse un `.sh` avec CR — demandé par toi le 2026-09-11 (« je n'installe qu'à travers ces scripts ») | deploiement §2 et H4, outillage, validation T-H1/T-H2 | `valider` prouvait que le produit était bien formé, pas que le serveur répondait sur le poste ; un `clone` Windows avec `autocrlf` aurait cassé `install.sh` dans une archive H5 ; une mise à jour silencieuse ne disait pas d'où l'on venait. |
 | 31 | Journal : un fichier par ticket (`journal/<id>.md`, sections candidates en en-tête) au lieu d'un fichier par question — demandé par toi le 2026-09-11 | base-connaissances §1 et §3, contrat-mcp §4, architecture D §3 | Onze fichiers pour deux tickets, redondants avec la section `questions` du ticket ; illisible à 50 tickets. La règle d'origine visait un journal *commun* mutable, pas un fichier par ticket écrit une fois. Les `-qNN` existants ne sont pas migrés. |
+| 32 | **Tags fermés, deux étages** : bibliothèque produit (manifeste, par domaine) ∪ client (`installation/tags.yaml`, `general` pour les transverses), enum ≤ 5 cochés, filtrés sur les domaines validés, servis par `cloture` ; la liste ne grandit que par la main du référent — décidé avec toi le 2026-09-14, amendé le 2026-09-17, implémenté le 2026-09-18 | plan-after-beta déc. 1 et §2.7, contrat-mcp §4-§6, manifeste.md, gouvernance §3 | 74 tags libres sur trois entrées réelles, des coquilles, des tags qui matchent tout : un tag libre est un choix du modèle sur la mécanique. |
+| 33 | **Signaux identifiés** : `{ id, libelle }` au manifeste, `max_signaux`, enum au démarrage, le modèle coche `{ id, preuve }`, le serveur classe les domaines et refuse un domaine proposé sans signal (incident) — décidé avec toi le 2026-09-17, implémenté le 2026-09-18 | déc. 2 et §2.6, manifeste.yaml, contrat-mcp §6, triage.md | Un signal rédigé de mémoire ne sert à personne ; le triage « constate lesquels sont présents ». Le manifeste a 20 signaux, pas 24. |
+| 34 | **État de session** : un processus par session, le serveur garde brouillon courant, skills chargés, sections servies, cas lus ; recopié dans le brouillon, reconstruit par `resume_ticket` ; refus hors séquence ; étape et escalades dérivées ; aucun refus sans brouillon courant — décidé avec toi le 2026-09-17, implémenté le 2026-09-18 | déc. 3 et §2.4, session.ts, contrat-mcp §6, D-serveur §4-§5 | L'ordre du flux était tenu par le prompt seul ; le stdio donne un processus par session, gratuitement. Voie A (id sur les lectures) écartée : le modèle l'oublierait. |
+| 35 | **`read_kb`, neuvième appel**, et D2 (score par rareté, rendu compact, plafond fixe, `limite` retirée) — décidé avec toi le 2026-09-17, implémenté le 2026-09-18 | déc. 4 et §2.5, contrat-mcp §3 et §3 bis | La base servait à savoir qu'un cas existe, pas à s'en servir ; un paramètre qui change ce que fait `search_kb` était un choix du modèle sur la mécanique. |
+| 36 | **L'hôte tient l'invariant** : `.claude/settings.json` déposé par `install` (`hote`), `Bash` et `PowerShell` retirés, `installation/` interdite à l'écriture, `kb/` et `en-cours/` à la lecture ; pas de hooks — décidé avec toi le 2026-09-17, implémenté le 2026-09-18 | déc. 5 et §2.3, deploiement §2, gouvernance §2, validation T-H5 | Le mode de permission se désactive d'un clic ; `Write(chemin)` n'est pas consulté par Claude Code, `Edit(chemin)` couvre les deux. `PowerShell` ajouté : l'outil shell sous Windows. |
+| 37 | **Tout en une passe, puis dix tickets** — amende la décision 6 (trois lots avec tickets intercalés) ; la passe sur le manifeste vient après les tests, pas avant — décidé par toi le 2026-09-18 | plan-after-beta §2.0, §2.11, §3 | Tester le produit complet plutôt qu'à moitié transformé ; ne pas jouer des tickets avec des skills qu'on sait devoir réécrire. Coût assumé : l'enum des signaux est figé avant les tickets réels sur quatre domaines. |
+| 38 | **Ce qu'on ne fait pas dans ce cycle** : empreinte optimiste, périmètre I, paliers, installation par poste, rétention d'`historique/`, hooks, `creation-vm`, migration des tickets existants, `mesures`, compatibilité produit/installation — décidé avec toi le 2026-09-18 | déc. 7 | Nommé pour que ça ne revienne pas par la fenêtre pendant l'implémentation. |
+| 39 | **L'audit** : `audit.ts` calcule (jeu de test du triage, brouillons anciens/zombies/orphelins, résolus non publiés, tags hors bibliothèque, cas lus, actions multiples, santé C3, T-P7 ; périmées, candidats, volumineuses, placeholders, historique), rapport daté dans `audits/`, commande CLI et skill `audit` qui propose un par un sur oui et n'écrit jamais de lui-même — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 8 et §2.9, audit.md, outillage.md | Le projet produisait des données sans outil pour se regarder ; T-P7 était vide depuis le premier jour. `verifier` (C3) et `mesures` absorbées. |
+| 40 | **Validité du contexte** : péremption 90 jours annotée « à confirmer » à l'usage, confirmation = `update_context` à contenu identique (re-date sans historique), `contradictions` de `save_progress` reprises à la clôture, file des candidats servie par `remplissage` et l'audit — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 9 et §2.8, format-contexte §5, contrat-mcp §5 bis | La boucle de fraîcheur de `validation.md` §6, différée depuis le 2026-09-11 ; pas d'appel `confirm_context`, pas de seuil par section. |
+| 41 | **Une question, une commande, attendre** : deux règles mot pour mot dans les douze skills (`valider` les exige), plan en séquence numérotée, T-B8 ; les règles « à confirmer » et « contradiction » voyagent avec la donnée plutôt que d'être répétées — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 10 et §2.2, format-skill §6, gouvernance §4 | Le ticket RBAC Azure : le modèle livrait les étapes 0 à 2 d'un coup ; « une commande à la fois » n'était écrit nulle part. Tenu par le prompt seul, c'est dit comme tel. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -175,7 +186,7 @@ deux scripts verts sur une installation temporaire.
    L'installation se crée dans `installation/` à côté de `produit/`
    (ignoré par Git). Pour un autre emplacement : `-Installation <chemin>`.
 2. Redémarrer Claude Code. Vérifier avec `/mcp` que `support-it` est là
-   avec huit outils.
+   avec neuf outils.
 3. Remplir au moins `installation/contexte/general.md` (sites, référents) et
    deux ou trois sections de `reseau.md` — ou ne rien remplir, pour voir
    l'outil poser ses questions.
@@ -236,3 +247,42 @@ plateforme ; les quatre domaines ; le domaine décrit synthétique du test).
 `install.*` — `init` en mode « rejoindre » copie les quatre nouveaux
 gabarits sans toucher aux fichiers existants ; `etat` les montrait
 « ABSENT » avant. Rien n'est migré.
+
+## 10. Bêta v3 — 0.3.0-beta, 2026-09-18 : le lot déterminisme
+
+**Ce qui change.** Dix décisions (`plan-after-beta.md` §1), un plan
+(§2), un plan de test (§3), neuf chantiers implémentés en une passe sur la
+branche `v0.3.0-beta`, un commit par chantier. Le principe : **le modèle
+n'a pas de choix sur la mécanique** (`retours-beta.md`, 2026-09-14). Ce
+qui était tenu par le prompt seul et que les tickets réels ont vu lâcher
+passe côté serveur ou côté hôte.
+
+| Avant | Après |
+| --- | --- |
+| Huit appels ; `search_kb` renvoie la première ligne, le modèle devine le chemin | Neuf appels : `read_kb` lit un cas publié ; score par rareté, rendu compact |
+| Le serveur ne sait pas à quel ticket un appel appartient | État de session : brouillon courant, skills, sections, cas lus ; refus hors séquence ; étape et escalades dérivées |
+| Signaux rédigés, tags libres, domaines en chaînes | Enums construits au démarrage : signaux `{ id, preuve }`, tags ≤ 5 d'une bibliothèque à deux étages, domaines, sections |
+| Symptôme, référence, plan, questions retapés à la clôture | Le brouillon est la source ; référence stable et jamais inventée ; durée calculée ; `resolu_par` null |
+| Le modèle peut écrire `installation/` avec `Edit`, lire `kb/`, lancer `Bash` | `.claude/settings.json` déposé par `install` |
+| Rien n'entretient le contexte | Péremption annotée, confirmation à l'identique, contradictions en ticket, file des candidats |
+| Rien ne relit l'installation ; T-P7 vide | `audit` : rapport daté, commande CLI et skill, propositions un par un sur oui |
+| « Une question à la fois » partout, « une commande à la fois » nulle part | Deux règles mot pour mot, contrôlées par `valider` ; plan en séquence |
+
+**Ce qui a été décidé** : décisions 32 à 41 du tableau §4.
+
+**Ce qui n'est pas fait.**
+
+- Le jeu de données de test (`outils/jeu-de-test.mjs`, §3.1 du plan) et
+  les dix tickets (§3.3) : c'est la phase de test, à jouer sur une
+  installation neuve.
+- La passe sur le manifeste (signaux) : **après** les dix tickets.
+- Le schéma SVG v4 (le v3 ne montre ni `read_kb`, ni l'étape dérivée, ni
+  l'audit).
+- Tout ce que la décision 7 remet à plus tard.
+
+**Pour une installation existante** : remplacer `produit/`, relancer
+`install.*` — `init` (mode mise à jour) crée `tags.yaml` et `audits/`,
+`hote` dépose `.claude/settings.json`. Les brouillons, tickets et entrées
+de base existants se lisent tels quels (signaux et tags libres acceptés en
+lecture) ; rien n'est migré. Les tickets antérieurs sortent dans le jeu de
+test du triage sans signaux cochés : à lire à la main.

@@ -4,72 +4,86 @@
 > en est, ce qui ne se casse pas, et ce qu'il faut mettre à jour quand on
 > modifie telle ou telle partie. Il complète `plan.md` (l'étude, le
 > pourquoi) et `fin-de-projet.md` (ce qui a été livré et décidé, le quoi).
-> Dernière mise à jour : 2026-09-11. Vérifier `git log` : ce fichier décrit
+> Dernière mise à jour : 2026-09-18. Vérifier `git log` : ce fichier décrit
 > l'arbre de travail, pas forcément le dernier commit.
 
 ---
 
 ## 1. Où on en est
 
-**Bêta 0.1.0 livrée le 2026-09-09, testée par l'auteur seul, sur son poste,
-avec Claude Code.** Deux domaines couverts (réseau, système), quatre décrits
-mais hors bêta (poste de travail, matériel, identité, applicatif). Deux
-tickets réels joués (un build Azure, un build AWS), qui ont chacun révélé
-un manque et conduit à une évolution le jour même.
+**Bêta 0.1.0 livrée le 2026-09-09**, deux domaines ; **bêta v2
+(`0.2.0-beta`) le 2026-09-11**, six domaines, dont quatre jamais joués sur
+un ticket réel. Trois tickets réels et une relecture du code ont produit
+`retours-beta.md` : le modèle avait encore la main sur la mécanique
+(tags libres, référence inventée, symptôme paraphrasé, signaux rédigés,
+ordre du flux tenu par le prompt seul, outils de l'hôte non bornés).
 
-**Bêta v2 (`0.2.0-beta`) le 2026-09-11 : les six domaines sont couverts.**
-Les quatre nouveaux n'ont jamais été joués sur un ticket réel — ce sont des
-hypothèses, à éprouver domaine par domaine. Le manifeste n'a plus de
-domaine `decrit` ; la branche « hors bêta » du serveur reste testée par un
-domaine synthétique dans le test de fumée.
+**Lot déterminisme (`0.3.0-beta`), implémenté le 2026-09-18** depuis
+`plan-after-beta.md` — dix décisions prises une à une, puis la section 2
+(le plan, un chantier par décision) et la section 3 (le plan de test).
+Tout a été implémenté en une passe, sur la branche `v0.3.0-beta`, un
+commit par chantier :
 
-Depuis la version commitée, dans l'arbre de travail :
-
-| Date | Évolution | Déclencheur |
+| Chantier | Ce qui a changé | Décision |
 | --- | --- | --- |
-| 2026-09-09 | `update_context` + skill `remplissage` + consigne du gabarit renvoyée sur section vide | Tester à vide : le contexte doit se remplir par conversation |
-| 2026-09-09 | Taxonomie du contexte (structure / pivots / instances), section `general/plateformes` | L'outil proposait d'inscrire une VM de projet dans le contexte |
-| 2026-09-09 | Référence du ticket externe demandée avant le triage, champ `reference` | Le technicien part toujours d'un ticket de son outil |
-| 2026-09-10 | `save_progress` + `resume_ticket` : brouillon par ticket dans `en-cours/`, pause, reprise, passation | Impossible de changer de ticket ou de passer la main |
-| 2026-09-10 | Taxonomie du brouillon : limites par entrée refusées par le serveur, corps du fichier réduit | Premier brouillon réel : 29 Ko de récit |
-| 2026-09-10 | Schéma `architecture/schema/routage_support_v3.svg` | Nouveau flux |
-| 2026-09-11 | Boucle de fraîcheur du contexte (différée), périmètre I documentation, section 5 montée en charge | Discussion : garder le contexte à jour, RAG, passage à l'échelle |
-| 2026-09-11 | Décision : le cloud est une plateforme, pas un domaine | Point ouvert depuis le premier ticket |
-| 2026-09-11 | **Bêta v2** : quatre domaines de plus (skill, demandes, gabarit), 44 sections, smoke sur six domaines | Le deuxième ticket avait besoin d'identité |
-| 2026-09-11 | Journal : un fichier par ticket au lieu d'un par question | Onze fichiers pour deux tickets, redondants avec le ticket |
-| 2026-09-11 | Scripts d'installation : `tester` à l'étape 3, `init` note `installation/VERSION` et annonce « MISE À JOUR », `.gitattributes` (LF / CRLF + BOM), bit exécutable de `install.sh`, console UTF-8, note ExecutionPolicy | L'auteur n'installe que par les scripts ; la mise à jour v1 → v2 devait être visible et sûre |
+| 2.1 corrections sans contrat | UTC ; dédoublonnage normalisé ; zombies ; domaines contrôlés ; rattachement par symptôme ; référence stable et jamais inventée ; le brouillon est la source (symptôme, domaines proposés, plan, questions) ; `resolu_par` null, durée calculée ; `publish_kb` refuse un non-résolu ; seuil en caractères ; « vide » indépendant du gabarit ; liste des brouillons plafonnée | 6 (lot a) |
+| 2.2 une question, une commande | Deux règles mot pour mot dans les douze skills, contrôlées par `valider` ; plan en séquence numérotée ; T-B8 | 10 |
+| 2.3 l'hôte | `.claude/settings.json` déposé par `install` (`hote`) : `Bash`, `PowerShell`, écriture dans `installation/`, lecture de `kb/` et `en-cours/` refusés au modèle | 5 |
+| 2.4 état de session | `session.ts` : brouillon courant, skills chargés, sections servies, cas lus ; refus hors séquence ; étape et escalades dérivées ; reconstruction à la reprise | 3 |
+| 2.5 `read_kb` et D2 | Neuvième appel ; score par rareté, rendu compact, plafond fixe | 4 |
+| 2.6 signaux | `{ id, libelle }` au manifeste, enum au démarrage, `{ id, preuve }` cochés, classement des domaines par le serveur | 2 |
+| 2.7 tags | Bibliothèque produit ∪ client (`tags.yaml`), enum ≤ 5, filtrée par domaines validés, servie par `cloture` | 1 |
+| 2.8 validité du contexte | Péremption 90 j annotée, confirmation à l'identique (re-date), `contradictions`, file des candidats | 9 |
+| 2.9 audit | `audit.ts` : rapport tickets + contexte, écrit dans `audits/`, commande CLI et skill `audit` | 8 |
+
+**Ce qui est amendé par rapport aux décisions écrites**, et pourquoi :
+la décision 6 (ordre des lots) est remplacée par « tout en une passe, puis
+dix tickets » (section 2.0 du plan) ; le manifeste a 20 signaux, pas 24 ;
+les règles « à confirmer » et « contradiction » ne sont pas répétées dans
+chaque skill (budget de lignes — elles voyagent avec la donnée,
+`format-skill.md` §6) ; le refus « domaine proposé sans signal coché » ne
+s'applique qu'aux incidents et dès qu'un signal est coché ; T-H4 existait
+déjà, le test manuel de l'hôte est T-H5 ; `PowerShell` est interdit avec
+`Bash` (l'outil shell de Claude Code sous Windows).
 
 État des contrôles : `npm run build` propre, `node dist/cli.js valider`
-zéro erreur (six avertissements de longueur acceptés, tous entre 101 et
-107 lignes), `npm test` vert sur les huit appels et les six domaines.
+zéro erreur (six avertissements de longueur acceptés, tous ≤ 110 lignes),
+`npm test` vert sur les neuf appels, les six domaines et trois sessions
+serveur (catalogue, séquence complète avec les refus, reprise après
+redémarrage).
 
-**Ce qui reste à faire**, dans l'ordre :
+**Ce qui reste à faire**, dans l'ordre (`plan-after-beta.md` §2.11 et §3) :
 
-1. Commiter l'arbre de travail (`git add -A`, message de version 0.2.0-beta).
-2. Sur l'installation existante : `node dist/cli.js init` (mode rejoindre)
-   pour recevoir les quatre nouveaux gabarits ; `etat` doit passer de
-   « ABSENT » à « vide » sur les quatre.
-3. Les tests de la porte 1 par le testeur : `conception/validation.md` §3,
-   T-P1 à T-P9, **et** T-A1, T-B5, T-B6 sur les quatre nouveaux domaines.
-   Noter dans `conception/retours-beta.md`.
-4. `creation-vm` côté système avec la plateforme en prérequis, et la
-   nuance « destination créée par le même plan » dans `ouverture-flux` —
-   après avoir implémenté « une demande par fichier » (`validation.md` §6),
-   `demandes.md` système étant à sa limite.
-5. Faire monter au manifeste les tags libres qui reviennent (règle : trois
-   occurrences).
-6. Porte 2 (collègues, partage réseau) : implémenter l'empreinte optimiste
-   sur le contexte et les brouillons (`architecture/D-serveur-mcp.md` §8).
+1. `outils/jeu-de-test.mjs` + `.yaml` : le générateur du jeu de données
+   (43 sections, 13 tickets, 19 anomalies), piloté par le client MCP.
+2. Réinstallation propre par le testeur (§3.2), puis les dix tickets, les
+   vingt refus provoqués, l'audit, T-H5 (§3.3) — une ligne par écart dans
+   `retours-beta.md`, une ligne par scénario dans `validation.md` §7.
+3. **Après** les dix tickets seulement : la passe sur le manifeste
+   (identifiants et libellés des signaux, à partir des écarts du jeu de
+   test), puis `0.3.0` sans `-beta`.
+4. Pendant les tests, observer le cycle de vie du processus serveur dans
+   Claude Code (`/clear`, `--resume`, reconnexion) : si l'état de session
+   est perdu plus souvent que « une session = un ticket », la
+   reconstruction par `resume_ticket` devient la voie principale
+   (`D-serveur-mcp.md` §5).
+5. Le schéma `architecture/schema/routage_support_v3.svg` est antérieur au
+   lot : `read_kb`, l'étape dérivée et l'audit n'y sont pas. À redessiner
+   (v4) une fois les tests passés.
+6. Porte 2 (collègues, partage réseau) : l'empreinte optimiste sur le
+   contexte et les brouillons (`D-serveur-mcp.md` §8), et ce que la
+   décision 7 a explicitement remis à plus tard.
 
 ## 2. Carte du dépôt — quoi lire pour quoi
 
 | Besoin | Fichier |
 | --- | --- |
 | Comprendre le produit, le vocabulaire, les décisions de fond | `plan.md` section 0 (à lire en entier avant tout) |
-| Ce qui a été livré, les 26 décisions prises seul, les limites | `fin-de-projet.md` |
-| Le contrat des huit appels MCP, dans le détail | `conception/contrat-mcp.md` |
+| Ce qui a été livré, les décisions prises (1 à 39), les limites | `fin-de-projet.md` |
+| Les dix décisions du lot déterminisme, le plan d'implémentation, le plan de test | `conception/plan-after-beta.md` |
+| Le contrat des neuf appels MCP, dans le détail | `conception/contrat-mcp.md` |
 | Comment le serveur est construit, ses cas limites | `architecture/D-serveur-mcp.md` |
-| Le flux en image | `architecture/schema/routage_support_v3.svg` |
+| Le flux en image | `architecture/schema/routage_support_v3.svg` (antérieur au lot du 2026-09-18 : v4 à faire) |
 | Ce qu'un skill contient et ne contient pas | `conception/format-skill.md` |
 | Ce qu'un contexte contient, et surtout ce qu'il ne contient pas | `conception/format-contexte.md` (§4.1 : la taxonomie) |
 | Comment le triage décide, l'escalade, la reprise | `conception/triage.md` et le texte livré `produit/contenu/general/triage.md` |
@@ -78,7 +92,7 @@ zéro erreur (six avertissements de longueur acceptés, tous entre 101 et
 | Installer, mettre à jour, distribuer | `conception/deploiement.md`, `produit/install.ps1`, `produit/install.sh` |
 
 Le contenu que le modèle lit à l'usage est **entièrement** dans
-`produit/contenu/` : `manifeste.yaml`, `general/{triage,cloture,remplissage,contexte.exemple}.md`,
+`produit/contenu/` : `manifeste.yaml`, `general/{triage,cloture,remplissage,audit,contexte.exemple}.md`,
 `domaines/<id>/{skill,demandes,contexte.exemple}.md`. Rien d'autre n'arrive
 jamais en contexte du modèle.
 
@@ -90,19 +104,21 @@ il est fragile et il faut le savoir.
 | Invariant | Tenu par |
 | --- | --- |
 | Le serveur ne raisonne jamais ; l'intelligence est dans `contenu/`, le déterminisme dans `serveur/`. | Architecture : aucun appel ne prend une décision qu'un skill pourrait prendre. |
-| Le modèle ne fabrique jamais un chemin, un identifiant, une date. | Contrat : aucun appel n'a de paramètre de chemin ; le serveur fabrique tout (`ids.ts`). |
-| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés). |
+| Le modèle ne fabrique jamais un chemin, un identifiant, une date. | Contrat : aucun appel n'a de paramètre de chemin ; le serveur fabrique tout (`ids.ts`). Une référence fabriquée est refusée (A6). |
+| **Le modèle n'a pas de choix sur la mécanique** (principe du 2026-09-14) : domaines, signaux, tags, sections sont des enums ; le symptôme, les domaines proposés, le plan, les questions viennent du brouillon ; l'étape, les escalades, les cas lus, la durée sont dérivés ; l'ordre du flux est tenu par l'état de session. | **Code** : schémas construits au démarrage (`index.ts`), `session.ts`, `encours.ts`, `tickets.ts`. Il reste au modèle : net ou ambigu, la question, la conclusion, le plan, les preuves des signaux, le constat d'une contradiction. |
+| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5). |
 | Aucune donnée d'entreprise dans `produit/contenu/`, même en exemple. | `valider` (regex IP, UNC, mail, domaine interne, nom d'hôte plausible). Placeholders `<...>` uniquement. |
 | Un ticket clôturé, un journal, une entrée de base : écrits une fois, jamais modifiés. | Code (`flag: "wx"`). |
 | Seules deux matières sont mutables : le contexte (`update_context`, avec copie dans `contexte/historique/`) et les brouillons (`save_progress`, fusion). La seule suppression est le brouillon à la clôture. | Code. Concurrence non protégée en mono-poste ; empreinte prévue à la porte 2. |
-| Le contexte n'est jamais écrit sans un oui explicite du technicien. | **Prompt seulement** (`remplissage.md`, `cloture.md`, description de l'outil). |
+| Le contexte n'est jamais écrit sans un oui explicite du technicien. | **Prompt seulement** (`remplissage.md`, `cloture.md`, `audit.md`, description de l'outil). Irréductible : il faut un humain. |
 | Trois points de validation humaine : triage ambigu, plan d'action, publication. Pas de quatrième. | Prompt (`triage.md`, `cloture.md`) + contrat (`publish_kb` distinct de `save_ticket`). |
-| L'IA n'exécute rien : le technicien exécute et rapporte. | **Prompt + mode de permission de Claude Code.** Aucun appel MCP n'exécute quoi que ce soit, mais l'outil hôte, lui, pourrait. |
+| L'IA n'exécute rien : le technicien exécute et rapporte. | Prompt + **l'hôte** : `Bash` et `PowerShell` retirés du contexte du modèle par `.claude/settings.json` (décision 5). Aucun appel MCP n'exécute quoi que ce soit. |
 | Une question, puis j'attends la réponse. | Prompt seulement (`format-skill.md` §6, mot pour mot dans chaque skill ; `valider` contrôle la présence, pas le respect). |
 | Une commande, puis j'attends la sortie — le plan s'applique une étape à la fois, un résultat inattendu l'arrête. | **Prompt seulement** (décision 10 du 2026-09-18). Les actions se passent hors de tout appel : aucun garde-fou serveur possible. L'audit signale un `save_progress` à plusieurs `actions` (indice). Test de référence : T-B8. |
 | Un skill fait ~100 lignes (110 max), pas de persona au-delà d'une ligne, chaque ligne passe le test de valeur. | `valider` (longueur) + relecture (T-B1). |
 | Les identifiants de sections (`domaine/section`) sont le contrat entre skills, gabarits et serveur ; renommer un `id` est interdit sans note de version. | `valider` (contrat B/C dans les deux sens). |
-| Le symptôme initial est conservé tel qu'exprimé. | Prompt + obligatoire à la création d'un brouillon et d'un ticket. |
+| Le symptôme initial est conservé tel qu'exprimé. | Code : le brouillon est la source, la clôture ne le remplace pas (A1). Irréductible : la première copie, au premier `save_progress`, est celle du modèle. |
+| Un ticket clôturé, un journal, une entrée de base ne sont jamais corrigés par l'outil, même à l'audit. | Prompt (`audit.md`) + code (l'audit n'a aucune écriture hors `audits/`). |
 | Le contexte reçoit la structure et les pivots, jamais les instances d'un ticket. | Prompt (`remplissage.md`, `cloture.md`) + signal « volumineuse » de `etat`. |
 
 ## 4. Si tu modifies… — les listes à suivre
@@ -166,18 +182,24 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
 - `serveur/src/index.ts` : `registerTool`, schéma zod, description en
   français qui dit **quand** l'appeler ; erreurs d'usage en `isError` texte,
   jamais d'exception.
-- Le module concerné (`skills`, `contexte`, `tickets`, `kb`, `encours`) ;
-  dépendances dans un seul sens (`architecture/D-serveur-mcp.md` §2).
+- Le module concerné (`skills`, `contexte`, `tickets`, `kb`, `encours`,
+  `audit`) ; dépendances dans un seul sens (`architecture/D-serveur-mcp.md`
+  §2). Un enum (domaine, signal, tag, section) se construit au démarrage
+  dans `index.ts` depuis le manifeste, la bibliothèque ou les gabarits.
+- `session.ts` si l'appel doit noter ou refuser quelque chose : ce qu'il
+  note, ce que `save_progress` recopie dans le brouillon, ce que
+  `resume_ticket` reconstruit.
 - `test/smoke.ts` : la liste des outils (ordre alphabétique) et les cas
   nominaux + erreurs.
 - Documents, dans cet ordre : `conception/contrat-mcp.md` (section de
   l'appel, invariants §6, §7), `plan.md` (0.3 flux, tableau des appels en D,
   décisions D), `architecture/D-serveur-mcp.md` (structure, formats, cas
   limites), `fin-de-projet.md` (§2 tableau des appels, §4 décision), le
-  schéma SVG, et `grep -rn "huit appels\|huit outils"` pour le compte.
-- Le texte livré qui doit appeler l'outil : `triage.md`, `cloture.md` ou
-  `remplissage.md`. Ces fichiers ont une limite : `triage.md` ≤ 130 lignes
-  (avertissement de `valider`).
+  schéma SVG, et `grep -rn "neuf appels\|neuf outils"` pour le compte.
+- Le texte livré qui doit appeler l'outil : `triage.md`, `cloture.md`,
+  `remplissage.md` ou `audit.md`. Ces fichiers ont une limite : ≤ 130 lignes
+  (avertissement de `valider`) ; `triage.md` y est, chaque ligne ajoutée
+  en coûte une ailleurs.
 
 ### 4.5 Le triage, la clôture, le remplissage (`contenu/general/*.md`)
 

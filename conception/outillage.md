@@ -47,7 +47,7 @@ Avertissement (n'empêche pas) :
 ## Test de fumée
 
 `npm test` (`dist/test/smoke.js`) : lance le serveur sur une installation
-temporaire, joue les huit appels dans l'ordre du flux, vérifie les erreurs
+temporaire, joue les neuf appels dans l'ordre du flux, vérifie les erreurs
 attendues (domaine inconnu, hors bêta, nature manquante, trois domaines,
 double publication, ticket introuvable), l'état des sections (ok, vide,
 inconnue, fichier absent), les fichiers écrits (ticket, journal, kb) et

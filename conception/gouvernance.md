@@ -18,15 +18,17 @@ faible au plus fort :
 
 1. **Le prompt** : « toute vérification passe par le technicien », dans chaque
    skill, chaque `demandes.md`, `triage.md`. Nécessaire, pas suffisant.
-2. **Le contrat** : les huit appels ne touchent ni au système d'exploitation,
+2. **Le contrat** : les neuf appels ne touchent ni au système d'exploitation,
    ni au réseau, ni à un équipement. Le serveur n'a aucun outil d'exécution.
    Ce que l'IA peut faire par MCP est exhaustivement : lire du produit, lire
    du contexte, chercher en base, écrire un ticket, publier un ticket.
-3. **Le mode de permission de Claude Code** : la seule barrière contre une
-   commande lancée par l'outil hôte lui-même (`ping`, `Get-Service`…). Le
-   script d'installation le rappelle ; il ne peut pas l'imposer. C'est
-   documenté comme prérequis d'usage, et c'est l'amélioration de prod
-   n° 3 de `validation.md`.
+3. **Le `.claude/settings.json` déposé par `install`** (décision 5,
+   2026-09-18, `deploiement.md` §2) : `Bash` et `PowerShell` retirés du
+   contexte du modèle, `installation/` interdite à l'écriture directe,
+   `kb/` et `en-cours/` à la lecture directe. Ce que le mode de
+   permission ne garantissait pas — il se désactive d'un clic — est tenu
+   par un fichier que le référent édite. Le mode de permission reste un
+   prérequis d'usage, plus la seule barrière.
 
 **Le contexte n'est jamais écrit sans validation humaine.** L'outil
 **formule** (section `mises-a-jour-contexte` du ticket, journal des

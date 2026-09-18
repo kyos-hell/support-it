@@ -1,4 +1,4 @@
-# Contrat MCP — les huit appels
+# Contrat MCP — les neuf appels
 
 > Livrable du périmètre D de `plan.md`. Décisions héritées : cinq appels sur
 > des données persistantes, serveur bête, le déterministe est du code, aucun
@@ -28,7 +28,7 @@ c'est ce que le modèle lit le mieux, et ce qui se relit dans un journal.
 
 | | |
 | --- | --- |
-| Entrée | `domaines` : liste d'identifiants du manifeste, 1 à `max_domaines` (2) ; ou une valeur réservée, seule : `triage`, `cloture`, ou `remplissage` (entretien de remplissage du contexte, renvoyé avec l'état de remplissage calculé à l'instant). `nature` : `incident` ou `demande`, **obligatoire** pour un domaine, ignorée pour les valeurs réservées. |
+| Entrée | `domaines` : liste d'identifiants du manifeste, 1 à `max_domaines` (2) ; ou une valeur réservée, seule : `triage`, `cloture` (avec les tags cochables, décision 1), `remplissage` (entretien de remplissage du contexte, renvoyé avec l'état de remplissage et la file des candidats calculés à l'instant), ou `audit` (le rapport d'audit, calculé et écrit par le serveur — décision 8, 2026-09-18). `nature` : `incident` ou `demande`, **obligatoire** pour un domaine, ignorée pour les valeurs réservées. |
 | Lit | `produit/contenu/manifeste.yaml`, `produit/contenu/general/triage.md`, `produit/contenu/general/cloture.md`, `produit/contenu/domaines/<id>/skill.md` ou `demandes.md`, et via `get_context` les sections `requis`. |
 | Écrit | Rien. |
 

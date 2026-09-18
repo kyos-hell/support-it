@@ -34,7 +34,7 @@ produit/serveur/
     tickets.ts      save_ticket : identifiant, rendu, journal, lien avec le brouillon
     kb.ts           search_kb, publish_kb
     validation.ts   contrôles de livraison
-    index.ts        le serveur : huit outils enregistrés, stdio
+    index.ts        le serveur : neuf outils enregistrés, enums construits au démarrage (domaines, signaux, tags, sections), état de session, stdio
     cli.ts          valider · tester · init · etat · enregistrer · entree · chemins
     test/smoke.ts   test de fumée bout en bout
 ```
@@ -157,7 +157,7 @@ d'identité (celle du partage), pas de limite de taille.
   `exemple-decrit` — le produit livré n'en a plus.
 - `node dist/cli.js chemins` sur le poste installé : les deux racines
   attendues.
-- Dans Claude Code, `/mcp` liste `support-it` avec sa version, huit outils.
+- Dans Claude Code, `/mcp` liste `support-it` avec sa version, neuf outils.
 - Après un premier ticket : un fichier dans `tickets/`, autant de fichiers
   dans `journal/` que de questions, rien ailleurs.
 
@@ -195,7 +195,7 @@ contexte sont rares (un référent, quelques fois par semaine) : le cas de
 conflit sera exceptionnel, et `historique/` garde de toute façon la
 version écrasée.
 
-**Ce qui ne change pas.** La signature des huit appels (un paramètre
+**Ce qui ne change pas.** La signature des neuf appels (un paramètre
 optionnel en plus), le format des fichiers, les scripts. Le contrat reste
 identique en local et sur le partage (H1). Test à écrire : deux
 `update_context` sur le même fichier avec la même empreinte, le second

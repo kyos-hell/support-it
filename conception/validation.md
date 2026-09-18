@@ -200,7 +200,7 @@ par T-D3.
 **T-D2 — `valider` passe.** `node dist/cli.js valider` : zéro erreur. Les
 avertissements sont lus et acceptés ou corrigés.
 
-**T-D3 — Test de fumée.** `npm test` : huit outils exactement ; `save_progress` et `resume_ticket` (création avec symptôme obligatoire, fusion par id, rattachement par référence sans écraser sa casse, liste, reprise avec marche à suivre, clôture sous le même id avec brouillon retiré et questions reprises) ; `update_context` (section remplacée avec consignes et date, sauvegarde en `historique/`, fichier créé depuis le gabarit, section inconnue, domaine sans gabarit, titre dans le contenu, contenu vide) ; `remplissage` avec état calculé ; consigne et squelette du gabarit sur une section vide ; triage avec
+**T-D3 — Test de fumée.** `npm test` : neuf outils exactement (depuis le 2026-09-18 : `read_kb` ; trois sessions serveur — catalogue, séquence complète avec les refus de l'état de session, reprise après redémarrage ; enums refusés par le schéma ; tags fermés ; contradictions ; audit écrit et vérifié) ; `save_progress` et `resume_ticket` (création avec symptôme obligatoire, fusion par id, rattachement par référence sans écraser sa casse, liste, reprise avec marche à suivre, clôture sous le même id avec brouillon retiré et questions reprises) ; `update_context` (section remplacée avec consignes et date, sauvegarde en `historique/`, fichier créé depuis le gabarit, section inconnue, domaine sans gabarit, titre dans le contenu, contenu vide) ; `remplissage` avec état calculé ; consigne et squelette du gabarit sur une section vide ; triage avec
 manifeste ; erreurs attendues (domaine inconnu, hors bêta, nature manquante,
 trois domaines, double publication, ticket introuvable) ; sections `ok`,
 `vide` (dont « identique au gabarit » et « fichier absent »), `inconnue` ;
@@ -233,7 +233,7 @@ gabarit manquant est copié, le reste est « gardé ».
 **T-H3 — Enregistrement.** Après `install.*` complet sur un poste :
 `~/.claude.json` contient `mcpServers.support-it` avec les deux racines,
 `~/.claude/skills/support/SKILL.md` existe, la sauvegarde `.support-it.bak`
-existe, et `/mcp` dans Claude Code liste `support-it` avec huit outils.
+existe, `.claude/settings.json` est déposé dans le dossier de lancement (T-H5), et `/mcp` dans Claude Code liste `support-it` avec neuf outils.
 **Non joué par l'auteur** : il modifie la configuration Claude Code du
 poste ; c'est le premier test de la porte 1, à faire par le testeur.
 
