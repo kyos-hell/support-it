@@ -17,6 +17,7 @@ produit/                         ← remplacé en bloc à chaque version
     domaines/<id>/{skill,demandes,contexte.exemple}.md
   serveur/                       ← le code (package.json, src/, dist/ après build)
   entrees/claude-code/support/SKILL.md   ← un dossier par outil hôte
+  entrees/claude-code/settings.json      ← permissions refusées au modèle, déposées par « hote »
 ```
 
 Quatre natures, quatre dossiers : un rédacteur de skills n'ouvre que
@@ -44,10 +45,11 @@ livraison invalide ou un serveur qui ne répond pas sur ce poste — `tester`,
 ajouté le 2026-09-11, `-SansTest` pour le sauter), `init` (initialiser,
 rejoindre ou mettre à jour — même commande, idempotente, qui note la
 version dans `installation/VERSION` et annonce le mode), `enregistrer` +
-`entree` (Claude Code), `etat`. Le script se termine par trois rappels :
-remplir le contexte (à la main ou par `/support remplis le contexte`),
-redémarrer Claude Code et vérifier `/mcp`, garder le mode de permission par
-défaut.
+`entree` + `hote` (Claude Code), `etat`. Le script se termine par trois
+rappels : remplir le contexte (à la main ou par `/support remplis le
+contexte`), redémarrer Claude Code et vérifier `/mcp`, lancer Claude Code
+depuis le dossier parent de `produit/` où `.claude/settings.json` tient la
+règle « l'IA n'exécute rien ».
 
 **Encodage et fins de ligne.** `install.ps1` est enregistré en **UTF-8 avec
 BOM** : Windows PowerShell 5.1 lit un `.ps1` sans BOM dans la page de codes
@@ -68,6 +70,65 @@ l'en-tête du script ; le script ne modifie jamais la politique lui-même.
 **Poste suivant sur un partage** : même commande avec
 `-Installation \\serveur\support-it\installation`. `init` trouve
 `contexte/` présent, ne copie rien, n'écrase rien.
+
+**Ce que Claude Code ne peut plus faire — `.claude/settings.json`
+(décision 5 du 2026-09-17, implémentée le 2026-09-18).** L'étape 5 appelle
+aussi `hote`, qui dépose dans le **dossier de lancement** — le parent de
+`produit/`, d'où le technicien lance Claude Code — un
+`.claude/settings.json` de permissions refusées, à partir du modèle livré
+`produit/entrees/claude-code/settings.json` :
+
+```json
+"permissions": { "deny": [
+  "Edit(/installation/**)",
+  "Read(/installation/kb/**)",
+  "Read(/installation/en-cours/**)",
+  "Bash",
+  "PowerShell"
+] }
+```
+
+Pourquoi : le modèle pouvait écrire `installation/contexte/reseau.md` avec
+`Edit` (sans `update_context`, sans `historique/`, sans oui), lire une
+entrée de base en devinant son chemin, ou exécuter une commande. Le mode de
+permission était la seule barrière, et il se désactive d'un clic. Avec ce
+fichier, la seule façon d'écrire dans `installation/` est un appel MCP :
+l'invariant « rien n'est écrit hors des appels » est tenu par l'hôte, plus
+par le prompt. `contexte/` et `tickets/` restent lisibles (`get_context`
+fait le tri, lire une archive n'a pas de dommage). `Bash` **et**
+`PowerShell` (l'outil shell de Claude Code sous Windows) sont retirés
+entièrement : « l'IA guide, le technicien exécute ». Le CLI (`etat`,
+`valider`, `audit`) est au référent, dans son terminal.
+
+Vérifié dans la documentation Claude Code et en vrai le 2026-09-18 :
+
+- Un motif `/chemin` est relatif au dossier qui contient `.claude/`, pas au
+  répertoire courant : le fichier tient même si Claude Code est lancé d'un
+  sous-dossier. Si l'installation n'est pas sous le dossier de lancement
+  (partage réseau), `hote` écrit la forme absolue `//C:/…/installation/**`
+  et le dit — à vérifier au premier ticket.
+- Une règle `Write(chemin)` n'est **pas** consultée par Claude Code ; c'est
+  `Edit(chemin)` qui couvre Edit et Write, et `Read(chemin)` bloque aussi
+  Edit et Write sur le même chemin (≥ 2.1.228). D'où `Edit` et non `Write`.
+- Un outil nommé sans motif (`Bash`) est retiré du contexte du modèle, qui
+  ne le voit plus. Un refus tombe **immédiatement**, sans redémarrage, et
+  le modèle reçoit un message lisible (`Permission to use Bash has been
+  denied.`) : il peut se rabattre sur l'appel MCP.
+- Les règles `deny` s'appliquent sans que le dossier soit « trusted »,
+  et priment sur toute règle `allow` de tout niveau.
+
+`hote` **fusionne**, n'écrase jamais : les entrées manquantes de `deny`
+sont ajoutées, le reste du fichier (`allow`, `env`, hooks…) est intact,
+l'ancien est copié en `settings.json.support-it.bak` ; relancé, il dit
+« déjà en place, rien ajouté ». Pour lever une interdiction, le référent
+édite le fichier à la main. Piège rencontré : lancer `hote` dans un dépôt
+de développement dépose le fichier à la racine du dépôt et coupe `Bash` à
+l'assistant qui y travaille — d'où `.claude/` dans le `.gitignore` du dépôt
+et un essai toujours fait sur une copie temporaire du produit.
+
+Pas de hooks dans ce cycle (`PreToolUse`, `Stop`) : ce qu'ils auraient
+bloqué est côté serveur (état de session, décision 3). Le smoke ne peut
+pas tester l'hôte : test manuel T-H5 (`validation.md` §2.5).
 
 ## 3. H4 — Mise à jour, tranchée
 

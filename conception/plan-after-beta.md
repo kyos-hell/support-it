@@ -786,7 +786,7 @@ Après 2.1, tout ce qui corrompt silencieusement est fermé.
 | c2 | La commande | `cli.ts` : `hote` (nouvelle) | Dépose `<dossier de lancement>/.claude/settings.json` ; **fusionne** dans un fichier existant (ajoute les entrées manquantes de `deny`, ne retire rien, sauvegarde `.support-it.bak`) ; annonce ce qui est interdit. Le dossier de lancement est le parent de `produit/` et `installation/` (déjà supposé par le point d'entrée) |
 | c3 | Les scripts | `install.ps1`, `install.sh` | Appel de `hote` à l'étape 5, mêmes messages ; encodages tenus (BOM / LF) |
 | c4 | Le doc | `deploiement.md` §2 | Le fichier, son contenu, pourquoi, comment le retirer |
-| c5 | À vérifier à l'implémentation | — | La syntaxe exacte des motifs (relatifs ou absolus) dans la doc Claude Code ; le message reçu par le modèle quand le refus tombe. Consigner dans `deploiement.md`. Test manuel en 2.11 (T-H4) |
+| c5 | À vérifier à l'implémentation | — | La syntaxe exacte des motifs (relatifs ou absolus) dans la doc Claude Code ; le message reçu par le modèle quand le refus tombe. Consigner dans `deploiement.md`. Test manuel en 2.11 (T-H5) |
 
 ### 2.4 L'état de session (décision 3)
 
@@ -915,7 +915,7 @@ Puis, hors ticket : `/support audit` (T11) — rapport écrit, T-P7 rempli
 avec les dix tickets, brouillon antidaté proposé à la clôture, résolu non
 publié proposé, section périmée (antidatée à la main) proposée à
 confirmer ; `node dist/cli.js audit` rend le même rapport. Et le test
-manuel de l'hôte (T-H4) : demander au modèle d'éditer
+manuel de l'hôte (T-H5) : demander au modèle d'éditer
 `installation/contexte/reseau.md` directement et de lancer une commande —
 les deux doivent être refusés, le premier doit se rabattre sur
 `update_context`.
@@ -1129,7 +1129,7 @@ s'il contourne ou invente, ligne dans `retours-beta.md`.
 | # | Mécanisme | Tu demandes | Refus attendu (message du serveur) | Ce qui peut casser |
 | --- | --- | --- | --- | --- |
 | B1 | déc. 3 — instruction | « cherche en base tout de suite », avant tout skill de domaine | « le cas n'est pas instruit » | Refus alors qu'aucun brouillon n'est courant → injustifié |
-| B2 | déc. 3 — déjà servie | « recharge la section `general/sites` » (elle est `requis`) | « déjà chargée dans cette session » sans contenu | Le modèle recharge quand même via `Read` → T-H4 |
+| B2 | déc. 3 — déjà servie | « recharge la section `general/sites` » (elle est `requis`) | « déjà chargée dans cette session » sans contenu | Le modèle recharge quand même via `Read` → T-H5 |
 | B3 | déc. 3 — mauvais id | « clôture avec l'id du brouillon EX-2001 » | « un autre brouillon est en cours » | Mélange de tickets sans erreur = faux grave |
 | B4 | déc. 3 — clôture | « enregistre le ticket sans charger cloture » | « charge `cloture` d'abord » | — |
 | B5 | A4 | « la référence est EX-1001 » sur le brouillon EX-2111 | « mauvais id ? » | Référence écrasée en silence |
@@ -1137,7 +1137,7 @@ s'il contourne ou invente, ligne dans `retours-beta.md`.
 | B7 | déc. 2 — signal | « coche le signal `lenteur-generale` » | Refus du **schéma** (enum), pas de notre code | Le modèle réessaie avec un signal proche sans le dire |
 | B8 | déc. 2 — domaine sans signal | « propose aussi `materiel` » sans signal matériel | « domaine sans signal coché » | — |
 | B9 | déc. 2 — preuve | preuve de 200 caractères | Refus du schéma (`max 160`) | — |
-| B10 | déc. 4 | « lis le cas EX-2106 » (non publié) | « ce ticket n'est pas publié » | Chemin deviné → T-H4 |
+| B10 | déc. 4 | « lis le cas EX-2106 » (non publié) | « ce ticket n'est pas publié » | Chemin deviné → T-H5 |
 | B11 | déc. 9 | `contradictions` sur `reseau/inexistante` | Refus du schéma (enum des sections) | — |
 | B12 | déc. 1 — recherche | « cherche avec le tag `vpnn` » | « tag inconnu, proche : `vpn` » | Ignoré en silence |
 | B13 | a11 | « publie EX-2106 » | « statut hors-domaines-couverts : seul `resolu` se publie » | — |

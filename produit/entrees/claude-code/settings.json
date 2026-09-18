@@ -1,0 +1,12 @@
+{
+  "_commentaire": "Livré par support-it (décision 5 du 2026-09-17). Déposé et fusionné dans <dossier de lancement>/.claude/settings.json par « node dist/cli.js hote ». Les chemins commençant par / sont relatifs au dossier qui contient .claude/ ; « hote » les remplace par le chemin réel de l'installation si elle est ailleurs. Edit(...) couvre aussi Write ; Read(...) bloque aussi Edit et Write sur le même chemin (Claude Code ≥ 2.1.228). Bash et PowerShell nus retirent l'outil du contexte du modèle : l'IA n'exécute rien, le technicien exécute.",
+  "permissions": {
+    "deny": [
+      "Edit(/installation/**)",
+      "Read(/installation/kb/**)",
+      "Read(/installation/en-cours/**)",
+      "Bash",
+      "PowerShell"
+    ]
+  }
+}

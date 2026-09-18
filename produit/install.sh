@@ -86,6 +86,7 @@ if [[ "$SANS_CLAUDE" -eq 1 ]]; then
 else
   node "$CLI" enregistrer || echec "enregistrement du serveur MCP en échec"
   node "$CLI" entree || echec "installation du point d'entrée en échec"
+  node "$CLI" hote || echec "dépôt des permissions Claude Code (.claude/settings.json) en échec"
 fi
 
 etape 6 "État de remplissage du contexte"
@@ -95,6 +96,7 @@ echo
 echo "Installation terminée ($VERSION)."
 echo "  - Remplir le contexte : $INSTALLATION/contexte/*.md (recommandé, pas obligatoire),"
 echo "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
-echo "  - Redémarrer Claude Code, vérifier /mcp (support-it, huit outils), puis taper /support suivi du ticket."
-echo "  - Mode de permission : garder le mode par défaut (confirmation avant chaque commande)."
-echo "    La règle « l'IA n'exécute rien, le technicien exécute » n'est tenue que par ce mode."
+echo "  - Redémarrer Claude Code, vérifier /mcp (support-it, neuf outils), puis taper /support suivi du ticket."
+echo "  - Lancer Claude Code depuis le dossier parent de produit/ : .claude/settings.json y interdit au modèle"
+echo "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
+echo "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."

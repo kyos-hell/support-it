@@ -27,6 +27,7 @@ Usage : node dist/cli.js <commande>
   etat         État de remplissage du contexte, par fichier et par section.
   enregistrer  Enregistre le serveur MCP dans ~/.claude.json (portée utilisateur), avec sauvegarde.
   entree       Installe le point d'entrée /support dans ~/.claude/skills/support/.
+  hote         Dépose .claude/settings.json dans le dossier de lancement (permissions refusées au modèle), en fusionnant.
 
 Variables : SUPPORT_IT_PRODUIT, SUPPORT_IT_INSTALLATION (défauts : le dossier produit/ du serveur, et installation/ à côté).`);
 }
@@ -140,6 +141,58 @@ function enregistrer(): number {
   return 0;
 }
 
+/**
+ * Décision 5 : ce que Claude Code ne peut plus faire là où un appel MCP
+ * existe. Dépose `<dossier de lancement>/.claude/settings.json` — le dossier
+ * de lancement est le parent de produit/, d'où le technicien lance Claude
+ * Code — en fusionnant : les entrées `deny` manquantes sont ajoutées, rien
+ * n'est retiré, le reste du fichier est intact, l'ancien est sauvegardé.
+ */
+function hote(): number {
+  const modele = path.join(r.produit, "entrees", "claude-code", "settings.json");
+  if (!fs.existsSync(modele)) {
+    console.error(`modèle de settings.json absent du produit : ${modele}`);
+    return 1;
+  }
+  const lancement = path.resolve(r.produit, "..");
+  const dossier = path.join(lancement, ".claude");
+  const fichier = path.join(dossier, "settings.json");
+  const livre = JSON.parse(fs.readFileSync(modele, "utf8")) as { permissions: { deny: string[] } };
+  // Les motifs livrés visent /installation/** relatif au dossier de lancement.
+  // Si l'installation est ailleurs (partage réseau), on vise son chemin absolu (forme //).
+  const relatif = path.relative(lancement, r.installation).replace(/\\/g, "/");
+  const dedans = relatif && !relatif.startsWith("..") && !path.isAbsolute(relatif);
+  const racineMotif = dedans ? `/${relatif}` : `//${r.installation.replace(/\\/g, "/").replace(/^\/+/, "")}`;
+  const deny = livre.permissions.deny.map((d) => d.replace("/installation", racineMotif));
+
+  let config: Record<string, unknown> = {};
+  let existant = false;
+  if (fs.existsSync(fichier)) {
+    existant = true;
+    try {
+      config = JSON.parse(fs.readFileSync(fichier, "utf8")) as Record<string, unknown>;
+    } catch {
+      console.error(`${fichier} illisible : rien n'a été modifié. Corriger le JSON, puis relancer « hote ».`);
+      return 1;
+    }
+  }
+  const permissions = (config.permissions ?? {}) as Record<string, unknown>;
+  const actuels = Array.isArray(permissions.deny) ? (permissions.deny as unknown[]).map(String) : [];
+  const ajoutes = deny.filter((d) => !actuels.includes(d));
+  permissions.deny = [...actuels, ...ajoutes];
+  config.permissions = permissions;
+  fs.mkdirSync(dossier, { recursive: true });
+  if (existant) fs.copyFileSync(fichier, `${fichier}.support-it.bak`);
+  fs.writeFileSync(fichier, JSON.stringify(config, null, 2) + "\n", "utf8");
+  console.log(`permissions Claude Code : ${fichier}${existant ? " (fusionné, sauvegarde .support-it.bak)" : " (créé)"}`);
+  console.log(`  dossier de lancement : ${lancement} — lancer Claude Code depuis là`);
+  console.log(`  ${ajoutes.length ? `ajouté : ${ajoutes.join(", ")}` : "déjà en place, rien ajouté"}`);
+  if (!dedans) console.log(`  installation hors du dossier de lancement : motifs absolus (${racineMotif}) — à vérifier au premier ticket`);
+  console.log("  interdit au modèle : écrire dans installation/ (Edit, Write), lire kb/ et en-cours/ directement, exécuter une commande (Bash, PowerShell).");
+  console.log("  Le serveur MCP écrit, Claude Code ne contourne plus. Redémarrer Claude Code.");
+  return 0;
+}
+
 function entree(): number {
   const source = path.join(r.produit, "entrees", "claude-code", "support", "SKILL.md");
   if (!fs.existsSync(source)) {
@@ -178,6 +231,9 @@ switch (commande) {
     break;
   case "entree":
     code = entree();
+    break;
+  case "hote":
+    code = hote();
     break;
   default:
     aide();

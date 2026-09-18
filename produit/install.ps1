@@ -101,6 +101,8 @@ if ($SansClaude) {
   if ($LASTEXITCODE -ne 0) { Echec "enregistrement du serveur MCP en échec" }
   & node $Cli entree
   if ($LASTEXITCODE -ne 0) { Echec "installation du point d'entrée en échec" }
+  & node $Cli hote
+  if ($LASTEXITCODE -ne 0) { Echec "dépôt des permissions Claude Code (.claude/settings.json) en échec" }
 }
 
 Etape 6 "État de remplissage du contexte"
@@ -110,6 +112,7 @@ Write-Host ""
 Write-Host "Installation terminée ($Version)." -ForegroundColor Green
 Write-Host "  - Remplir le contexte : $Installation\contexte\*.md (recommandé, pas obligatoire),"
 Write-Host "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
-Write-Host "  - Redémarrer Claude Code, vérifier /mcp (support-it, huit outils), puis taper /support suivi du ticket."
-Write-Host "  - Mode de permission : garder le mode par défaut (confirmation avant chaque commande)."
-Write-Host "    La règle « l'IA n'exécute rien, le technicien exécute » n'est tenue que par ce mode."
+Write-Host "  - Redémarrer Claude Code, vérifier /mcp (support-it, neuf outils), puis taper /support suivi du ticket."
+Write-Host "  - Lancer Claude Code depuis le dossier parent de produit/ : .claude/settings.json y interdit au modèle"
+Write-Host "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
+Write-Host "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."
