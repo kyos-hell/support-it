@@ -8,10 +8,40 @@ export function propre(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "x";
 }
 
+const p = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * Tout en UTC (A7) : les dates ISO le sont déjà, les identifiants et les
+ * noms de fichiers doivent trier dans le même ordre sur deux postes de
+ * fuseaux différents. Format inchangé, fichiers existants valides.
+ */
 export function horodatage(d: Date): { compact: string; iso: string } {
-  const p = (n: number) => String(n).padStart(2, "0");
-  const compact = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const compact = `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`;
   return { compact, iso: d.toISOString() };
+}
+
+/** `AAAA-MM-JJ` en UTC : la ligne « Dernière mise à jour » du contexte. */
+export function dateDuJour(d = new Date()): string {
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+}
+
+/** `AAAAMMJJ-HHMMSS` en UTC : suffixe des copies dans contexte/historique/. */
+export function horodatageCompact(d = new Date()): string {
+  return horodatage(d).compact;
+}
+
+/**
+ * Clé de comparaison d'une entrée libre (A2) : minuscules, sans accents ni
+ * ponctuation, espaces réduits. Deux reformulations de la même ligne
+ * (« Cran 1 : ping OK. » / « cran 1 — ping ok ») ne s'ajoutent pas deux fois.
+ */
+export function normaliserCle(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export function utilisateur(): string {

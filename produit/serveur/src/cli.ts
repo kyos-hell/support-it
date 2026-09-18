@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assurerInstallation, chemins, lireVersion, racines } from "./config.js";
 import { etatRemplissage, gabaritsLivres } from "./contexte.js";
-import { ageJours, JOURS_BROUILLON_ANCIEN, listerBrouillons } from "./encours.js";
+import { ageJours, JOURS_BROUILLON_ANCIEN, lireEnCours } from "./encours.js";
 import { rendreConstats, valider } from "./validation.js";
 
 const r = racines();
@@ -91,15 +91,17 @@ function etat(): number {
     if (e.vides.length) console.log(`             vides : ${e.vides.join(", ")}`);
     if (e.manquantes.length) console.log(`             MANQUANTES (gabarit plus récent que le fichier) : ${e.manquantes.join(", ")}`);
     if (e.enPlus.length) console.log(`             en plus (inconnues du gabarit) : ${e.enPlus.join(", ")}`);
-    if (e.volumineuses.length) console.log(`             VOLUMINEUSES (> 40 lignes, inventaire à élaguer ?) : ${e.volumineuses.join(", ")}`);
+    if (e.volumineuses.length) console.log(`             VOLUMINEUSES (> 40 lignes ou > 2 500 car., inventaire à élaguer ?) : ${e.volumineuses.join(", ")}`);
     vides += e.vides.length;
   }
-  const brouillons = listerBrouillons(r);
-  console.log(`Tickets en cours : ${brouillons.length}`);
-  for (const b of brouillons) {
+  const enCours = lireEnCours(r);
+  console.log(`Tickets en cours : ${enCours.actifs.length}`);
+  for (const b of enCours.actifs) {
     const age = ageJours(b);
     console.log(`  ${(b.reference ?? "—").padEnd(14)} ${b.id}  ${b.technicien}  ${b.etape}  ${age} j${age >= JOURS_BROUILLON_ANCIEN ? "  ANCIEN : à clôturer ou reprendre" : ""}`);
   }
+  for (const b of enCours.zombies) console.log(`  ZOMBIE  ${b.id} : le ticket est déjà clôturé, le brouillon reste dans en-cours/ (ignoré ; supprimer à la main)`);
+  for (const f of enCours.orphelins) console.log(`  ORPHELIN  ${f} : pas d'en-tête lisible (ignoré ; supprimer à la main)`);
   console.log(
     vides === 0
       ? "Contexte complet."

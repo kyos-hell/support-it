@@ -41,6 +41,11 @@ export function trouverDomaine(m: Manifeste, id: string): DomaineManifeste | und
   return m.domaines.find((d) => d.id === id);
 }
 
+/** Les identifiants qui ne sont pas des domaines du manifeste (A3). */
+export function domainesInconnus(m: Manifeste, ids: string[]): string[] {
+  return ids.filter((id) => !trouverDomaine(m, id));
+}
+
 /** Rendu markdown du manifeste, tel que le triage le reçoit. */
 export function rendreManifeste(m: Manifeste): string {
   const lignes: string[] = [];

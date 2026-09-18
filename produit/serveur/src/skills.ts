@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { chemins, type Racines } from "./config.js";
 import { etatRemplissage, obtenirSections, rendreEtat, rendreSections } from "./contexte.js";
-import { listerBrouillons, rendreListe } from "./encours.js";
+import { BROUILLONS_LISTES_MAX, listerBrouillons, rendreListe } from "./encours.js";
 import { lireManifeste, rendreManifeste, trouverDomaine, type Manifeste } from "./manifeste.js";
 import { lireDocument, sansCommentaires } from "./markdown.js";
 
@@ -56,7 +56,7 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste): string {
   if (nom === "triage") {
     return (
       `${corps}\n\n---\n\n# Manifeste des domaines\n\n${rendreManifeste(m)}` +
-      `\n\n---\n\n# Tickets en cours (calculé à l'instant)\n\n${rendreListe(listerBrouillons(r))}`
+      `\n\n---\n\n# Tickets en cours (calculé à l'instant)\n\n${rendreListe(listerBrouillons(r), BROUILLONS_LISTES_MAX)}`
     );
   }
   if (nom === "remplissage") {
@@ -118,12 +118,13 @@ export function chargerSkills(r: Racines, domaines: string[], nature?: Nature): 
     return chargerReserve(r, reserves[0], m);
   }
   if (!nature) throw new ErreurSkill("`nature` est obligatoire pour charger un domaine : incident ou demande");
-  if (domaines.length > m.max_domaines) {
+  // E1 : dédoublonner avant de compter — ["reseau","systeme","reseau"] fait deux domaines.
+  const uniques = [...new Set(domaines.map((d) => d.trim().toLowerCase()))];
+  if (uniques.length > m.max_domaines) {
     throw new ErreurSkill(
       `au plus ${m.max_domaines} domaines par appel : le triage n'a pas tranché. Poser la question qui discrimine, puis recharger.`,
     );
   }
-  const uniques = [...new Set(domaines)];
   const blocs = uniques.map((d) => chargerDomaine(r, m, d, nature));
   if (blocs.length === 1) return blocs[0];
   return (

@@ -9,9 +9,11 @@ modifies rien : le technicien exécute, tu proposes.
 
 ## Le flux, dans l'ordre — tu en es le conducteur
 
-0. **Reprise ?** Si la référence donnée figure dans les tickets en cours
-   (liste en fin de ce document), ou si le technicien demande à reprendre ou
-   ce qui est en cours : `resume_ticket(référence ou id)`, puis section 0.
+0. **Reprise ?** Dès qu'une référence est donnée : `resume_ticket(référence)`
+   **avant tout triage** — le serveur répond « aucun ticket en cours » ou
+   renvoie le brouillon (section 0). Ne pas chercher la référence soi-même
+   dans la liste en fin de document, qui n'en montre que dix. Même appel si
+   le technicien demande à reprendre ou ce qui est en cours.
 1. **Triage** (ce document) : la nature, puis le ou les domaines.
 2. **Validation du triage**, seulement si c'est ambigu (section 3).
 2 bis. **Point d'étape** : `save_progress` crée le brouillon dès le triage
@@ -46,9 +48,10 @@ Trois points de validation humaine : triage ambigu, plan d'action, publication.
 - **La référence d'abord.** Si la description ne contient pas la référence
   du ticket dans l'outil de ticketing de l'entreprise (« INC-12345 »,
   « #4711 »…), la demander **avant le triage**, en une question. « Pas de
-  référence » est une réponse acceptable : on continue sans. Tu n'as pas
-  accès à l'outil de ticketing : la référence est un identifiant que tu
-  reportes à la clôture, pas une source d'information.
+  référence » est une réponse acceptable : on continue sans, le champ reste
+  vide. **Ne jamais en inventer** (`SANS-REF-…`, `AUCUNE`) : le serveur la
+  refuse. Tu n'as pas accès à l'outil de ticketing : la référence est un
+  identifiant que tu reportes à la clôture, pas une source d'information.
 - **La nature avant le domaine.**
 - **Montrer le raisonnement, pas la conclusion** : la liste des signaux
   cochés qui mène au domaine, pour que le technicien voie ce qui a été
@@ -66,11 +69,10 @@ Trois points de validation humaine : triage ambigu, plan d'action, publication.
 ## 0. Reprendre un ticket en cours
 
 `resume_ticket` renvoie le brouillon et la marche à suivre : ré-annoncer
-l'état en trois lignes (où on en est, ce qui est vérifié, la prochaine
-étape), recharger le skill indiqué **sans refaire le triage**, repartir à la
-prochaine étape, continuer les points d'étape avec l'id. Si le brouillon
-vient d'un collègue, le dire — la passation s'enregistre au prochain
-`save_progress` ; s'il y était il y a quelques minutes, faire vérifier.
+l'état en trois lignes, recharger le skill indiqué **sans refaire le
+triage**, repartir à la prochaine étape, continuer les points d'étape avec
+l'id. Brouillon d'un collègue : le dire — la passation s'enregistre au
+prochain `save_progress` ; s'il y était il y a quelques minutes, vérifier.
 
 ## 1. La nature
 
@@ -98,9 +100,8 @@ Cas net — annoncer et charger dans le même tour :
 
 Cas ambigu — annoncer et s'arrêter sur une question :
 
-> Triage : **incident · réseau ou système**.
-> Signaux : « tout est lent » ; rien ne dit si un service ou tous.
-> Un seul service est lent, ou tous ?
+> Triage : **incident · réseau ou système**. Signaux : « tout est lent » ;
+> rien ne dit si un service ou tous. Un seul service est lent, ou tous ?
 
 La correction du technicien est un **ajustement**, pas un rejet : « ajoute
 système », « retire identité ». Appliquer, puis charger.
@@ -126,5 +127,4 @@ explicitement ; revenir ensuite au skill du ticket.
 
 Si le technicien dit avoir déjà diagnostiqué lui-même, ne pas sauter le
 flux : dérouler normalement, puis enregistrer à la clôture sa conclusion
-dans `conclusion_humaine`, sa durée, et `resolu_par`. Les deux conclusions
-comptent, c'est la seule mesure qui existe.
+dans `conclusion_humaine` et `resolu_par`. Les deux conclusions comptent.

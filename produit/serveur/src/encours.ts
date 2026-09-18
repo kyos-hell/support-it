@@ -6,7 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
-import { fabriquerId, idValide, poste, utilisateur } from "./ids.js";
+import { fabriquerId, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
+import { domainesInconnus, lireManifeste } from "./manifeste.js";
 import { lireDocument } from "./markdown.js";
 
 export type Etape = "triage" | "instruction" | "recherche" | "plan" | "actions" | "cloture" | "pause";
@@ -77,8 +78,8 @@ export interface ProgressionEcrite {
   id: string;
   fichier: string;
   cree: boolean;
-  /** Vrai si l'appel sans id a été rattaché à un brouillon existant par sa référence. */
-  lie: boolean;
+  /** Si l'appel sans id a été rattaché à un brouillon existant : par quoi (A5 : le symptôme). */
+  lie: "reference" | "symptome" | null;
   passation: Passation | null;
   etape: Etape;
 }
@@ -87,6 +88,47 @@ export class ErreurEnCours extends Error {}
 
 const MINUTES_REPRISE_PRUDENTE = 10;
 export const JOURS_BROUILLON_ANCIEN = 30;
+/** Plafond de la liste rendue au triage (B1) ; `resume_ticket()` rend tout. */
+export const BROUILLONS_LISTES_MAX = 10;
+
+/**
+ * Une référence fabriquée par le modèle n'est pas une référence (A6) : le
+ * technicien en donne une, ou dit « pas de référence », et le champ reste vide.
+ */
+const RE_REFERENCE_FABRIQUEE = /^(sans[-_ ]?ref|aucune?|n\/?a|none|null|inconnue?|pas[-_ ]de[-_ ]ref)/i;
+
+export function verifierReference(reference: string | undefined): string {
+  const ref = (reference ?? "").trim();
+  if (!ref) return "";
+  if (RE_REFERENCE_FABRIQUEE.test(ref)) {
+    throw new ErreurEnCours(
+      `référence « ${ref} » : une référence ne s'invente pas. Si le technicien n'en a pas donné, omettre le champ — « pas de référence » est un état valide.`,
+    );
+  }
+  return ref;
+}
+
+/** A4 : un brouillon qui a une référence ne la change pas (variante de casse exceptée). */
+function verifierReferenceStable(b: Brouillon, ref: string): void {
+  if (ref && b.reference && b.reference.toLowerCase() !== ref.toLowerCase()) {
+    throw new ErreurEnCours(
+      `le brouillon ${b.id} porte déjà la référence « ${b.reference} », on donne « ${ref} » : mauvais id ? Un ticket = une référence ; resume_ticket() liste ceux en cours.`,
+    );
+  }
+}
+
+/** A3 : les domaines sont ceux du manifeste, en minuscules et sans espaces. */
+export function verifierDomaines(r: Racines, champ: string, liste: string[] | undefined): string[] | undefined {
+  if (!liste) return undefined;
+  const propres = [...new Set(liste.map((d) => d.trim().toLowerCase()).filter(Boolean))];
+  const inconnus = domainesInconnus(lireManifeste(r), propres);
+  if (inconnus.length) {
+    throw new ErreurEnCours(
+      `${champ} : domaine(s) inconnu(s) du manifeste : ${inconnus.join(", ")}. Domaines : ${lireManifeste(r).domaines.map((d) => d.id).join(", ")}.`,
+    );
+  }
+  return propres;
+}
 
 function fichierBrouillon(r: Racines, id: string): string {
   return path.join(chemins(r).enCours, `${id}.md`);
@@ -127,15 +169,31 @@ export function lireBrouillon(r: Racines, id: string): Brouillon | null {
   return lireFichier(fichierBrouillon(r, id));
 }
 
+export interface EnCours {
+  /** Les brouillons vivants, du plus récent au plus ancien. */
+  actifs: Brouillon[];
+  /** A8 : brouillons dont le ticket est déjà clôturé (fichier dans tickets/). Ignorés partout, signalés par `etat` et l'audit. */
+  zombies: Brouillon[];
+  /** Fichiers de en-cours/ sans en-tête `id` lisible : ignorés, signalés. */
+  orphelins: string[];
+}
+
+export function lireEnCours(r: Racines): EnCours {
+  const c = chemins(r);
+  const out: EnCours = { actifs: [], zombies: [], orphelins: [] };
+  if (!fs.existsSync(c.enCours)) return out;
+  for (const f of fs.readdirSync(c.enCours).filter((x) => x.endsWith(".md"))) {
+    const b = lireFichier(path.join(c.enCours, f));
+    if (!b) out.orphelins.push(path.join(c.enCours, f));
+    else if (fs.existsSync(path.join(c.tickets, `${b.id}.md`))) out.zombies.push(b);
+    else out.actifs.push(b);
+  }
+  out.actifs.sort((a, b) => b.derniere_mise_a_jour.localeCompare(a.derniere_mise_a_jour));
+  return out;
+}
+
 export function listerBrouillons(r: Racines): Brouillon[] {
-  const d = chemins(r).enCours;
-  if (!fs.existsSync(d)) return [];
-  return fs
-    .readdirSync(d)
-    .filter((f) => f.endsWith(".md"))
-    .map((f) => lireFichier(path.join(d, f)))
-    .filter((b): b is Brouillon => b !== null)
-    .sort((a, b) => b.derniere_mise_a_jour.localeCompare(a.derniere_mise_a_jour));
+  return lireEnCours(r).actifs;
 }
 
 /** Par identifiant, sinon par référence (insensible à la casse ; le plus récent si plusieurs). */
@@ -147,12 +205,19 @@ export function trouverBrouillon(r: Racines, idOuReference: string): Brouillon |
   return listerBrouillons(r).find((b) => (b.reference ?? "").toLowerCase() === ref) ?? null;
 }
 
+/** A5 : un brouillon actif qui porte le même symptôme initial, à la normalisation près. */
+export function trouverParSymptome(r: Racines, symptome: string): Brouillon | null {
+  const cle = normaliserCle(symptome);
+  if (!cle) return null;
+  return listerBrouillons(r).find((b) => normaliserCle(b.symptome_initial) === cle) ?? null;
+}
+
 function ajouter<T>(existants: T[], nouveaux: T[] | undefined, cle: (x: T) => string): T[] {
   if (!nouveaux) return existants;
-  const vus = new Set(existants.map(cle));
+  const vus = new Set(existants.map((x) => normaliserCle(cle(x))));
   const out = [...existants];
   for (const n of nouveaux) {
-    const k = cle(n);
+    const k = normaliserCle(cle(n));
     if (!k || vus.has(k)) continue;
     vus.add(k);
     out.push(n);
@@ -255,18 +320,28 @@ export function sauverProgression(r: Racines, e: EntreeProgression): Progression
   assurerInstallation(r);
   if (!ETAPES.includes(e.etape)) throw new ErreurEnCours(`étape inconnue : ${e.etape}. Étapes : ${ETAPES.join(", ")}`);
   verifierLongueurs(e);
+  const ref = verifierReference(e.reference);
+  const domainesProposes = verifierDomaines(r, "domaines_proposes", e.domaines_proposes);
+  const domainesValides = verifierDomaines(r, "domaines_valides", e.domaines_valides);
+  const escalades = verifierDomaines(r, "escalades", e.escalades);
   const maintenant = new Date().toISOString();
   const moi = utilisateur();
 
   let b: Brouillon | null = null;
-  let lie = false;
+  let lie: ProgressionEcrite["lie"] = null;
   if (e.id) {
     b = lireBrouillon(r, e.id);
     if (!b) throw new ErreurEnCours(`brouillon inconnu : ${e.id}. Sans id, save_progress crée le brouillon ; resume_ticket() liste ceux qui existent.`);
-  } else if (e.reference) {
-    b = trouverBrouillon(r, e.reference);
-    lie = b !== null;
+  } else if (ref) {
+    b = trouverBrouillon(r, ref);
+    if (b) lie = "reference";
   }
+  if (!b && !e.id && texte(e.symptome_initial ?? "")) {
+    // A5 : un oubli d'id ne crée pas un doublon.
+    b = trouverParSymptome(r, e.symptome_initial!);
+    if (b) lie = "symptome";
+  }
+  if (b) verifierReferenceStable(b, ref);
 
   let cree = false;
   if (!b) {
@@ -311,18 +386,17 @@ export function sauverProgression(r: Racines, e: EntreeProgression): Progression
   b.poste = poste();
   b.derniere_mise_a_jour = maintenant;
   b.etape = e.etape;
-  // La référence ne change que si elle change vraiment : une variante de
-  // casse (rattachement par « inc-123 ») ne doit pas écraser « INC-123 ».
-  const ref = texte(e.reference ?? "");
-  if (ref && (b.reference ?? "").toLowerCase() !== ref.toLowerCase()) b.reference = ref;
+  // La référence ne s'écrit que si le brouillon n'en a pas (A4 a déjà refusé
+  // un changement) : une variante de casse ne doit pas écraser « INC-123 ».
+  if (ref && !b.reference) b.reference = ref;
   if (!b.symptome_initial && texte(e.symptome_initial ?? "")) b.symptome_initial = texte(e.symptome_initial!);
   if (e.nature) b.nature = e.nature;
-  if (e.domaines_proposes) b.domaines_proposes = e.domaines_proposes;
-  if (e.domaines_valides) b.domaines_valides = e.domaines_valides;
-  if (e.skill_charge) b.skill_charge = e.skill_charge;
+  if (domainesProposes) b.domaines_proposes = domainesProposes;
+  if (domainesValides) b.domaines_valides = domainesValides;
+  if (e.skill_charge) b.skill_charge = { ...e.skill_charge, domaines: verifierDomaines(r, "skill_charge.domaines", e.skill_charge.domaines) ?? [] };
   if (texte(e.prochaine_etape ?? "")) b.prochaine_etape = texte(e.prochaine_etape!);
   if (texte(e.plan_action ?? "")) b.plan_action = texte(e.plan_action!);
-  b.escalades = ajouter(b.escalades, e.escalades, (x) => x.trim());
+  b.escalades = ajouter(b.escalades, escalades, (x) => x.trim());
   b.signaux = ajouter(b.signaux, e.signaux, (x) => x.trim());
   b.verifications = ajouter(b.verifications, e.verifications, (x) => x.trim());
   b.actions = ajouter(b.actions, e.actions, (x) => x.trim());
@@ -371,18 +445,27 @@ export function rendreReprise(b: Brouillon): string {
   );
 }
 
-export function rendreListe(bs: Brouillon[]): string {
+/**
+ * La liste des tickets en cours. `plafond` (B1) : au triage, les 10 plus
+ * récents seulement — le modèle ne reconnaît pas une référence dans la
+ * liste, il appelle `resume_ticket(référence)` ; `resume_ticket()` rend tout.
+ */
+export function rendreListe(bs: Brouillon[], plafond = Infinity): string {
   if (bs.length === 0) return "Aucun ticket en cours.";
+  const montres = bs.slice(0, plafond);
   const out = [
     `${bs.length} ticket(s) en cours — reprendre avec \`resume_ticket(<id ou référence>)\` :`,
     "",
     "| Référence | Id | Technicien | Étape | Dernier point | Prochaine étape |",
     "| --- | --- | --- | --- | --- | --- |",
   ];
-  for (const b of bs) {
+  for (const b of montres) {
     const age = ageJours(b);
     const vieux = age >= JOURS_BROUILLON_ANCIEN ? ` ⚠ ${age} j` : "";
     out.push(`| ${b.reference ?? "—"} | \`${b.id}\` | ${b.technicien} | ${b.etape}${vieux} | ${b.derniere_mise_a_jour.slice(0, 16).replace("T", " ")} | ${b.prochaine_etape || "—"} |`);
+  }
+  if (bs.length > montres.length) {
+    out.push("", `… et ${bs.length - montres.length} autre(s) : \`resume_ticket()\` sans argument pour tout voir.`);
   }
   if (bs.some((b) => ageJours(b) >= JOURS_BROUILLON_ANCIEN)) {
     out.push("", `Un brouillon de plus de ${JOURS_BROUILLON_ANCIEN} jours est à clôturer (save_ticket, statut non-resolu si besoin) ou à reprendre.`);

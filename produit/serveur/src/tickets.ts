@@ -5,8 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
-import { lireBrouillon, retirerBrouillon, trouverBrouillon, type QuestionPosee } from "./encours.js";
-import { fabriquerId, horodatage, idValide, poste, utilisateur } from "./ids.js";
+import { ErreurEnCours, lireBrouillon, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type QuestionPosee } from "./encours.js";
+import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
 import { lireDocument, sections } from "./markdown.js";
 
 export { idValide, fabriquerId, type QuestionPosee };
@@ -75,7 +75,8 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
     poste: poste(),
     nature: e.nature,
     statut: e.statut,
-    resolu_par: e.resolu_par ?? "outil",
+    // Jamais une valeur que personne n'a dite : `null` si omis, pas « outil ».
+    resolu_par: e.resolu_par ?? null,
     reference: e.reference?.trim() || null,
     duree_minutes: e.duree_minutes ?? null,
     domaines_proposes: e.domaines_proposes,
@@ -114,23 +115,56 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
   assurerInstallation(r);
   const c = chemins(r);
   const date = new Date();
-  // Lien avec un brouillon en cours : par id, sinon par référence. Le ticket
-  // final reprend l'id du brouillon (continuité), et le brouillon est retiré.
-  let brouillon = e.id ? lireBrouillon(r, e.id) : e.reference ? trouverBrouillon(r, e.reference) : null;
+  let ref: string;
+  try {
+    ref = verifierReference(e.reference);
+    e = {
+      ...e,
+      reference: ref || undefined,
+      domaines_proposes: verifierDomaines(r, "domaines_proposes", e.domaines_proposes) ?? [],
+      domaines_valides: verifierDomaines(r, "domaines_valides", e.domaines_valides) ?? [],
+      escalades: verifierDomaines(r, "escalades", e.escalades),
+    };
+  } catch (err) {
+    if (err instanceof ErreurEnCours) throw new ErreurTicket(err.message);
+    throw err;
+  }
+  // Lien avec un brouillon en cours : par id, sinon par référence, sinon par
+  // le symptôme (A5). Le ticket final reprend l'id du brouillon (continuité),
+  // et le brouillon est retiré.
+  let brouillon = e.id ? lireBrouillon(r, e.id) : ref ? trouverBrouillon(r, ref) : null;
   if (e.id && !brouillon) throw new ErreurTicket(`brouillon inconnu : ${e.id}. Omettre id pour clôturer sans brouillon.`);
+  if (!brouillon && !e.id) brouillon = trouverParSymptome(r, e.symptome_initial);
   let id: string;
   let fichier: string;
   if (brouillon) {
     id = brouillon.id;
     fichier = path.join(c.tickets, `${id}.md`);
-    if (fs.existsSync(fichier)) throw new ErreurTicket(`ticket ${id} déjà clôturé.`);
-    // Ce que le brouillon a accumulé et que la clôture n'a pas redonné n'est pas perdu.
+    if (fs.existsSync(fichier)) {
+      // A8 : un brouillon dont le ticket existe est un zombie — on le retire, on ne le liste plus.
+      retirerBrouillon(r, id);
+      throw new ErreurTicket(`ticket ${id} déjà clôturé ; le brouillon resté en en-cours/ a été retiré.`);
+    }
+    // A4 : le brouillon a une référence, la clôture n'en donne pas une autre.
+    if (ref && brouillon.reference && brouillon.reference.toLowerCase() !== ref.toLowerCase()) {
+      throw new ErreurTicket(
+        `le brouillon ${id} porte la référence « ${brouillon.reference} », la clôture donne « ${ref} » : mauvais id ? Un ticket = une référence.`,
+      );
+    }
+    // A1 et complément : le brouillon est la source. Le symptôme, les domaines
+    // proposés, le plan et les questions viennent de lui ; ceux de la clôture
+    // ne servent que là où le brouillon n'a rien. Les listes s'ajoutent.
     e = {
       ...e,
-      reference: e.reference ?? brouillon.reference ?? undefined,
-      signaux: fusion(e.signaux, brouillon.signaux, (x) => x.trim()),
-      questions: fusion(e.questions, brouillon.questions, (q) => q.question.trim()),
-      escalades: fusion(e.escalades, brouillon.escalades, (x) => x.trim()),
+      reference: brouillon.reference ?? e.reference,
+      symptome_initial: brouillon.symptome_initial || e.symptome_initial,
+      domaines_proposes: brouillon.domaines_proposes.length ? brouillon.domaines_proposes : e.domaines_proposes,
+      plan_action: brouillon.plan_action || e.plan_action,
+      signaux: fusion(brouillon.signaux, e.signaux ?? [], (x) => x),
+      questions: fusion(brouillon.questions, e.questions ?? [], (q) => q.question),
+      escalades: fusion(brouillon.escalades, e.escalades ?? [], (x) => x),
+      // La durée est celle du brouillon (création → clôture), pas une estimation.
+      duree_minutes: dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
     };
   } else {
     id = fabriquerId(date);
@@ -141,6 +175,9 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
       id = `${fabriquerId(date)}-${++n}`;
       fichier = path.join(c.tickets, `${id}.md`);
     }
+  }
+  if (e.statut === "resolu" && !(e.plan_action ?? "").trim()) {
+    throw new ErreurTicket("un ticket résolu a un plan d'action : celui qui a été validé et exécuté (plan_action), tel que proposé.");
   }
   fs.writeFileSync(fichier, rendreTicket(id, e, date), { encoding: "utf8", flag: "wx" });
   const brouillon_retire = brouillon ? retirerBrouillon(r, brouillon.id) : false;
@@ -191,17 +228,25 @@ function ecrireJournal(r: Racines, id: string, e: EntreeTicket, date: Date): { f
   return { fichier: f, questions: questions.length };
 }
 
-function fusion<T>(donnes: T[] | undefined, existants: T[], cle: (x: T) => string): T[] {
-  const out = [...(donnes ?? [])];
-  const vus = new Set(out.map(cle));
-  for (const x of existants) {
-    const k = cle(x);
+/** La source d'abord, puis ce qui manque — à la clé normalisée près (A2). */
+function fusion<T>(source: T[], ajouts: T[], cle: (x: T) => string): T[] {
+  const out = [...source];
+  const vus = new Set(out.map((x) => normaliserCle(cle(x))));
+  for (const x of ajouts) {
+    const k = normaliserCle(cle(x));
     if (k && !vus.has(k)) {
       vus.add(k);
       out.push(x);
     }
   }
   return out;
+}
+
+/** Minutes entières entre la création du brouillon et la clôture ; `undefined` si la date est illisible. */
+function dureeMinutes(creeIso: string, cloture: Date): number | undefined {
+  const t = Date.parse(creeIso);
+  if (Number.isNaN(t)) return undefined;
+  return Math.max(0, Math.round((cloture.getTime() - t) / 60000));
 }
 
 export interface TicketLu {

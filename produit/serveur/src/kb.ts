@@ -71,7 +71,7 @@ export function rendreRecherche(tags: string[], res: { total: number; resultats:
 
 export class ErreurKb extends Error {}
 
-export function publier(r: Racines, ticketId: string, tagsSupp: string[] = []): { id: string; fichier: string; tags: string[] } {
+export function publier(r: Racines, ticketId: string, tagsSupp: string[] = []): { id: string; fichier: string; tags: string[]; symptome: string } {
   assurerInstallation(r);
   const c = chemins(r);
   if (!idValide(ticketId)) throw new ErreurKb(`identifiant de ticket invalide : ${ticketId}`);
@@ -80,10 +80,16 @@ export function publier(r: Racines, ticketId: string, tagsSupp: string[] = []): 
   const cible = path.join(c.kb, `${ticketId}.md`);
   if (fs.existsSync(cible)) throw new ErreurKb(`ticket ${ticketId} déjà publié.`);
 
-  const texte = fs.readFileSync(source, "utf8");
-  const doc = lireDocument(texte);
+  const t = lireTicket(source);
+  // Un cas non résolu en base serait pris pour une solution éprouvée : seul `resolu` se publie.
+  const statut = String(t.entete.statut ?? "");
+  if (statut !== "resolu") {
+    throw new ErreurKb(`ticket ${ticketId} : statut « ${statut || "inconnu"} », seul un ticket résolu se publie en base de connaissances.`);
+  }
+  const doc = lireDocument(t.texte);
   const tags = normaliser([...(((doc.entete.tags as string[]) ?? []).map(String)), ...tagsSupp]);
   const entete = { ...doc.entete, tags, publie: new Date().toISOString() };
   fs.writeFileSync(cible, `---\n${YAML.stringify(entete).trimEnd()}\n---\n\n${doc.corps}`, { encoding: "utf8", flag: "wx" });
-  return { id: ticketId, fichier: cible, tags };
+  // La réponse cite le symptôme : le modèle voit ce qu'il vient de publier, pas seulement un id.
+  return { id: ticketId, fichier: cible, tags, symptome: t.symptome.split("\n")[0] };
 }

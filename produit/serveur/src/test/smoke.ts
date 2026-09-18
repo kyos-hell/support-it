@@ -81,7 +81,10 @@ async function main() {
   assert.ok(!estErreur(dejaBeta), "materiel est en bêta depuis la v2 : " + texte(dejaBeta));
   const sansNature = await client.callTool({ name: "load_skill", arguments: { domaines: ["reseau"] } });
   assert.ok(estErreur(sansNature) && /nature/.test(texte(sansNature)));
-  const trop = await client.callTool({ name: "load_skill", arguments: { domaines: ["reseau", "systeme", "reseau"], nature: "incident" } });
+  // E1 : dédoublonné avant de compter — ["reseau","systeme","reseau"] fait deux domaines, pas trois.
+  const doublon = await client.callTool({ name: "load_skill", arguments: { domaines: ["reseau", "systeme", "reseau"], nature: "incident" } });
+  assert.ok(!estErreur(doublon) && /Deux domaines chargés/.test(texte(doublon)), texte(doublon));
+  const trop = await client.callTool({ name: "load_skill", arguments: { domaines: ["reseau", "systeme", "identite"], nature: "incident" } });
   assert.ok(estErreur(trop) && /au plus 2/.test(texte(trop)));
 
   // 3. Skill réseau, incident : corps + requis résolus (sites rempli, topologie vide).
@@ -195,6 +198,15 @@ async function main() {
   assert.match(texte(majV2), /créé depuis le gabarit/);
   assert.match(fs.readFileSync(path.join(installation, "contexte", "identite.md"), "utf8"), /ANNUAIRE-TEST[\s\S]*## comptes-service — Comptes de service/);
 
+  // C2 : une section qui ne contient que le squelette (en-tête de table + placeholders), même
+  // reformulé par rapport au gabarit livré, reste « vide ».
+  const majSquelette = await client.callTool({
+    name: "update_context",
+    arguments: { section: "reseau/wifi", contenu: "| SSID | Usage | Authentification |\n| --- | --- | --- |\n| <nom du réseau> | <qui> | <comment> |" },
+  });
+  assert.ok(!estErreur(majSquelette), texte(majSquelette));
+  const wifiVide = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/wifi"] } });
+  assert.match(texte(wifiVide), /reseau\/wifi[^\n]*· vide/, "C2 : squelette seul = vide, quel que soit le gabarit");
   const majInconnue = await client.callTool({ name: "update_context", arguments: { section: "reseau/nexiste-pas", contenu: "x" } });
   assert.ok(estErreur(majInconnue) && /inconnue du fichier/.test(texte(majInconnue)));
   const majDomaine = await client.callTool({ name: "update_context", arguments: { section: "cloud/parc", contenu: "x" } });
@@ -225,14 +237,25 @@ async function main() {
     arguments: { id: pid, etape: "instruction", verifications: ["cran 1 : ping OK", "cran 2 : disque plein 100 %"], questions: [{ question: "Quel serveur porte le partage ?", reponse: "SRV-TEST", section: "systeme/serveurs" }], prochaine_etape: "cran 3 : état du service" },
   });
   assert.ok(!estErreur(p2) && /Brouillon mis à jour/.test(texte(p2)), texte(p2));
+  // A6 : référence fabriquée ; A3 : domaine inconnu ; A4 : référence changée sur un brouillon qui en a une.
+  const refFabriquee = await client.callTool({ name: "save_progress", arguments: { etape: "triage", reference: "SANS-REF-20260918", symptome_initial: "Test A6" } });
+  assert.ok(estErreur(refFabriquee) && /ne s'invente pas/.test(texte(refFabriquee)), texte(refFabriquee));
+  const domaineInconnu = await client.callTool({ name: "save_progress", arguments: { id: pid, etape: "instruction", domaines_valides: ["Systeme", "cloud"] } });
+  assert.ok(estErreur(domaineInconnu) && /domaine\(s\) inconnu\(s\) du manifeste : cloud/.test(texte(domaineInconnu)), texte(domaineInconnu));
+  const refChangee = await client.callTool({ name: "save_progress", arguments: { id: pid, etape: "instruction", reference: "INC-AUTRE" } });
+  assert.ok(estErreur(refChangee) && /mauvais id/.test(texte(refChangee)), texte(refChangee));
+  // A5 : sans id ni référence, le même symptôme rattache au lieu de créer un doublon (A2 : à la normalisation près).
+  const parSymptome = await client.callTool({ name: "save_progress", arguments: { etape: "instruction", symptome_initial: "test, le partage ne repond plus !", notes: ["rattaché sans id"] } });
+  assert.ok(!estErreur(parSymptome) && /rattaché par le symptôme/.test(texte(parSymptome)) && texte(parSymptome).includes(pid), texte(parSymptome));
   const p3 = await client.callTool({
     name: "save_progress",
-    arguments: { reference: "inc-pause-1", etape: "pause", verifications: ["cran 2 : disque plein 100 %"], notes: ["mis en pause pour un ticket urgent"], prochaine_etape: "libérer de l'espace puis cran 3" },
+    arguments: { reference: "inc-pause-1", etape: "pause", verifications: ["Cran 2 — disque plein 100 %."], notes: ["mis en pause pour un ticket urgent"], prochaine_etape: "libérer de l'espace puis cran 3" },
   });
   assert.ok(!estErreur(p3) && /rattaché par la référence/.test(texte(p3)), texte(p3));
   const brouillon = fs.readFileSync(path.join(installation, "en-cours", `${pid}.md`), "utf8");
   assert.match(brouillon, /^etape: pause$/m);
-  assert.equal((brouillon.match(/disque plein 100 %/g) ?? []).length, 1, "vérification dédoublonnée, et le corps ne répète pas l'en-tête");
+  assert.match(brouillon, /^reference: INC-PAUSE-1$/m, "la casse d'origine de la référence est conservée");
+  assert.equal((brouillon.match(/disque plein 100 %/g) ?? []).length, 1, "vérification dédoublonnée à la clé normalisée (A2), et le corps ne répète pas l'en-tête");
   assert.match(brouillon, /## etat — Où en est le ticket[\s\S]*libérer de l'espace puis cran 3/);
   assert.doesNotMatch(brouillon, /## verifications —/, "le corps du fichier est réduit à l'état");
   assert.match(brouillon, /2 vérification\(s\), 1 question\(s\)/);
@@ -259,9 +282,22 @@ async function main() {
   assert.match(texte(triage2), /Tickets en cours[\s\S]*INC-PAUSE-1/);
   const mauvaisId = await client.callTool({ name: "save_ticket", arguments: { id: "20200101-000000-x-y", symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: [], conclusion: "x", statut: "resolu" } });
   assert.ok(estErreur(mauvaisId) && /brouillon inconnu/.test(texte(mauvaisId)));
+  // Un ticket résolu sans plan d'action est refusé, rien n'est écrit.
+  const sansPlan = await client.callTool({
+    name: "save_ticket",
+    arguments: { id: pid, symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "Test : disque plein", statut: "resolu" },
+  });
+  assert.ok(estErreur(sansPlan) && /plan d'action/.test(texte(sansPlan)), texte(sansPlan));
+  assert.ok(fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)), "un refus ne retire pas le brouillon");
+  // A1 : le symptôme paraphrasé à la clôture est ignoré, le brouillon est la source ; A4 à la clôture aussi.
+  const clotRef = await client.callTool({
+    name: "save_ticket",
+    arguments: { id: pid, reference: "INC-AUTRE", symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu" },
+  });
+  assert.ok(estErreur(clotRef) && /mauvais id/.test(texte(clotRef)), texte(clotRef));
   const clot = await client.callTool({
     name: "save_ticket",
-    arguments: { id: pid, symptome_initial: "Test : le partage ne répond plus", nature: "incident", domaines_proposes: ["systeme", "reseau"], domaines_valides: ["systeme"], conclusion: "Test : disque plein", statut: "resolu" },
+    arguments: { id: pid, symptome_initial: "Le partage ne répond plus (paraphrase de clôture)", nature: "incident", domaines_proposes: ["reseau"], domaines_valides: ["systeme"], conclusion: "Test : disque plein", plan_action: "Test : libérer de l'espace", statut: "resolu", duree_minutes: 999 },
   });
   assert.ok(!estErreur(clot), texte(clot));
   assert.match(texte(clot), new RegExp(`Ticket enregistré : ${pid}\\n`));
@@ -269,7 +305,33 @@ async function main() {
   assert.ok(!fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)), "le brouillon est retiré à la clôture");
   const final = fs.readFileSync(path.join(installation, "tickets", `${pid}.md`), "utf8");
   assert.match(final, /^reference: INC-PAUSE-1$/m, "référence héritée du brouillon");
+  assert.match(final, /Test : le partage ne répond plus/, "A1 : le symptôme du brouillon, tel qu'exprimé");
+  assert.doesNotMatch(final, /paraphrase de clôture/, "A1 : la paraphrase de la clôture est ignorée");
+  assert.match(final, /^domaines_proposes:\n  - systeme\n  - reseau$/m, "domaines proposés du brouillon, pas ceux de la clôture");
+  assert.match(final, /^resolu_par: null$/m, "resolu_par omis → null, jamais « outil » par défaut");
+  assert.match(final, /^duree_minutes: \d+$/m, "durée calculée par le serveur (création → clôture), pas la valeur donnée");
+  assert.doesNotMatch(final, /^duree_minutes: 999$/m);
   assert.match(final, /Quel serveur porte le partage/, "questions du brouillon reprises");
+  // A8 : un brouillon dont le ticket existe est un zombie — ignoré, et retiré au premier save_ticket.
+  fs.writeFileSync(path.join(installation, "en-cours", `${pid}.md`), brouillon, "utf8");
+  const listeZombie = await client.callTool({ name: "resume_ticket", arguments: {} });
+  assert.match(texte(listeZombie), /Aucun ticket en cours/, "le zombie n'est pas listé");
+  const dejaClos = await client.callTool({ name: "save_ticket", arguments: { id: pid, symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu" } });
+  assert.ok(estErreur(dejaClos) && /déjà clôturé/.test(texte(dejaClos)) && /retiré/.test(texte(dejaClos)), texte(dejaClos));
+  assert.ok(!fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)), "le zombie est retiré");
+  // B1 : la liste du triage est plafonnée à dix ; resume_ticket() rend tout.
+  const ids11: string[] = [];
+  for (let i = 1; i <= 11; i++) {
+    const p = await client.callTool({ name: "save_progress", arguments: { etape: "triage", symptome_initial: `Test B1 numéro ${i}` } });
+    assert.ok(!estErreur(p), texte(p));
+    ids11.push(texte(p).match(/Brouillon créé : (\S+) ·/)![1]);
+  }
+  const triage11 = await client.callTool({ name: "load_skill", arguments: { domaines: ["triage"] } });
+  assert.match(texte(triage11), /11 ticket\(s\) en cours[\s\S]*… et 1 autre\(s\) : `resume_ticket\(\)`/);
+  const liste11 = await client.callTool({ name: "resume_ticket", arguments: {} });
+  assert.equal((texte(liste11).match(/Test B1 numéro/g) ?? []).length, 0, "la liste ne montre pas le symptôme");
+  assert.equal((texte(liste11).match(/^\| — \| `/gm) ?? []).length, 11, "resume_ticket() rend les onze");
+  for (const i of ids11) fs.rmSync(path.join(installation, "en-cours", `${i}.md`));
   const journalPid = path.join(installation, "journal", `${pid}.md`);
   assert.ok(fs.existsSync(journalPid), "journal écrit depuis les questions du brouillon");
   const tj = fs.readFileSync(journalPid, "utf8");
@@ -333,6 +395,17 @@ async function main() {
   assert.match(texte(rien), /Aucun cas ne partage/);
   const inexistant = await client.callTool({ name: "publish_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
   assert.ok(estErreur(inexistant) && /introuvable/.test(texte(inexistant)));
+  assert.match(texte(pub), /symptôme : Test de fumée : lenteur uniquement via VPN/, "la réponse de publish_kb cite ce qui a été publié");
+  // Seul un ticket résolu se publie.
+  const nonResolu = await client.callTool({
+    name: "save_ticket",
+    arguments: { symptome_initial: "Test : devis câblage", nature: "demande", domaines_proposes: [], domaines_valides: [], conclusion: "Test : hors domaines", statut: "hors-domaines-couverts" },
+  });
+  assert.ok(!estErreur(nonResolu), texte(nonResolu));
+  const idNonResolu = texte(nonResolu).match(/Ticket enregistré : (\S+)/)![1];
+  const pubRefusee = await client.callTool({ name: "publish_kb", arguments: { ticket_id: idNonResolu } });
+  assert.ok(estErreur(pubRefusee) && /seul un ticket résolu/.test(texte(pubRefusee)), texte(pubRefusee));
+  assert.ok(!fs.existsSync(path.join(installation, "kb", `${idNonResolu}.md`)));
 
   // 8. Domaine décrit, hors bêta : refusé par load_skill, affiché tel quel au triage (produit temporaire).
   const produitTmp = produitAvecDomaineDecrit();

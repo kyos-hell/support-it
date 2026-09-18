@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chemins, type Racines } from "./config.js";
+import { dateDuJour, horodatageCompact } from "./ids.js";
 import { lireDocument, sansCommentaires, sections, type Section } from "./markdown.js";
 
 export type EtatSection = "ok" | "vide" | "inconnue";
@@ -85,14 +86,39 @@ function sectionsGabarit(r: Racines, domaine: string): Map<string, SectionGabari
   return m;
 }
 
-/** Sections d'un fichier de contexte rempli, avec « vide » calculé contre le gabarit. */
+/**
+ * « Vide » indépendamment de la version du gabarit (C2) : une fois retirées
+ * les lignes qui ne contiennent que des placeholders `<…>`, des séparateurs
+ * de table (`|`, `-`, `:`) ou une ligne d'en-tête de table dont toutes les
+ * cellules sont des placeholders, il ne reste rien.
+ */
+export function squeletteSeulement(contenu: string): boolean {
+  const lignes = contenu
+    .replace(RE_MAJ_LIGNE, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const separateur = (l: string) => /^\|?[\s|:\-]+\|?$/.test(l) && l.includes("-");
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    if (separateur(l)) continue;
+    // L'en-tête d'une table (la ligne juste avant le séparateur) est de la structure, pas du contenu.
+    if (l.startsWith("|") && i + 1 < lignes.length && separateur(lignes[i + 1])) continue;
+    const sansPlaceholders = l.replace(/<[^<>\n]{1,80}>/g, "");
+    if (/^[\s|:\-]*$/.test(sansPlaceholders)) continue; // cellules toutes placeholders
+    return false;
+  }
+  return true;
+}
+
+/** Sections d'un fichier de contexte rempli, avec « vide » calculé contre le gabarit et contre le squelette. */
 export function sectionsRemplies(r: Racines, domaine: string): Section[] | null {
   const secs = lireSections(path.join(chemins(r).contexte, `${domaine}.md`));
   if (!secs) return null;
   const gabarit = sectionsGabarit(r, domaine);
   return secs.map((s) => ({
     ...s,
-    vide: s.vide || normaliser(s.contenu) === gabarit.get(s.id)?.contenuNormalise,
+    vide: s.vide || normaliser(s.contenu) === gabarit.get(s.id)?.contenuNormalise || squeletteSeulement(s.contenu),
   }));
 }
 
@@ -196,16 +222,6 @@ export interface EcritureContexte {
   derniereMiseAJour: string | null;
 }
 
-function dateDuJour(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-function horodatageCompact(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-}
-
 export function ecrireSection(r: Racines, id: string, contenu: string): EcritureContexte {
   const m = id.match(RE_ID);
   if (!m) throw new ErreurContexte("identifiant attendu au format domaine/section");
@@ -289,11 +305,17 @@ export interface EtatFichier {
   manquantes: string[];
   /** Sections du fichier rempli inconnues du gabarit : à signaler, pas une erreur. */
   enPlus: string[];
-  /** Sections de plus de LIGNES_MAX_SECTION lignes : inventaire déguisé, à élaguer (format-contexte §4.1). */
+  /** Sections de plus de LIGNES_MAX_SECTION lignes ou CARACTERES_MAX_SECTION caractères : inventaire déguisé, à élaguer (format-contexte §4.1). */
   volumineuses: string[];
 }
 
 export const LIGNES_MAX_SECTION = 40;
+/** C1 : le coût est en caractères, pas en lignes — une table de 20 lignes à 400 caractères par cellule passe sous le seuil de lignes. */
+export const CARACTERES_MAX_SECTION = 2500;
+
+export function volumineuse(contenu: string): boolean {
+  return contenu.split("\n").length > LIGNES_MAX_SECTION || contenu.length > CARACTERES_MAX_SECTION;
+}
 
 export function etatRemplissage(r: Racines): EtatFichier[] {
   const c = chemins(r);
@@ -328,7 +350,7 @@ export function rendreEtat(etats: EtatFichier[]): string {
   }
   const vol = etats.flatMap((e) => e.volumineuses.map((s) => `\`${e.domaine}/${s}\``));
   if (vol.length) {
-    out.push("", `Sections volumineuses (plus de ${LIGNES_MAX_SECTION} lignes — probablement un inventaire de niveau 3 à élaguer, format-contexte §4.1) : ${vol.join(", ")}`);
+    out.push("", `Sections volumineuses (plus de ${LIGNES_MAX_SECTION} lignes ou ${CARACTERES_MAX_SECTION} caractères — probablement un inventaire de niveau 3 à élaguer, format-contexte §4.1) : ${vol.join(", ")}`);
   }
   return out.join("\n");
 }

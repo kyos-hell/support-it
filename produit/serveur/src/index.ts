@@ -92,8 +92,8 @@ server.registerTool(
       signaux: z.array(z.string()).optional().describe("Signaux discriminants retenus, vérifiés"),
       conclusion: z.string().min(1).describe("Diagnostic posé ou étude de la demande, et cause retenue"),
       conclusion_humaine: z.string().optional().describe("Baseline : conclusion du technicien avant l'outil"),
-      resolu_par: z.enum(["outil", "humain", "les-deux"]).optional(),
-      plan_action: z.string().optional().describe("Le plan d'action validé, tel que proposé"),
+      resolu_par: z.enum(["outil", "humain", "les-deux"]).optional().describe("Seulement si le technicien l'a dit ; omis = null, jamais une valeur supposée"),
+      plan_action: z.string().optional().describe("Le plan d'action validé, tel que proposé — obligatoire pour un ticket résolu ; celui du brouillon est pris s'il existe"),
       questions: z
         .array(
           z.object({
@@ -110,9 +110,9 @@ server.registerTool(
         .describe("Contenu candidat pour les sections de contexte, à destination du référent"),
       statut: z.enum(["resolu", "non-resolu", "hors-domaines-couverts", "escalade-externe"]),
       tags: z.array(z.string()).optional().describe("Tags libres en plus du domaine et de la nature, ajoutés automatiquement"),
-      duree_minutes: z.number().int().min(0).optional().describe("Durée du traitement, pour la mesure"),
-      reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing de l'entreprise (ex. INC-12345), telle que donnée par le technicien ; ajoutée aux tags"),
-      id: z.string().optional().describe("Identifiant du brouillon en cours (renvoyé par save_progress) : le ticket final reprend cet id et le brouillon est retiré. Sans id, le serveur relie par la référence s'il trouve un brouillon."),
+      duree_minutes: z.number().int().min(0).optional().describe("Durée du traitement, pour la mesure — calculée par le serveur (création du brouillon → clôture) dès qu'un brouillon existe ; ne sert qu'à un ticket de baseline sans brouillon"),
+      reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing de l'entreprise (ex. INC-12345), telle que donnée par le technicien ; ajoutée aux tags. Jamais inventée : sans référence, omettre"),
+      id: z.string().optional().describe("Identifiant du brouillon en cours (renvoyé par save_progress) : le ticket final reprend cet id et le brouillon est retiré. Sans id, le serveur relie par la référence, sinon par le symptôme initial."),
     },
   },
   async (entree) => {
@@ -143,7 +143,7 @@ server.registerTool(
   async ({ ticket_id, tags }) => {
     try {
       const p = publier(r, ticket_id, tags ?? []);
-      return texte(`Publié : ${p.id}\n- fichier : ${p.fichier}\n- tags : ${p.tags.join(", ")}`);
+      return texte(`Publié : ${p.id}\n- symptôme : ${p.symptome}\n- fichier : ${p.fichier}\n- tags : ${p.tags.join(", ")}`);
     } catch (e) {
       if (e instanceof ErreurKb) return erreur(e);
       throw e;
@@ -160,8 +160,8 @@ server.registerTool(
       "Premier appel sans id : crée le brouillon (symptome_initial obligatoire) et renvoie l'id ; appels suivants avec id et seulement ce qui est nouveau — les listes s'ajoutent, l'étape et la prochaine étape se remplacent. " +
       "À appeler à chaque point d'étape : triage validé, cran validé, réponse obtenue, plan validé, action rapportée, et sur « je mets en pause ». Toujours noter prochaine_etape.",
     inputSchema: {
-      id: z.string().optional().describe("Id du brouillon, renvoyé par le premier appel ; absent = création (ou rattachement par référence)"),
-      reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing"),
+      id: z.string().optional().describe("Id du brouillon, renvoyé par le premier appel ; absent = création, ou rattachement par référence, sinon par symptôme initial identique"),
+      reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing, telle que donnée. Jamais inventée ; ne change plus une fois posée"),
       etape: z.enum(ETAPES as [string, ...string[]]).describe("Étape du flux atteinte : triage, instruction, recherche, plan, actions, cloture, ou pause"),
       symptome_initial: z.string().optional().describe("Tel qu'exprimé par le technicien — obligatoire à la création"),
       nature: z.enum(["incident", "demande"]).optional(),
@@ -182,7 +182,7 @@ server.registerTool(
     try {
       const p = sauverProgression(r, { ...entree, etape: entree.etape as (typeof ETAPES)[number] });
       const lignes = [
-        `${p.cree ? "Brouillon créé" : p.lie ? "Brouillon rattaché par la référence et mis à jour" : "Brouillon mis à jour"} : ${p.id} · étape ${p.etape}`,
+        `${p.cree ? "Brouillon créé" : p.lie === "reference" ? "Brouillon rattaché par la référence et mis à jour" : p.lie === "symptome" ? "Brouillon rattaché par le symptôme (même ticket, id oublié) et mis à jour" : "Brouillon mis à jour"} : ${p.id} · étape ${p.etape}`,
         `- fichier : ${p.fichier}`,
         p.passation ? `- passation enregistrée : de ${p.passation.de} à ${p.passation.a}` : "",
         `Continuer les points d'étape avec id: "${p.id}". À la clôture : save_ticket(id: "${p.id}", …).`,
