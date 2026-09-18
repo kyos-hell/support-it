@@ -44,6 +44,17 @@ export function rendreSignal(m: Manifeste | null, s: SignalCoche): string {
   return `${libelle} (\`${s.id}\`)${s.preuve ? ` — ${s.preuve}` : ""}`;
 }
 
+/**
+ * Une contradiction (décision 9) : une vérification du ticket contredit une
+ * valeur chargée du contexte. Le modèle la note quand il la constate ; la
+ * clôture la reprend dans les mises à jour de contexte sans compter sur sa
+ * mémoire. `section` est un enum des sections des gabarits.
+ */
+export interface Contradiction {
+  section: string;
+  constat: string;
+}
+
 export interface QuestionPosee {
   question: string;
   reponse: string;
@@ -93,6 +104,7 @@ export interface Brouillon {
   plan_action: string;
   actions: string[];
   notes: string[];
+  contradictions: Contradiction[];
 }
 
 export interface EntreeProgression {
@@ -111,6 +123,7 @@ export interface EntreeProgression {
   plan_action?: string;
   actions?: string[];
   notes?: string[];
+  contradictions?: Contradiction[];
 }
 
 export interface ProgressionEcrite {
@@ -207,6 +220,7 @@ function lireFichier(fichier: string): Brouillon | null {
     plan_action: String(e.plan_action ?? ""),
     actions: e.actions ?? [],
     notes: e.notes ?? [],
+    contradictions: Array.isArray(e.contradictions) ? (e.contradictions as Contradiction[]).filter((x) => x && x.section) : [],
   };
 }
 
@@ -288,6 +302,7 @@ export const LIMITES = {
   action: 240,
   note: 240,
   prochaine_etape: 200,
+  contradiction: 240,
 } as const;
 
 function verifierLongueurs(e: EntreeProgression): void {
@@ -301,6 +316,7 @@ function verifierLongueurs(e: EntreeProgression): void {
   check("verifications", "un acquis : « cran N : commande → résultat », une ligne — le raisonnement et les fausses pistes vont dans notes", e.verifications, LIMITES.verification);
   check("actions", "ce que le technicien a exécuté et le résultat, une ligne", e.actions, LIMITES.action);
   check("notes", "un piège ou une fausse piste à ne pas refaire, une ligne", e.notes, LIMITES.note);
+  check("contradictions.constat", "ce que le ticket a constaté, qui contredit la section — une ligne", e.contradictions?.map((x) => x.constat), LIMITES.contradiction);
   check("prochaine_etape", "ce qu'on fait en premier à la reprise, une ligne", [e.prochaine_etape], LIMITES.prochaine_etape);
   check("questions.question", "la question posée, courte", e.questions?.map((q) => q.question), LIMITES.question);
   check("questions.reponse", "la réponse du technicien, courte — les détails vérifiés vont dans verifications", e.questions?.map((q) => q.reponse), LIMITES.reponse);
@@ -346,7 +362,7 @@ function rendre(b: Brouillon): string {
     `## etat — Où en est le ticket\n\n` +
     `${ligneEtat(b)}\n\n` +
     `**Prochaine étape :** ${b.prochaine_etape || "_(non notée)_"}\n\n` +
-    `Dernier point d'étape : ${b.derniere_mise_a_jour} par ${b.technicien} sur ${b.poste} · ${b.verifications.length} vérification(s), ${b.questions.length} question(s), ${b.actions.length} action(s), ${b.notes.length} note(s). Le détail est dans l'en-tête ci-dessus ; \`resume_ticket\` le rend en clair.\n\n` +
+    `Dernier point d'étape : ${b.derniere_mise_a_jour} par ${b.technicien} sur ${b.poste} · ${b.verifications.length} vérification(s), ${b.questions.length} question(s), ${b.actions.length} action(s), ${b.notes.length} note(s), ${b.contradictions.length} contradiction(s). Le détail est dans l'en-tête ci-dessus ; \`resume_ticket\` le rend en clair.\n\n` +
     `## passations — Passations\n\n${passations}\n`
   );
 }
@@ -378,6 +394,8 @@ function rendreComplet(b: Brouillon): string {
     bloc("actions", "Actions réalisées et leurs résultats", puces(b.actions)) +
     "\n" +
     bloc("notes", "Notes pour la reprise", puces(b.notes)) +
+    "\n" +
+    bloc("contradictions", "Contexte contredit par le terrain (repris à la clôture)", puces(b.contradictions.map((x) => `\`${x.section}\` : ${x.constat}`))) +
     "\n" +
     bloc("passations", "Passations", passations)
   );
@@ -455,6 +473,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
       plan_action: "",
       actions: [],
       notes: [],
+      contradictions: [],
     };
     cree = true;
   }
@@ -482,6 +501,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   b.actions = ajouter(b.actions, e.actions, (x) => x.trim());
   b.notes = ajouter(b.notes, e.notes, (x) => x.trim());
   b.questions = ajouter(b.questions, e.questions, (q) => q.question.trim());
+  b.contradictions = ajouter(b.contradictions, e.contradictions, (x) => `${x.section} ${x.constat}`);
   // Décision 2, point 7 : un domaine proposé sans signal coché est refusé (incidents ; une demande n'a pas de signaux).
   if (domainesProposes && (b.nature ?? "incident") === "incident") {
     const coches = new Set(b.signaux.map((x) => x.id).filter(Boolean));

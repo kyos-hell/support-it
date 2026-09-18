@@ -31,8 +31,10 @@ seulement pour celui-là.
   prestataire) — la **section de contexte** qu'elle pourrait remplir. Le
   serveur en fait le journal du ticket (un fichier par ticket) : c'est
   ainsi que les gabarits se complètent.
-- Les **mises à jour de contexte** : quand le terrain a contredit ou complété
-  le contexte, formuler le contenu **prêt à coller** dans la section visée.
+- Les **mises à jour de contexte** : quand le terrain a complété le
+  contexte, formuler le contenu **prêt à coller** dans la section visée.
+  Les **contradictions** notées en cours de ticket (`contradictions` de
+  `save_progress`) sont déjà reprises par le serveur : ne pas les redire.
   **Trier avant de proposer** : le contexte reçoit ce que l'entreprise
   possède et comment c'est organisé (une plateforme, un abonnement et ses
   pièges, une convention, un référent, un serveur pivot dont d'autres

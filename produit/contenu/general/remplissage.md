@@ -10,8 +10,8 @@ fausse.
 
 ## Règles
 
-- **Une question à la fois.** Une section peut demander plusieurs
-  questions ; chacune attend sa réponse avant la suivante.
+- **Une question, puis j'attends la réponse.** Une section peut demander
+  plusieurs questions ; chacune attend sa réponse avant la suivante.
 - **Jamais d'écriture sans un oui explicite** sur le contenu montré. Tu
   proposes, il valide, tu appelles `update_context`. Un silence, un
   « bof », un « on verra » ne sont pas des oui.
@@ -36,6 +36,13 @@ fausse.
 
 ## Déroulé
 
+0. **Les candidats d'abord.** La liste en fin de document dit ce que les
+   tickets ont proposé pour le contexte et qui n'y est pas encore (réponse
+   à une question, mise à jour proposée à la clôture, contradiction
+   constatée). Les proposer **un par un**, la section la plus demandée en
+   tête : montrer le contenu en entier, demander le oui, écrire. Une
+   contradiction se tranche par le technicien : le contexte dit X, le
+   ticket a constaté Y — lequel est vrai ?
 1. **Choisir le domaine.** S'il n'est pas donné, proposer d'après l'état
    ci-dessous : commencer par `general` (sites, référents) s'il est vide,
    sinon le domaine que le technicien traite le plus. Une question.
@@ -49,6 +56,10 @@ fausse.
    section telle quelle ? »
 4. **Sur oui** : `update_context(section, contenu)`. Rapporter ce que le
    serveur répond (fichier, sauvegarde). Sur non : corriger et remontrer.
+   Une section marquée **à confirmer** (datée de plus de 90 jours) se
+   confirme de la même façon : « toujours vrai ? » — oui → `update_context`
+   avec le contenu identique, le serveur re-date seulement ; non → le
+   nouveau contenu.
 5. **Après la dernière section du domaine** : résumer ce qui est rempli,
    ce qui reste vide, et proposer un autre domaine ou s'arrêter.
 

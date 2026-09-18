@@ -52,6 +52,13 @@ export function chemins(r: Racines) {
   };
 }
 
+/**
+ * Décision 9 : une section datée de plus de JOURS_PEREMPTION jours est
+ * périmée — annotée « à confirmer » à l'usage, proposée à l'audit. Un seul
+ * chiffre, global, connu de tous.
+ */
+export const JOURS_PEREMPTION = 90;
+
 export function lireVersion(r: Racines): string {
   try {
     return fs.readFileSync(chemins(r).version, "utf8").trim();

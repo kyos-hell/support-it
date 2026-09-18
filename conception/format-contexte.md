@@ -109,7 +109,7 @@ dans <outil> ».
 `general/plateformes` (niveau 1 pur) que les skills système et les demandes
 réseau chargent d'office.
 
-## 5. Mise à jour — trois canaux, un propriétaire
+## 5. Mise à jour — quatre canaux, un propriétaire
 
 | Canal | Quand | Qui applique |
 | --- | --- | --- |
@@ -117,6 +117,7 @@ réseau chargent d'office.
 | Mises à jour formulées à la clôture | L'outil formule « section X : contenu candidat » dans le ticket | Le référent du domaine |
 | Changement hors outil (topologie, équipement remplacé…) | Au fil de l'eau | Le référent du domaine |
 | Entretien de remplissage (`/support remplis le domaine X`) ou sections candidates à la clôture | Sur demande, ou proposé à la clôture | L'outil, par `update_context`, après le oui du technicien sur chaque section |
+| **La boucle de fraîcheur** (décision 9 du 2026-09-18, le quatrième canal annoncé ici) : péremption à l'usage, file des candidats, contradictions en ticket | Une section datée de plus de **90 jours** (`JOURS_PEREMPTION`, `config.ts`) est annotée « à confirmer » par `get_context` et dans les requis d'un skill, avec la marche à suivre ; `remplissage` et l'audit servent la **file des candidats** (réponses journalisées sur une section encore vide, mises à jour proposées jamais appliquées, contradictions notées) ; en ticket, `save_progress.contradictions` reçoit une vérification qui contredit le contexte, et la clôture la reprend en mise à jour proposée sans compter sur la mémoire du modèle | L'outil, par `update_context`, sur oui. **Confirmer = `update_context` à contenu identique** : le serveur re-date seulement, sans copie dans `historique/`. Aucun appel `confirm_context`. |
 
 Le **référent** est nommé dans `general/referents` — un nom par domaine,
 propriétaire de la fraîcheur de son fichier. Si le terrain contredit le

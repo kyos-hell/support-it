@@ -358,9 +358,14 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
   contrainte que les modèles moins forts respectent le moins.
 - **Mode de permission** : vérifier à l'installation que l'outil hôte
   demande confirmation avant toute commande (H3).
-- **Fraîcheur du contexte — une boucle en trois temps** (discussion du
-  2026-09-11, `retours-beta.md`). Le contexte se remplit par l'usage, mais
-  rien ne l'entretient. Trois mécanismes qui se cumulent, chacun ne fait que
+- **Fraîcheur du contexte — une boucle en trois temps.** **Décidé et
+  implémenté le 2026-09-18** (décision 9 de `plan-after-beta.md`) : seuil
+  de 90 jours global, confirmation par `update_context` à contenu
+  identique (re-date sans historique), champ `contradictions` de
+  `save_progress` repris à la clôture, file des candidats servie par
+  `remplissage` et par l'audit. Le texte d'origine reste ci-dessous pour
+  la trace ; `format-contexte.md` §5 décrit le canal tel qu'il existe.
+  Trois mécanismes qui se cumulent, chacun ne fait que
   **détecter et proposer** — l'invariant tient, aucun n'écrit sans le oui du
   technicien :
   1. *Péremption à l'usage* : `load_skill` et `get_context` annotent une

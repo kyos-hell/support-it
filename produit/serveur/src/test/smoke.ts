@@ -209,6 +209,20 @@ async function main() {
   assert.match(hist[0], /^reseau-\d{8}-\d{6}\.md$/);
   const relu = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/plan-adressage"] } });
   assert.match(texte(relu), /plan-adressage[^\n]*· ok[\s\S]*VLAN-TEST/);
+  assert.doesNotMatch(texte(relu), /À confirmer/, "datée d'aujourd'hui : pas périmée");
+  // Décision 9 : le même contenu = « toujours vrai » — re-datée, pas de copie dans historique/.
+  const confirmee = await client.callTool({
+    name: "update_context",
+    arguments: { section: "reseau/plan-adressage", contenu: "| VLAN | Nom | Plage | Usage | Site(s) |\n| --- | --- | --- | --- | --- |\n| 10 | VLAN-TEST | PLAGE-TEST | test | SITE-TEST |" },
+  });
+  assert.ok(!estErreur(confirmee) && /confirmée, re-datée/.test(texte(confirmee)), texte(confirmee));
+  assert.equal(fs.readdirSync(path.join(installation, "contexte", "historique")).length, 1, "une confirmation ne copie rien dans historique/");
+  // Une section datée de plus de 90 jours est annotée « à confirmer » — dans get_context comme dans les requis d'un skill.
+  const reseauMdDate = fs.readFileSync(path.join(installation, "contexte", "reseau.md"), "utf8");
+  fs.writeFileSync(path.join(installation, "contexte", "reseau.md"), reseauMdDate.replace(/Dernière mise à jour : \d{4}-\d{2}-\d{2}/, "Dernière mise à jour : 2020-01-01"), "utf8");
+  const perimee = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/plan-adressage"] } });
+  assert.match(texte(perimee), /plan-adressage[^\n]*· ok[\s\S]*\*\*À confirmer\*\* : datée du 2020-01-01, plus de 90 jours/, texte(perimee));
+  assert.match(texte(perimee), /update_context avec le contenu identique/);
 
   const maj2 = await client.callTool({
     name: "update_context",
@@ -319,9 +333,11 @@ async function main() {
   // Instruction : le skill, ses requis, un point d'étape.
   const sk = await clientB.callTool({ name: "load_skill", arguments: { domaines: ["systeme"], nature: "incident" } });
   assert.ok(!estErreur(sk), texte(sk));
+  await refusSchema(clientB.callTool({ name: "save_progress", arguments: { id: pid, contradictions: [{ section: "reseau/inexistante", constat: "x" }] } }), /inexistante/, "section inconnue des gabarits");
+  await refusSchema(clientB.callTool({ name: "save_progress", arguments: { id: pid, questions: [{ question: "q", reponse: "r", section: "systeme/nexiste-pas" }] } }), /nexiste-pas/, "section candidate inconnue");
   const p2 = await clientB.callTool({
     name: "save_progress",
-    arguments: { id: pid, verifications: ["cran 1 : ping OK", "cran 2 : disque plein 100 %"], questions: [{ question: "Quel serveur porte le partage ?", reponse: "SRV-TEST", section: "systeme/serveurs" }], prochaine_etape: "cran 3 : état du service" },
+    arguments: { id: pid, verifications: ["cran 1 : ping OK", "cran 2 : disque plein 100 %"], questions: [{ question: "Quel serveur porte le partage ?", reponse: "SRV-TEST", section: "systeme/serveurs" }], contradictions: [{ section: "systeme/serveurs", constat: "le partage est sur SRV-AUTRE, pas SRVTEST" }], prochaine_etape: "cran 3 : état du service" },
   });
   assert.ok(!estErreur(p2) && /Brouillon mis à jour : \S+ · étape instruction/.test(texte(p2)), texte(p2));
   const b2 = fs.readFileSync(path.join(installation, "en-cours", `${pid}.md`), "utf8");
@@ -413,6 +429,8 @@ async function main() {
   assert.doesNotMatch(final, /^duree_minutes: 999$/m);
   assert.match(final, /Libérer de l'espace/, "plan d'action du brouillon");
   assert.match(final, /Quel serveur porte le partage/, "questions du brouillon reprises");
+  assert.match(final, /## contradictions — Contexte contredit par le terrain[\s\S]*`systeme\/serveurs` : le partage est sur SRV-AUTRE/, "contradictions reprises dans le ticket");
+  assert.match(final, /## mises-a-jour-contexte[\s\S]*`systeme\/serveurs` :[\s\S]*\(contradiction constatée en ticket\) le partage est sur SRV-AUTRE/, "la contradiction devient une mise à jour proposée, sans la mémoire du modèle");
   const journalPid = path.join(installation, "journal", `${pid}.md`);
   assert.ok(fs.existsSync(journalPid), "journal écrit depuis les questions du brouillon");
   const tj = fs.readFileSync(journalPid, "utf8");
@@ -566,6 +584,11 @@ async function main() {
   const finalC = fs.readFileSync(path.join(installation, "tickets", `${pid2}.md`), "utf8");
   assert.match(finalC, /^escalades:\n  - systeme$/m, "escalade dérivée à travers un redémarrage du serveur");
   assert.match(finalC, new RegExp(`^cas_lus:\n  - ${id}$`, "m"), "le cas lu est noté dans le ticket");
+  const remplissageC = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["remplissage"] } });
+  assert.match(texte(remplissageC), /Candidats au remplissage/);
+  assert.match(texte(remplissageC), /`reseau\/topologie` \| question \|[^\n]*\| TEST \|/, "question journalisée sur une section vide → candidat");
+  assert.match(texte(remplissageC), /`reseau\/acces-distant` \| mise-a-jour \|[^\n]*\| TEST \|/, "mise à jour proposée jamais appliquée → candidat");
+  assert.match(texte(remplissageC), /`systeme\/serveurs` \| contradiction \|/, "contradiction notée → candidat");
   await clientC.close();
 
   // 8. Domaine décrit, hors bêta : refusé par load_skill, affiché tel quel au triage (produit temporaire).

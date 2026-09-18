@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
-import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, lireSignaux, rendreSignal, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type QuestionPosee, type SignalCoche } from "./encours.js";
+import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, lireSignaux, rendreSignal, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type Contradiction, type QuestionPosee, type SignalCoche } from "./encours.js";
 import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
 import { domaineDuTag, lireManifeste, tagsCandidats, type Bibliotheque } from "./manifeste.js";
 import { lireDocument, sections } from "./markdown.js";
@@ -37,6 +37,8 @@ export interface EntreeTicket {
   plan_action?: string;
   questions?: QuestionPosee[];
   mises_a_jour_contexte?: MiseAJourContexte[];
+  /** Reprises du brouillon par le serveur (décision 9) ; ajoutées aux mises à jour de contexte. */
+  contradictions?: Contradiction[];
   statut: Statut;
   tags?: string[];
   duree_minutes?: number;
@@ -89,6 +91,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
     domaines_valides: e.domaines_valides,
     escalades: e.escalades ?? [],
     cas_lus: e.cas_lus ?? [],
+    contradictions: e.contradictions ?? [],
     signaux: e.signaux ?? [],
     tags: tagsAutomatiques(e),
     questions: (e.questions ?? []).length,
@@ -99,6 +102,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
   const maj = (e.mises_a_jour_contexte ?? [])
     .map((m) => `- \`${m.section}\` :\n\n  ${m.contenu.trim().replace(/\n/g, "\n  ")}`)
     .join("\n");
+  const contradictions = (e.contradictions ?? []).map((x) => `- \`${x.section}\` : ${x.constat}`).join("\n");
   return (
     `---\n${YAML.stringify(entete).trimEnd()}\n---\n\n` +
     `# Ticket ${id}${e.reference?.trim() ? ` — ${e.reference.trim()}` : ""}\n\n` +
@@ -114,7 +118,9 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
     "\n" +
     bloc("Questions posées au technicien", "questions", questions) +
     "\n" +
-    bloc("Mises à jour de contexte proposées (à destination du référent)", "mises-a-jour-contexte", maj)
+    bloc("Mises à jour de contexte proposées (à destination du référent)", "mises-a-jour-contexte", maj) +
+    "\n" +
+    bloc("Contexte contredit par le terrain (à corriger, sur oui)", "contradictions", contradictions)
   );
 }
 
@@ -208,6 +214,15 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       cas_lus: session ? fusionnerEtat(etatBrouillon(brouillon), session).cas_lus : brouillon.cas_lus,
       // La durée est celle du brouillon (création → clôture), pas une estimation.
       duree_minutes: dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
+      // Décision 9 : les contradictions notées en cours de ticket sont reprises, et deviennent
+      // des mises à jour de contexte proposées — sans compter sur la mémoire du modèle.
+      contradictions: brouillon.contradictions,
+      mises_a_jour_contexte: [
+        ...(e.mises_a_jour_contexte ?? []),
+        ...brouillon.contradictions
+          .filter((x) => !(e.mises_a_jour_contexte ?? []).some((m) => m.section === x.section))
+          .map((x) => ({ section: x.section, contenu: `(contradiction constatée en ticket) ${x.constat}` })),
+      ],
     };
   } else {
     e = { ...e, escalades: session ? escaladesDerivees(session.skillsCharges) : [], cas_lus: session ? [...session.casLus] : [] };

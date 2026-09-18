@@ -121,6 +121,14 @@ commande, une seule à la fois ») plutôt que d'en inventer une.
   l'humain exécute et rapporte. L'IA n'exécute rien, ne modifie rien.
 - **Information manquante = question**, pas supposition — et jamais de
   chemin, d'identifiant ou d'horodatage fabriqué par le modèle (0.4).
+- **Une section de contexte « à confirmer »** (datée de plus de 90 jours,
+  décision 9) se fait confirmer par le technicien avant qu'on s'en serve ;
+  **une valeur contredite par une vérification** se note dans
+  `save_progress.contradictions` au moment où on la constate. Ces deux
+  règles voyagent avec la donnée : le serveur annote la section périmée
+  avec la marche à suivre, et le champ `contradictions` est décrit dans
+  l'outil. Elles ne sont donc pas répétées dans chaque skill (budget de
+  lignes), contrairement aux deux premières.
 
 ## 7. Contraintes de forme
 

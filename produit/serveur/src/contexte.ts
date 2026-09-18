@@ -11,7 +11,7 @@
 // explicite (tenue par le prompt : remplissage.md, cloture.md).
 import fs from "node:fs";
 import path from "node:path";
-import { chemins, type Racines } from "./config.js";
+import { JOURS_PEREMPTION, chemins, type Racines } from "./config.js";
 import { dateDuJour, horodatageCompact } from "./ids.js";
 import { lireDocument, sansCommentaires, sections, type Section } from "./markdown.js";
 
@@ -23,6 +23,10 @@ export interface ResultatSection {
   titre?: string;
   contenu?: string;
   derniereMiseAJour?: string;
+  /** Âge en jours depuis « Dernière mise à jour » ; absent si la section n'a pas de date. */
+  ageJours?: number;
+  /** Décision 9 : datée de plus de JOURS_PEREMPTION jours — à faire confirmer avant de s'en servir. */
+  perimee?: boolean;
   note?: string;
   /** Pour une section vide : la consigne de remplissage du gabarit et son squelette. */
   consigne?: string;
@@ -35,6 +39,14 @@ const RE_MAJ_LIGNE = /^Dernière mise à jour\s*:.*$/im;
 
 function normaliser(s: string): string {
   return s.replace(/\s+/g, " ").trim();
+}
+
+/** Âge d'une date AAAA-MM-JJ, en jours entiers ; null si illisible. */
+export function ageEnJours(date: string | undefined, maintenant = new Date()): number | null {
+  if (!date) return null;
+  const t = Date.parse(date.trim().slice(0, 10));
+  if (Number.isNaN(t)) return null;
+  return Math.floor((maintenant.getTime() - t) / 86400000);
 }
 
 function commentaires(brut: string): string {
@@ -176,12 +188,15 @@ export function obtenirSections(r: Racines, ids: string[]): ResultatSection[] {
       });
       continue;
     }
+    const age = ageEnJours(s.derniereMiseAJour);
     resultats.push({
       id,
       etat: "ok",
       titre: s.titre,
       contenu: s.contenu,
       derniereMiseAJour: s.derniereMiseAJour,
+      ageJours: age ?? undefined,
+      perimee: age !== null && age > JOURS_PEREMPTION,
       note: RE_PLACEHOLDER.test(s.contenu)
         ? "contient encore des placeholders <…> : tenir ces valeurs pour inconnues, pas pour vraies"
         : undefined,
@@ -198,6 +213,11 @@ export function rendreSections(res: ResultatSection[]): string {
     if (s.etat === "ok") {
       out.push(s.contenu ?? "");
       if (s.derniereMiseAJour) out.push(`_Dernière mise à jour : ${s.derniereMiseAJour}_`);
+      if (s.perimee) {
+        out.push(
+          `_**À confirmer** : datée du ${s.derniereMiseAJour}, plus de ${JOURS_PEREMPTION} jours. Avant de s'en servir, faire confirmer au technicien que c'est toujours vrai — oui : update_context avec le contenu identique (le serveur re-date seulement) ; non : update_context avec le nouveau contenu._`,
+        );
+      }
       if (s.note) out.push(`_${s.note}_`);
     } else {
       if (s.note) out.push(`_${s.note}_`);
@@ -220,6 +240,8 @@ export interface EcritureContexte {
   fichierCree: boolean;
   sectionAjoutee: boolean;
   derniereMiseAJour: string | null;
+  /** Décision 9 : le contenu était identique — seule la date a changé, pas de copie dans historique/. */
+  confirmee: boolean;
 }
 
 export function ecrireSection(r: Racines, id: string, contenu: string): EcritureContexte {
@@ -252,6 +274,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
 
   let nouvelles: string[];
   let sectionAjoutee = false;
+  let confirmee = false;
   let aDate: boolean;
   if (debut < 0) {
     if (!gab) {
@@ -270,6 +293,8 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
     if (fin < 0) fin = lignes.length;
     const ancien = lignes.slice(debut + 1, fin).join("\n");
     aDate = RE_MAJ_LIGNE.test(ancien) || Boolean(gab?.aDate);
+    // Décision 9 : « toujours vrai » = le même contenu ; on repose la date, sans copie dans historique/.
+    confirmee = normaliser(sansCommentaires(ancien).replace(RE_MAJ_LIGNE, "")) === normaliser(propre);
     const consignes = ancien.match(/<!--[\s\S]*?-->/g) ?? [];
     const bloc = [lignes[debut], "", ...consignes, ...(consignes.length ? [""] : []), propre];
     if (aDate) bloc.push("", `Dernière mise à jour : ${dateDuJour()}`);
@@ -277,9 +302,10 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
     nouvelles = [...lignes.slice(0, debut), ...bloc, ...lignes.slice(fin)];
   }
 
-  // Sauvegarde de la version précédente, puis écriture atomique.
+  // Sauvegarde de la version précédente, puis écriture atomique. Une confirmation
+  // (contenu identique) ne change que la date : rien à sauver.
   let sauvegarde: string | null = null;
-  if (!fichierCree) {
+  if (!fichierCree && !confirmee) {
     const hist = path.join(c.contexte, "historique");
     fs.mkdirSync(hist, { recursive: true });
     sauvegarde = path.join(hist, `${domaine}-${horodatageCompact()}.md`);
@@ -290,7 +316,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
   const tmp = `${fichier}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, nouvelles.join("\n").replace(/\n{3,}/g, "\n\n"), "utf8");
   fs.renameSync(tmp, fichier);
-  return { id, fichier, sauvegarde, fichierCree, sectionAjoutee, derniereMiseAJour: aDate ? dateDuJour() : null };
+  return { id, fichier, sauvegarde, fichierCree, sectionAjoutee, derniereMiseAJour: aDate ? dateDuJour() : null, confirmee };
 }
 
 // ---- État de remplissage (CLI, script d'installation, skill remplissage) ----
@@ -353,4 +379,13 @@ export function rendreEtat(etats: EtatFichier[]): string {
     out.push("", `Sections volumineuses (plus de ${LIGNES_MAX_SECTION} lignes ou ${CARACTERES_MAX_SECTION} caractères — probablement un inventaire de niveau 3 à élaguer, format-contexte §4.1) : ${vol.join(", ")}`);
   }
   return out.join("\n");
+}
+
+/** Tous les identifiants « domaine/section » des gabarits livrés — l'enum des champs `section` (décision 9). */
+export function identifiantsSections(r: Racines): string[] {
+  const out: string[] = [];
+  for (const g of gabaritsLivres(r)) {
+    for (const s of lireSections(g.fichier) ?? []) out.push(`${g.domaine}/${s.id}`);
+  }
+  return out;
 }

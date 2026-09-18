@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { lireVersion, racines } from "./config.js";
-import { ErreurContexte, ecrireSection, obtenirSections, rendreSections } from "./contexte.js";
+import { ErreurContexte, ecrireSection, identifiantsSections, obtenirSections, rendreSections } from "./contexte.js";
 import { ErreurEnCours, LIMITES, escaladesBrouillon, etatBrouillon, lireBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
 import { ErreurKb, lireCas, publier, rechercher, rendreCas, rendreRecherche } from "./kb.js";
 import { bibliotheque, identifiantsSignaux, lireManifeste } from "./manifeste.js";
@@ -37,6 +37,8 @@ const biblio = bibliotheque(r, manifeste);
 for (const a of biblio.avertissements) console.error(`support-it : ${a}`);
 const TAGS_MAX = 5;
 const TAGS = z.array(enumOuChaine(biblio.tous)).max(TAGS_MAX);
+/** Les sections des gabarits (décision 9) : un identifiant de section qui n'existe pas n'entre nulle part. */
+const SECTION = enumOuChaine(identifiantsSections(r));
 const SIGNAL = z.object({
   id: enumOuChaine(identifiantsSignaux(manifeste)).describe("Identifiant du signal, tel qu'écrit au manifeste"),
   preuve: z.string().max(LIMITES.signal).describe(`L'extrait du ticket qui montre le signal (≤ ${LIMITES.signal} car.), libre`),
@@ -180,15 +182,15 @@ server.registerTool(
           z.object({
             question: z.string().min(1),
             reponse: z.string(),
-            section: z.string().optional().describe("Section de contexte que la réponse pourrait remplir"),
+            section: SECTION.optional().describe("Section de contexte que la réponse pourrait remplir"),
           }),
         )
         .optional()
         .describe("Chaque question posée au technicien et sa réponse"),
       mises_a_jour_contexte: z
-        .array(z.object({ section: z.string(), contenu: z.string() }))
+        .array(z.object({ section: SECTION, contenu: z.string() }))
         .optional()
-        .describe("Contenu candidat pour les sections de contexte, à destination du référent"),
+        .describe("Contenu candidat pour les sections de contexte, à destination du référent. Les contradictions notées en cours de ticket y sont ajoutées par le serveur"),
       statut: z.enum(["resolu", "non-resolu", "hors-domaines-couverts", "escalade-externe"]),
       tags: TAGS.optional().describe(`Au plus ${TAGS_MAX} tags COCHÉS dans la liste servie par load_skill(["cloture"]) — ceux qui distinguent ce cas. Un tag d'un autre domaine que ceux validés est refusé (les transverses passent). Nature, domaines, escalades et référence sont ajoutés automatiquement, hors plafond`),
       duree_minutes: z.number().int().min(0).optional().describe("Durée du traitement, pour la mesure — calculée par le serveur (création du brouillon → clôture) dès qu'un brouillon existe ; ne sert qu'à un ticket de baseline sans brouillon"),
@@ -253,10 +255,14 @@ server.registerTool(
       prochaine_etape: z.string().optional().describe(`Une ligne (≤ ${LIMITES.prochaine_etape} car.) : ce qu'on fait en premier à la reprise`),
       signaux: z.array(SIGNAL).optional().describe("Les signaux du manifeste COCHÉS au triage, avec pour chacun l'extrait du ticket qui le montre. Un constat de diagnostic n'est pas un signal : il va dans verifications — ajoutés, dédoublonnés sur l'id"),
       verifications: z.array(z.string()).optional().describe(`Un constat vérifié par entrée — « cran N : commande → résultat », ou la lecture d'un portail ou d'un journal — une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
-      questions: z.array(z.object({ question: z.string(), reponse: z.string(), section: z.string().optional() })).optional().describe(`Une DÉCISION du technicien : question et réponse courtes (≤ ${LIMITES.question} car. chacune). La référence du ticket a son champ, elle n'est pas une question — ajoutées`),
+      questions: z.array(z.object({ question: z.string(), reponse: z.string(), section: SECTION.optional() })).optional().describe(`Une DÉCISION du technicien : question et réponse courtes (≤ ${LIMITES.question} car. chacune). La référence du ticket a son champ, elle n'est pas une question — ajoutées`),
       plan_action: z.string().optional().describe("Le plan TEL QUE PROPOSÉ au technicien, sinon vide. Seul champ long. Les éléments déjà arrêtés avant le plan sont des verifications — remplace"),
       actions: z.array(z.string()).optional().describe(`Ce que le technicien a exécuté et le résultat, une ligne (≤ ${LIMITES.action} car.) — ajoutées`),
       notes: z.array(z.string()).optional().describe(`Un PIÈGE ou une fausse piste à ne pas refaire, une ligne (≤ ${LIMITES.note} car.) — ajoutées`),
+      contradictions: z
+        .array(z.object({ section: SECTION, constat: z.string().max(LIMITES.contradiction) }))
+        .optional()
+        .describe(`Quand une vérification CONTREDIT une valeur chargée du contexte : la section, et ce que le ticket a constaté (≤ ${LIMITES.contradiction} car.). Repris à la clôture comme mise à jour de contexte — ajoutées`),
     },
   },
   async (entree) => {
@@ -323,10 +329,10 @@ server.registerTool(
       const e = ecrireSection(r, section, contenu);
       oublierSection(session, section);
       const lignes = [
-        `Section écrite : ${e.id}`,
+        e.confirmee ? `Section confirmée, re-datée : ${e.id} (contenu identique, rien d'autre ne change)` : `Section écrite : ${e.id}`,
         `- fichier : ${e.fichier}${e.fichierCree ? " (créé depuis le gabarit)" : ""}`,
-        e.sectionAjoutee ? "- section ajoutée en fin de fichier (elle manquait)" : "- section remplacée",
-        `- version précédente : ${e.sauvegarde ?? "aucune (fichier nouveau)"}`,
+        e.confirmee ? "- contenu inchangé" : e.sectionAjoutee ? "- section ajoutée en fin de fichier (elle manquait)" : "- section remplacée",
+        `- version précédente : ${e.sauvegarde ?? (e.confirmee ? "aucune (rien n'a changé, pas de copie dans historique/)" : "aucune (fichier nouveau)")}`,
         e.derniereMiseAJour ? `- dernière mise à jour : ${e.derniereMiseAJour}` : "- section sans date de péremption",
       ];
       return texte(lignes.join("\n"));

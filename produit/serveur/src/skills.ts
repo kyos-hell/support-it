@@ -2,6 +2,7 @@
 // résolues, et sa table selon-cas. Valeurs réservées : triage, cloture, remplissage.
 import fs from "node:fs";
 import path from "node:path";
+import { candidats, rendreCandidats } from "./audit.js";
 import { chemins, type Racines } from "./config.js";
 import { etatRemplissage, obtenirSections, rendreEtat, rendreSections } from "./contexte.js";
 import { BROUILLONS_LISTES_MAX, listerBrouillons, rendreListe } from "./encours.js";
@@ -79,7 +80,10 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste, o: OptionsCharge
     );
   }
   if (nom === "remplissage") {
-    return `${corps}\n\n---\n\n# État de remplissage du contexte (calculé à l'instant)\n\n${rendreEtat(etatRemplissage(r))}`;
+    return (
+      `${corps}\n\n---\n\n# État de remplissage du contexte (calculé à l'instant)\n\n${rendreEtat(etatRemplissage(r))}` +
+      `\n\n---\n\n# Candidats au remplissage — proposé par les tickets, pas encore dans le contexte (calculé à l'instant)\n\n${rendreCandidats(candidats(r))}`
+    );
   }
   if (nom === "cloture") return corps + rendreTagsCandidats(o);
   return corps;
