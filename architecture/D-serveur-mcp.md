@@ -28,8 +28,9 @@ produit/serveur/
     manifeste.ts    lecture + rendu markdown + vocabulaire des tags
     contexte.ts     get_context, update_context, définition de « vide », état de remplissage
     skills.ts       load_skill (domaines, triage, cloture), en-tête des skills
-    ids.ts          identifiants, horodatages, utilisateur et poste (partagés par tickets et brouillons)
-    encours.ts      save_progress, resume_ticket : brouillon d'un ticket en cours, fusion, liste, reprise
+    ids.ts          identifiants, horodatages (UTC), clé de normalisation, utilisateur et poste
+    session.ts      l'état de session en mémoire (décision 3) : brouillon courant, skills chargés, sections servies, cas lus — sans dépendance
+    encours.ts      save_progress, resume_ticket : brouillon d'un ticket en cours, fusion, liste, reprise, étape calculée
     tickets.ts      save_ticket : identifiant, rendu, journal, lien avec le brouillon
     kb.ts           search_kb, publish_kb
     validation.ts   contrôles de livraison
@@ -39,7 +40,8 @@ produit/serveur/
 ```
 
 Dépendances entre modules, dans un seul sens :
-`index`/`cli` → `skills`/`tickets`/`kb`/`validation` → `contexte`/`manifeste` → `markdown`/`config`.
+`index`/`cli` → `skills`/`tickets`/`kb`/`validation` → `encours` → `contexte`/`manifeste` → `markdown`/`config`/`ids`/`session`.
+`session.ts` est une feuille : il ne connaît ni les fichiers ni les autres modules ; `index.ts` en tient l'instance et la passe à `sauverProgression` et `enregistrerTicket`.
 
 ## 3. Formats
 
@@ -94,10 +96,21 @@ sauvegarde préalable en `.support-it.bak`.
 
 ## 4. Comportement nominal
 
-Un ticket type : `load_skill(triage)` → `load_skill([reseau], incident)` →
-0 à n `get_context` → `search_kb` → `load_skill(cloture)` → `save_ticket` →
-éventuellement `publish_kb`. Chaque appel est sans état : le serveur ne
-garde rien entre deux appels, tout est sur disque ou dans la conversation.
+Un ticket type : `load_skill(triage)` → `save_progress` (création) →
+`load_skill([reseau], incident)` → 0 à n `get_context` → `save_progress` →
+`search_kb` → `save_progress` (plan, puis actions une par une) →
+`load_skill(cloture)` → `save_ticket` → éventuellement `publish_kb`.
+
+**Depuis le 2026-09-18 le serveur a un état de session** (décision 3,
+`session.ts`) : un processus par session Claude Code (stdio), donc il se
+souvient du brouillon courant, des skills chargés, des sections servies,
+des cas lus, d'une recherche faite. Cet état est recopié dans le brouillon
+à chaque `save_progress` (champs `skills_charges`, `sections_servies`,
+`cas_lus`, `recherche_faite`, que le modèle ne fournit jamais), reconstruit
+depuis le brouillon par `resume_ticket`, vidé par `save_ticket`. Le disque
+reste la vérité ; la mémoire n'est qu'un garde-fou qui rend un appel hors
+séquence impossible (voir `contrat-mcp.md` §6). Sans brouillon courant, le
+serveur sert comme avant, sans refus.
 
 ## 5. Cas limites et dégradés
 
@@ -122,6 +135,10 @@ garde rien entre deux appels, tout est sur disque ou dans la conversation.
 | Brouillon abandonné | Reste dans `en-cours/` ; `etat` et `resume_ticket()` le signalent au-delà de 30 jours. Clôture manuelle par `save_ticket(id, statut non-resolu)`. |
 | `save_ticket(id)` sur un brouillon déjà clôturé | Refus : le ticket final existe. |
 | Session Claude Code fermée entre deux points d'étape | Ce qui a été dit depuis le dernier `save_progress` est perdu ; c'est la raison de la règle « un point d'étape par acquis ». |
+| Processus serveur relancé en cours de ticket (`/clear`, `--resume`, reconnexion après `CONNECT_TIMEOUT`) | L'état mémoire est vide : aucun refus ne s'applique tant que `resume_ticket` ou `save_progress(id)` n'a pas reconstruit le courant depuis le brouillon. Ce qui a été chargé entre le dernier `save_progress` et la coupure n'est pas dans le brouillon : une escalade faite juste avant la coupure peut manquer. Le smoke rejoue la reprise sur un second processus (client C). **À observer pendant les dix tickets de test** : si Claude Code relance le processus plus souvent que « une session = un processus », la reconstruction devient la voie principale et `triage.md` devra dire « `resume_ticket` à chaque reprise de conversation ». |
+| `save_ticket` alors qu'un autre brouillon que le courant est visé | Refus : deux tickets en parallèle dans une session n'est pas un usage ; `resume_ticket` bascule le courant. |
+| `save_progress` sans id alors qu'un brouillon est courant, symptôme et référence nouveaux | Un nouveau brouillon est créé et devient le courant ; l'état de session repart de zéro pour lui. L'ancien reste sur disque avec son état. |
+| `get_context` sur une section réécrite par `update_context` dans la session | Elle redevient servable : la mise à jour l'a retirée des « déjà servies ». |
 
 ## 6. Ce que le composant ne fait pas
 

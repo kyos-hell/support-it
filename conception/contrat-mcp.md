@@ -183,25 +183,33 @@ la main à un collègue. Le brouillon d'un ticket en cours est un fichier par
 ticket dans `installation/en-cours/`, **volontairement mutable** et isolé
 pour le dire, écrit au fil de l'eau et retiré à la clôture.
 
-### `save_progress(id?, etape, …)`
+### `save_progress(id?, pause?, …)` — signature réduite le 2026-09-18 (décision 3)
 
 | | |
 | --- | --- |
-| Entrée | `etape` (obligatoire) : `triage`, `instruction`, `recherche`, `plan`, `actions`, `cloture` ou `pause`. `id` : absent au premier appel. `symptome_initial` (obligatoire à la création), `reference`, `nature`, `domaines_proposes`, `domaines_valides`, `skill_charge{domaines, nature}`, `prochaine_etape`, `plan_action` ; listes `escalades`, `signaux`, `verifications`, `questions`, `actions`, `notes`. |
-| Lit | Le brouillon existant, par `id` ou — sans `id` — par `reference`. |
-| Écrit | `installation/en-cours/<id>.md`, écriture atomique. |
+| Entrée | `id` : absent au premier appel. `pause` : vrai sur « je mets en pause ». `symptome_initial` (obligatoire à la création), `reference`, `nature`, `domaines_proposes`, `domaines_valides`, `prochaine_etape`, `plan_action` ; listes `signaux`, `verifications`, `questions`, `actions`, `notes`. **Disparus** : `etape` (calculée), `escalades` (dérivées), `skill_charge` (c'est `domaines_valides` + `nature`). |
+| Lit | Le brouillon existant, par `id`, sinon par `reference`, sinon par symptôme initial identique (A5). |
+| Écrit | `installation/en-cours/<id>.md`, écriture atomique ; y recopie l'état de session (`skills_charges`, `sections_servies`, `cas_lus`, `recherche_faite`). |
 
-**Comportement.** Sans `id` et sans brouillon de même référence : création,
-identifiant fabriqué par le serveur (même forme que les tickets), technicien
-et poste relevés. Sinon **fusion** : les scalaires fournis remplacent
-(`etape`, `prochaine_etape`, `plan_action`, `nature`, domaines, skill),
-`symptome_initial` n'est posé qu'une fois, `reference` ne change que si elle
-change vraiment (pas sur une variante de casse), les listes s'**ajoutent**
-sans doublon. Si le technicien du dernier point d'étape n'est pas l'appelant,
-une **passation** est enregistrée. Réponse : id, fichier, créé / mis à jour /
-rattaché, passation éventuelle. Le fichier a l'en-tête YAML pour source de
-vérité et un corps rendu (état et prochaine étape en premier, puis symptôme,
-signaux, vérifications, questions, plan, actions, notes, passations).
+**Comportement.** Sans `id`, sans brouillon de même référence ni de même
+symptôme : création, identifiant fabriqué par le serveur (même forme que
+les tickets), technicien et poste relevés ; le brouillon devient le
+**courant** de la session. Sinon **fusion** : les scalaires fournis
+remplacent (`prochaine_etape`, `plan_action`, `nature`, domaines),
+`symptome_initial` n'est posé qu'une fois, `reference` ne se pose qu'une
+fois — une autre est **refusée** (A4), une référence fabriquée aussi (A6) —,
+les domaines sont contrôlés contre le manifeste (A3), les listes
+s'**ajoutent** sans doublon à la clé normalisée (A2). Si le technicien du
+dernier point d'étape n'est pas l'appelant, une **passation** est
+enregistrée. **L'étape est calculée** par le serveur : `pause` si demandé,
+sinon `actions` dès qu'une action existe, `plan` dès qu'un plan existe,
+`recherche` après un `search_kb`, `instruction` dès qu'un skill de domaine
+a été chargé, `triage` sinon. Réponse : id, fichier, étape, créé / mis à
+jour / rattaché (par la référence ou par le symptôme), passation éventuelle.
+Le fichier a l'en-tête YAML pour source de vérité et un corps rendu (état —
+étape, domaines, escalade dérivée, skills chargés, sections servies, cas
+lus — et prochaine étape en premier, puis symptôme, signaux, vérifications,
+questions, plan, actions, notes, passations).
 
 **Taxonomie du brouillon (2026-09-10, après le premier brouillon réel : 29 Ko,
 un récit).** Un champ, une nature, une longueur, imposée par le serveur :
@@ -221,8 +229,9 @@ Le test d'une entrée : *un repreneur peut-il repartir avec cette ligne sans
 relire la conversation ?* Une entrée trop longue est **refusée** avec la
 règle du champ et rien n'est écrit, même les entrées valides du même appel.
 Le fichier n'écrit plus le corps en double : l'en-tête YAML est la source de
-vérité, le corps se réduit à l'état (étape, domaines, skill, prochaine
-étape, compteurs, passations) ; `resume_ticket` rend l'ensemble en clair.
+vérité, le corps se réduit à l'état (étape, domaines, escalade, skills,
+prochaine étape, compteurs, passations) ; `resume_ticket` rend l'ensemble
+en clair.
 
 **Quand l'appeler** (règle de `triage.md`) : dès le triage validé, puis à
 chaque acquis qui coûterait à refaire — cran validé et résultat, réponse
@@ -237,25 +246,41 @@ Toujours avec `prochaine_etape`. Discipline de prompt : à surveiller en bêta.
 | Lit | `installation/en-cours/`. |
 | Écrit | Rien — la passation s'enregistre au `save_progress` suivant. |
 
-**Comportement.** Sans argument : tableau des tickets en cours (référence,
-id, technicien, étape, dernier point, prochaine étape), brouillons de plus
-de 30 jours signalés. Avec argument : le brouillon rendu **sans son en-tête
-YAML**, précédé de la marche à suivre (ré-annoncer, recharger `load_skill`
-avec le skill enregistré sans retrianger, repartir à la prochaine étape,
-continuer avec l'id) et d'un avertissement si le dernier point d'étape est
-d'un autre technicien — renforcé s'il date de moins de dix minutes. Inconnu :
-erreur avec la liste. `load_skill(["triage"])` joint la même liste, ce qui
-permet au triage de proposer la reprise quand la référence y figure.
+**Comportement.** Sans argument : tableau de **tous** les tickets en cours
+(référence, id, technicien, étape, dernier point, prochaine étape),
+brouillons de plus de 30 jours signalés ; les zombies (ticket déjà clôturé)
+et les orphelins (fichier illisible) sont ignorés (A8). Avec argument : le
+brouillon rendu **sans son en-tête YAML**, précédé de la marche à suivre
+(ré-annoncer, recharger `load_skill` du dernier domaine chargé sans
+retrianger, repartir à la prochaine étape, continuer avec l'id) et d'un
+avertissement si le dernier point d'étape est d'un autre technicien —
+renforcé s'il date de moins de dix minutes. Inconnu : erreur avec la liste.
+**Effet sur la session** : le brouillon devient le courant et l'état
+(skills chargés, sections servies, cas lus, recherche faite) est
+**reconstruit** depuis lui — c'est la voie de reprise après un redémarrage
+du serveur. `load_skill(["triage"])` joint la même liste, plafonnée aux dix
+plus récents (B1) : le triage ne reconnaît pas une référence dans la liste,
+il appelle `resume_ticket(référence)` d'abord et le serveur répond.
 
 ### Effet sur `save_ticket`
 
-`save_ticket` accepte `id` : le ticket final **reprend l'identifiant du
-brouillon**, hérite de sa référence, reprend ses questions, signaux et
-escalades s'ils manquent, puis le brouillon est **retiré**. Sans `id`, le
-serveur relie par la référence s'il trouve un brouillon. C'est la seule
-suppression que le serveur fasse, et elle ne perd rien : le ticket final
-contient tout le récit. Un `id` inconnu est refusé ; un id déjà clôturé
-aussi.
+Quand un brouillon est courant dans la session, `save_ticket` s'y
+rattache **sans `id`** ; un `id` qui désigne un autre brouillon est refusé
+(`resume_ticket` pour basculer) ; sans `cloture` chargé dans la session, la
+clôture est refusée. Sans brouillon courant (processus neuf, clôture d'un
+ticket jamais brouillonné), le serveur relie par `id`, sinon par référence,
+sinon par symptôme identique. Le ticket final **reprend l'identifiant du
+brouillon** et le brouillon est **la source** : symptôme initial (A1),
+référence, domaines proposés, plan d'action, questions, signaux — ce que
+la clôture fournit ne sert que là où le brouillon n'a rien, les listes
+s'ajoutent. La durée est calculée (création → clôture), `resolu_par` vaut
+`null` s'il n'est pas dit, `plan_action` est obligatoire pour un ticket
+résolu. Les **escalades sont dérivées** des skills chargés (brouillon ∪
+session) : tout domaine chargé après le premier appel de domaine. Puis le
+brouillon est **retiré** et la session vidée. C'est la seule suppression
+que le serveur fasse, et elle ne perd rien : le ticket final contient tout
+le récit. Un `id` inconnu est refusé ; un id déjà clôturé aussi, et le
+brouillon zombie est retiré au passage (A8).
 
 ## 6. Invariants du contrat
 
@@ -273,6 +298,22 @@ aussi.
   `SUPPORT_IT_INSTALLATION` change (H1).
 - Une erreur d'usage renvoie un texte avec `isError` ; une erreur de
   livraison (fichier produit manquant) aussi, mais en nommant le fichier.
+- **L'état de session** (décision 3, 2026-09-18). Un processus serveur par
+  session (stdio) : le serveur garde en mémoire le brouillon courant, les
+  skills chargés (un élément par `load_skill`, domaines joints par `+`),
+  les sections servies, les cas lus, et si une recherche a eu lieu. Il le
+  recopie dans le brouillon à chaque `save_progress`, le reconstruit par
+  `resume_ticket`, le vide à `save_ticket`. **Quand un brouillon est
+  courant**, il refuse : `search_kb` sans skill de domaine chargé (« le cas
+  n'est pas instruit ») ; `save_ticket` sans `cloture` chargé ; `save_ticket`
+  visant un autre brouillon ; et `get_context` sur une section déjà servie
+  répond « déjà chargée » sans le contenu (une section réécrite par
+  `update_context` redevient servable). **Sans brouillon courant, aucun
+  refus** : le serveur sert comme avant. Un brouillon neuf hérite des skills
+  et sections servis avant sa création (le triage), pas d'une recherche ni
+  d'un cas lu pour un autre ticket. Le disque reste la vérité, la mémoire
+  n'est qu'un garde-fou : ce qui se passe entre le dernier `save_progress`
+  et une coupure est perdu, et c'est marginal.
 
 ## 7. Ce que le serveur ne fait pas
 

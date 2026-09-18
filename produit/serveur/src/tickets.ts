@@ -5,9 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
-import { ErreurEnCours, lireBrouillon, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type QuestionPosee } from "./encours.js";
+import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type QuestionPosee } from "./encours.js";
 import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
 import { lireDocument, sections } from "./markdown.js";
+import { escaladesDerivees, fusionnerEtat, skillCharge, type Session } from "./session.js";
 
 export { idValide, fabriquerId, type QuestionPosee };
 
@@ -111,7 +112,13 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
   );
 }
 
-export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
+/**
+ * `session` : l'état de la session serveur (décision 3). Quand un brouillon
+ * est courant, la clôture s'y rattache sans id, refuse un autre id, et
+ * refuse si `cloture` n'a pas été chargé dans la session. Les escalades
+ * sont dérivées des skills chargés, jamais fournies par le modèle.
+ */
+export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session): TicketEcrit {
   assurerInstallation(r);
   const c = chemins(r);
   const date = new Date();
@@ -123,16 +130,27 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
       reference: ref || undefined,
       domaines_proposes: verifierDomaines(r, "domaines_proposes", e.domaines_proposes) ?? [],
       domaines_valides: verifierDomaines(r, "domaines_valides", e.domaines_valides) ?? [],
-      escalades: verifierDomaines(r, "escalades", e.escalades),
+      escalades: undefined,
     };
   } catch (err) {
     if (err instanceof ErreurEnCours) throw new ErreurTicket(err.message);
     throw err;
   }
-  // Lien avec un brouillon en cours : par id, sinon par référence, sinon par
-  // le symptôme (A5). Le ticket final reprend l'id du brouillon (continuité),
-  // et le brouillon est retiré.
-  let brouillon = e.id ? lireBrouillon(r, e.id) : ref ? trouverBrouillon(r, ref) : null;
+  const courant = session?.brouillonCourant ?? null;
+  if (courant) {
+    if (e.id && e.id !== courant) {
+      throw new ErreurTicket(
+        `le brouillon courant de cette session est ${courant}, la clôture vise ${e.id} : un autre ticket est en cours. resume_ticket("${e.id}") pour basculer, ou omettre id.`,
+      );
+    }
+    if (!skillCharge(session!.skillsCharges, "cloture")) {
+      throw new ErreurTicket('charger `cloture` d\'abord : load_skill(["cloture"]) — ses consignes n\'ont pas été lues dans cette session.');
+    }
+  }
+  // Lien avec un brouillon en cours : le courant de la session, sinon par id,
+  // sinon par référence, sinon par le symptôme (A5). Le ticket final reprend
+  // l'id du brouillon (continuité), et le brouillon est retiré.
+  let brouillon: Brouillon | null = courant ? lireBrouillon(r, courant) : e.id ? lireBrouillon(r, e.id) : ref ? trouverBrouillon(r, ref) : null;
   if (e.id && !brouillon) throw new ErreurTicket(`brouillon inconnu : ${e.id}. Omettre id pour clôturer sans brouillon.`);
   if (!brouillon && !e.id) brouillon = trouverParSymptome(r, e.symptome_initial);
   let id: string;
@@ -162,11 +180,13 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket): TicketEcrit {
       plan_action: brouillon.plan_action || e.plan_action,
       signaux: fusion(brouillon.signaux, e.signaux ?? [], (x) => x),
       questions: fusion(brouillon.questions, e.questions ?? [], (q) => q.question),
-      escalades: fusion(brouillon.escalades, e.escalades ?? [], (x) => x),
+      // Ce que la session a vu depuis le dernier save_progress compte aussi.
+      escalades: session ? escaladesDerivees(fusionnerEtat(etatBrouillon(brouillon), session).skills_charges) : escaladesBrouillon(brouillon),
       // La durée est celle du brouillon (création → clôture), pas une estimation.
       duree_minutes: dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
     };
   } else {
+    e = { ...e, escalades: session ? escaladesDerivees(session.skillsCharges) : [] };
     id = fabriquerId(date);
     fichier = path.join(c.tickets, `${id}.md`);
     // Deux clôtures dans la même seconde sur le même poste : suffixe, jamais d'écrasement.

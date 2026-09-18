@@ -9,9 +9,15 @@ import { assurerInstallation, chemins, type Racines } from "./config.js";
 import { fabriquerId, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
 import { domainesInconnus, lireManifeste } from "./manifeste.js";
 import { lireDocument } from "./markdown.js";
+import { casInstruit, domainesInstruits, escaladesDerivees, etatDepuisSession, fusionnerEtat, type EtatBrouillon, type Session } from "./session.js";
 
-export type Etape = "triage" | "instruction" | "recherche" | "plan" | "actions" | "cloture" | "pause";
-export const ETAPES: Etape[] = ["triage", "instruction", "recherche", "plan", "actions", "cloture", "pause"];
+/**
+ * L'étape est calculée par le serveur depuis ce qu'il a vu passer (décision
+ * 3, point 5) ; seule « pause » est un mot du technicien. Elle ne peut plus
+ * contredire le contenu du brouillon.
+ */
+export type Etape = "triage" | "instruction" | "recherche" | "plan" | "actions" | "pause";
+export const ETAPES: Etape[] = ["triage", "instruction", "recherche", "plan", "actions", "pause"];
 
 export interface QuestionPosee {
   question: string;
@@ -38,12 +44,21 @@ export interface Brouillon {
   derniere_mise_a_jour: string;
   technicien: string;
   poste: string;
+  /** Calculée à l'écriture (calculerEtape) ; stockée pour la liste et le CLI. */
   etape: Etape;
+  pause: boolean;
   nature: "incident" | "demande" | null;
   domaines_proposes: string[];
   domaines_valides: string[];
+  /** Dérivées de skills_charges depuis 2.4 ; lues telles quelles sur les brouillons antérieurs. */
   escalades: string[];
+  /** Antérieur à 2.4, gardé en lecture : c'est domaines_valides + nature. */
   skill_charge: SkillCharge | null;
+  /** État de session recopié par le serveur (session.ts) — jamais fourni par le modèle. */
+  skills_charges: string[];
+  sections_servies: string[];
+  cas_lus: string[];
+  recherche_faite: boolean;
   passations: Passation[];
   symptome_initial: string;
   prochaine_etape: string;
@@ -58,13 +73,12 @@ export interface Brouillon {
 export interface EntreeProgression {
   id?: string;
   reference?: string;
-  etape: Etape;
+  /** Le seul mot d'étape que le serveur ne peut pas voir : « je mets en pause ». Levé au save_progress suivant. */
+  pause?: boolean;
   symptome_initial?: string;
   nature?: "incident" | "demande";
   domaines_proposes?: string[];
   domaines_valides?: string[];
-  escalades?: string[];
-  skill_charge?: SkillCharge;
   prochaine_etape?: string;
   signaux?: string[];
   verifications?: string[];
@@ -147,11 +161,16 @@ function lireFichier(fichier: string): Brouillon | null {
     technicien: String(e.technicien ?? ""),
     poste: String(e.poste ?? ""),
     etape: (ETAPES.includes(e.etape as Etape) ? e.etape : "triage") as Etape,
+    pause: Boolean(e.pause ?? e.etape === "pause"),
     nature: e.nature ?? null,
     domaines_proposes: e.domaines_proposes ?? [],
     domaines_valides: e.domaines_valides ?? [],
     escalades: e.escalades ?? [],
     skill_charge: e.skill_charge ?? null,
+    skills_charges: e.skills_charges ?? [],
+    sections_servies: e.sections_servies ?? [],
+    cas_lus: e.cas_lus ?? [],
+    recherche_faite: Boolean(e.recherche_faite),
     passations: e.passations ?? [],
     symptome_initial: String(e.symptome_initial ?? ""),
     prochaine_etape: String(e.prochaine_etape ?? ""),
@@ -265,6 +284,32 @@ function verifierLongueurs(e: EntreeProgression): void {
   }
 }
 
+function ligneEtat(b: Brouillon): string {
+  const escalades = escaladesBrouillon(b);
+  return (
+    `Étape : **${b.etape}** · ${b.nature ?? "nature non décidée"} · domaines validés : ${b.domaines_valides.join(", ") || "—"}` +
+    `${escalades.length ? ` · escalade : ${escalades.join(" → ")}` : ""}` +
+    `${b.skills_charges.length ? ` · skills chargés : ${b.skills_charges.join(", ")}` : ""}` +
+    `${b.sections_servies.length ? ` · sections servies : ${b.sections_servies.length}` : ""}` +
+    `${b.cas_lus.length ? ` · cas lus : ${b.cas_lus.join(", ")}` : ""}`
+  );
+}
+
+/** Les escalades : dérivées de skills_charges ; sur un brouillon antérieur à 2.4, celles qu'il porte. */
+export function escaladesBrouillon(b: Brouillon): string[] {
+  return b.skills_charges.length ? escaladesDerivees(b.skills_charges) : b.escalades;
+}
+
+/** L'étape, calculée : pause > actions > plan > recherche > instruction > triage. */
+export function calculerEtape(b: Brouillon): Etape {
+  if (b.pause) return "pause";
+  if (b.actions.length) return "actions";
+  if (b.plan_action.trim()) return "plan";
+  if (b.recherche_faite) return "recherche";
+  if (casInstruit(b.skills_charges) || b.skill_charge) return "instruction";
+  return "triage";
+}
+
 /** Le fichier : l'en-tête YAML (source de vérité) et un corps réduit à l'état. */
 function rendre(b: Brouillon): string {
   const passations = b.passations.length ? b.passations.map((p) => `- ${p.date} : de ${p.de} à ${p.a}`).join("\n") : "_(aucune)_";
@@ -272,7 +317,7 @@ function rendre(b: Brouillon): string {
     `---\n${YAML.stringify(b).trimEnd()}\n---\n\n` +
     `# En cours ${b.id}${b.reference ? ` — ${b.reference}` : ""}\n\n` +
     `## etat — Où en est le ticket\n\n` +
-    `Étape : **${b.etape}** · ${b.nature ?? "nature non décidée"} · domaines validés : ${b.domaines_valides.join(", ") || "—"}${b.skill_charge ? ` · skill chargé : ${b.skill_charge.domaines.join("+")} (${b.skill_charge.nature})` : ""}\n\n` +
+    `${ligneEtat(b)}\n\n` +
     `**Prochaine étape :** ${b.prochaine_etape || "_(non notée)_"}\n\n` +
     `Dernier point d'étape : ${b.derniere_mise_a_jour} par ${b.technicien} sur ${b.poste} · ${b.verifications.length} vérification(s), ${b.questions.length} question(s), ${b.actions.length} action(s), ${b.notes.length} note(s). Le détail est dans l'en-tête ci-dessus ; \`resume_ticket\` le rend en clair.\n\n` +
     `## passations — Passations\n\n${passations}\n`
@@ -288,7 +333,7 @@ function rendreComplet(b: Brouillon): string {
   const passations = b.passations.length ? b.passations.map((p) => `- ${p.date} : de ${p.de} à ${p.a}`).join("\n") : "_(aucune)_";
   const bloc = (id: string, titre: string, contenu: string) => `## ${id} — ${titre}\n\n${contenu}\n`;
   return (
-    bloc("etat", "Où en est le ticket", `Étape : **${b.etape}** · ${b.nature ?? "nature non décidée"} · domaines validés : ${b.domaines_valides.join(", ") || "—"}${b.skill_charge ? ` · skill chargé : ${b.skill_charge.domaines.join("+")} (${b.skill_charge.nature})` : ""}\n\n**Prochaine étape :** ${b.prochaine_etape || "_(non notée)_"}`) +
+    bloc("etat", "Où en est le ticket", `${ligneEtat(b)}\n\n**Prochaine étape :** ${b.prochaine_etape || "_(non notée)_"}`) +
     "\n" +
     bloc("symptome-initial", "Symptôme initial, tel qu'exprimé", b.symptome_initial || "_(rien)_") +
     "\n" +
@@ -316,14 +361,16 @@ function ecrire(r: Racines, b: Brouillon): string {
   return fichier;
 }
 
-export function sauverProgression(r: Racines, e: EntreeProgression): ProgressionEcrite {
+/**
+ * `session` : l'état de la session serveur, recopié dans le brouillon (le
+ * modèle ne renseigne jamais ces champs). Absent dans les tests unitaires.
+ */
+export function sauverProgression(r: Racines, e: EntreeProgression, session?: Session): ProgressionEcrite {
   assurerInstallation(r);
-  if (!ETAPES.includes(e.etape)) throw new ErreurEnCours(`étape inconnue : ${e.etape}. Étapes : ${ETAPES.join(", ")}`);
   verifierLongueurs(e);
   const ref = verifierReference(e.reference);
   const domainesProposes = verifierDomaines(r, "domaines_proposes", e.domaines_proposes);
   const domainesValides = verifierDomaines(r, "domaines_valides", e.domaines_valides);
-  const escalades = verifierDomaines(r, "escalades", e.escalades);
   const maintenant = new Date().toISOString();
   const moi = utilisateur();
 
@@ -358,12 +405,17 @@ export function sauverProgression(r: Racines, e: EntreeProgression): Progression
       derniere_mise_a_jour: maintenant,
       technicien: moi,
       poste: poste(),
-      etape: e.etape,
+      etape: "triage",
+      pause: false,
       nature: null,
       domaines_proposes: [],
       domaines_valides: [],
       escalades: [],
       skill_charge: null,
+      skills_charges: [],
+      sections_servies: [],
+      cas_lus: [],
+      recherche_faite: false,
       passations: [],
       symptome_initial: "",
       prochaine_etape: "",
@@ -385,7 +437,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression): Progression
   b.technicien = moi;
   b.poste = poste();
   b.derniere_mise_a_jour = maintenant;
-  b.etape = e.etape;
+  b.pause = Boolean(e.pause);
   // La référence ne s'écrit que si le brouillon n'en a pas (A4 a déjà refusé
   // un changement) : une variante de casse ne doit pas écraser « INC-123 ».
   if (ref && !b.reference) b.reference = ref;
@@ -393,18 +445,35 @@ export function sauverProgression(r: Racines, e: EntreeProgression): Progression
   if (e.nature) b.nature = e.nature;
   if (domainesProposes) b.domaines_proposes = domainesProposes;
   if (domainesValides) b.domaines_valides = domainesValides;
-  if (e.skill_charge) b.skill_charge = { ...e.skill_charge, domaines: verifierDomaines(r, "skill_charge.domaines", e.skill_charge.domaines) ?? [] };
   if (texte(e.prochaine_etape ?? "")) b.prochaine_etape = texte(e.prochaine_etape!);
   if (texte(e.plan_action ?? "")) b.plan_action = texte(e.plan_action!);
-  b.escalades = ajouter(b.escalades, escalades, (x) => x.trim());
   b.signaux = ajouter(b.signaux, e.signaux, (x) => x.trim());
   b.verifications = ajouter(b.verifications, e.verifications, (x) => x.trim());
   b.actions = ajouter(b.actions, e.actions, (x) => x.trim());
   b.notes = ajouter(b.notes, e.notes, (x) => x.trim());
   b.questions = ajouter(b.questions, e.questions, (q) => q.question.trim());
+  if (session) {
+    // Un brouillon neuf hérite des skills et sections servis avant sa création
+    // (le triage, un domaine chargé trop tôt), pas d'une recherche ou d'un cas
+    // lu pour un autre ticket : ceux-là sont propres au ticket.
+    if (cree) {
+      session.rechercheFaite = false;
+      session.casLus = [];
+    }
+    const etat = fusionnerEtat(etatBrouillon(b), session);
+    b.skills_charges = etat.skills_charges;
+    b.sections_servies = etat.sections_servies;
+    b.cas_lus = etat.cas_lus;
+    b.recherche_faite = etat.recherche_faite;
+  }
+  b.etape = calculerEtape(b);
 
   const fichier = ecrire(r, b);
   return { id: b.id, fichier, cree, lie, passation, etape: b.etape };
+}
+
+export function etatBrouillon(b: Brouillon): EtatBrouillon {
+  return { skills_charges: b.skills_charges, sections_servies: b.sections_servies, cas_lus: b.cas_lus, recherche_faite: b.recherche_faite };
 }
 
 export function retirerBrouillon(r: Racines, id: string): boolean {
@@ -440,7 +509,7 @@ export function rendreReprise(b: Brouillon): string {
     `# Reprise du ticket ${b.id}${b.reference ? ` — ${b.reference}` : ""}\n\n` +
     `Créé le ${b.cree} · dernier point d'étape le ${b.derniere_mise_a_jour} par ${b.technicien} sur ${b.poste}.\n\n` +
     (avert.length ? avert.map((a) => `> ${a}`).join("\n\n") + "\n\n" : "") +
-    `**Marche à suivre** : ré-annoncer l'état en trois lignes au technicien, recharger le skill (\`load_skill(${JSON.stringify(b.skill_charge?.domaines ?? b.domaines_valides)}, "${b.skill_charge?.nature ?? b.nature ?? "…"}")\`) sans refaire le triage, puis reprendre à la prochaine étape notée. Continuer les points d'étape avec \`id: "${b.id}"\`.\n\n---\n\n` +
+    `**Marche à suivre** : ré-annoncer l'état en trois lignes au technicien, recharger le skill (\`load_skill(${JSON.stringify(domainesInstruits(b.skills_charges).length ? domainesInstruits(b.skills_charges).slice(-1) : b.skill_charge?.domaines ?? b.domaines_valides)}, "${b.nature ?? b.skill_charge?.nature ?? "…"}")\`) sans refaire le triage — l'état de session (skills, sections, cas lus) est déjà reconstruit depuis le brouillon, puis reprendre à la prochaine étape notée. Continuer les points d'étape avec \`id: "${b.id}"\`.\n\n---\n\n` +
     corps
   );
 }

@@ -65,7 +65,15 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste): string {
   return corps;
 }
 
-function chargerDomaine(r: Racines, m: Manifeste, id: string, nature: Nature): string {
+export interface SkillRendu {
+  texte: string;
+  /** Ce que la session note : les domaines (ou le réservé) effectivement chargés. */
+  domaines: string[];
+  /** Les sections requises servies avec le skill (état ok ou vide : le modèle les a vues). */
+  sectionsServies: string[];
+}
+
+function chargerDomaine(r: Racines, m: Manifeste, id: string, nature: Nature): { texte: string; sections: string[] } {
   const d = trouverDomaine(m, id);
   if (!d) {
     throw new ErreurSkill(
@@ -106,16 +114,16 @@ function chargerDomaine(r: Racines, m: Manifeste, id: string, nature: Nature): s
   for (const [signal, ids] of cles) {
     out.push(`- **${signal}** → ${ids.map((x) => `\`${x}\``).join(", ")}`);
   }
-  return out.join("\n");
+  return { texte: out.join("\n"), sections: requis.filter((s) => s.etat !== "inconnue").map((s) => s.id) };
 }
 
-export function chargerSkills(r: Racines, domaines: string[], nature?: Nature): string {
+export function chargerSkills(r: Racines, domaines: string[], nature?: Nature): SkillRendu {
   const m = lireManifeste(r);
   if (domaines.length === 0) throw new ErreurSkill("aucun domaine demandé");
   const reserves = domaines.filter((d): d is Reserve => (RESERVES as string[]).includes(d));
   if (reserves.length > 0) {
     if (domaines.length !== 1) throw new ErreurSkill("`triage`, `cloture` et `remplissage` se chargent seuls, sans autre domaine");
-    return chargerReserve(r, reserves[0], m);
+    return { texte: chargerReserve(r, reserves[0], m), domaines: [reserves[0]], sectionsServies: [] };
   }
   if (!nature) throw new ErreurSkill("`nature` est obligatoire pour charger un domaine : incident ou demande");
   // E1 : dédoublonner avant de compter — ["reseau","systeme","reseau"] fait deux domaines.
@@ -126,10 +134,14 @@ export function chargerSkills(r: Racines, domaines: string[], nature?: Nature): 
     );
   }
   const blocs = uniques.map((d) => chargerDomaine(r, m, d, nature));
-  if (blocs.length === 1) return blocs[0];
-  return (
-    `# Deux domaines chargés : ${uniques.map((d) => `\`${d}\``).join(" et ")}\n\n` +
-    `**Discriminer d'abord.** Utiliser les signaux du manifeste pour éliminer un des deux au plus vite — une question au technicien si l'étape 0 ne suffit pas — puis suivre l'ordre du skill survivant, l'autre restant en référence. Jamais deux diagnostics de front.\n\n` +
-    blocs.join("\n\n---\n\n")
-  );
+  const sectionsServies = [...new Set(blocs.flatMap((b) => b.sections))];
+  if (blocs.length === 1) return { texte: blocs[0].texte, domaines: uniques, sectionsServies };
+  return {
+    texte:
+      `# Deux domaines chargés : ${uniques.map((d) => `\`${d}\``).join(" et ")}\n\n` +
+      `**Discriminer d'abord.** Utiliser les signaux du manifeste pour éliminer un des deux au plus vite — une question au technicien si l'étape 0 ne suffit pas — puis suivre l'ordre du skill survivant, l'autre restant en référence. Jamais deux diagnostics de front.\n\n` +
+      blocs.map((b) => b.texte).join("\n\n---\n\n"),
+    domaines: uniques,
+    sectionsServies,
+  };
 }

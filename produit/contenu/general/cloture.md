@@ -17,8 +17,9 @@ seulement pour celui-là.
   test du triage.
 - Le **statut** : `resolu`, `non-resolu`, `hors-domaines-couverts`,
   `escalade-externe`.
-- Les **domaines** : proposés par le triage (dans l'ordre), validés par le
-  technicien, et la chaîne d'escalade s'il y en a eu.
+- Les **domaines** validés par le technicien. Les domaines proposés et la
+  chaîne d'escalade viennent du brouillon et des skills chargés : le
+  serveur les a, ne pas les reconstituer de mémoire.
 - Les **signaux** retenus : ceux qui ont été vérifiés, pas ceux supposés.
 - La **conclusion** : la cause retenue et comment elle a été établie.
 - Le **plan d'action** validé, tel que proposé (la séquence numérotée,
@@ -49,10 +50,11 @@ seulement pour celui-là.
   baseline, `conclusion_humaine` et `resolu_par`.
 
 Le serveur fabrique l'identifiant et le chemin : ne jamais en proposer.
-**Si le ticket a un brouillon en cours** (`save_progress` a été appelé),
-passer son `id` à `save_ticket` : le ticket final reprend cet id, ce que le
-brouillon a accumulé (questions, signaux, escalades) est repris s'il manque,
-et le brouillon est retiré. Sans id, le serveur relie par la référence.
+**Le brouillon en cours est rattaché par le serveur** : `save_ticket` sans
+`id` suffit, le ticket final reprend l'id du brouillon, ce qu'il a
+accumulé (symptôme, questions, signaux, plan, durée) est la source, et il
+est retiré. Un `id` n'est utile que pour lever une ambiguïté ; un autre
+brouillon que le courant est refusé (`resume_ticket` pour basculer).
 
 ## Après `save_ticket` : proposer d'écrire le contexte
 

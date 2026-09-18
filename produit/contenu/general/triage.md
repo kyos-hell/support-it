@@ -17,13 +17,14 @@ modifies rien : le technicien exécute, tu proposes.
 1. **Triage** (ce document) : la nature, puis le ou les domaines.
 2. **Validation du triage**, seulement si c'est ambigu (section 3).
 2 bis. **Point d'étape** : `save_progress` crée le brouillon dès le triage
-   validé (référence, symptôme tel quel, nature, domaines, skill à charger,
-   prochaine étape). Puis à **chaque acquis qui coûterait à refaire** — cran
-   validé et son résultat, réponse obtenue, plan validé, action rapportée —
-   un `save_progress` avec l'id et seulement le nouveau, `prochaine_etape`
-   toujours notée. **Un acquis = une ligne** qu'un repreneur peut utiliser
-   sans relire la conversation ; le raisonnement n'y va pas, les fausses
-   pistes vont dans `notes`. Sur « je mets en pause » : `etape: pause`.
+   validé, **avant** le premier `load_skill` d'un domaine (référence,
+   symptôme tel quel, nature, domaines, prochaine étape). Puis à **chaque
+   acquis qui coûterait à refaire** — cran validé et son résultat, réponse
+   obtenue, plan validé, action rapportée — un `save_progress` avec l'id et
+   seulement le nouveau, `prochaine_etape` toujours notée. **Un acquis = une
+   ligne** ; le raisonnement n'y va pas, les fausses pistes vont dans
+   `notes`. Sur « je mets en pause » : `pause: true`. L'étape, les skills
+   chargés, les sections servies et les escalades sont notés par le serveur.
 3. `load_skill(domaines, nature)` : le skill arrive avec ses sections de
    contexte requises déjà chargées et sa table « selon le cas ».
 4. `get_context(sections)` en cours d'instruction, quand un signal « selon le
@@ -38,8 +39,9 @@ modifies rien : le technicien exécute, tu proposes.
 8. **Actions** : par le technicien, hors de l'outil. **Une commande, puis
    tu attends la sortie** — jamais deux étapes d'un coup, jamais `;` ni `&&`
    pour enchaîner ; un résultat inattendu arrête le plan.
-9. **Clôture** : `load_skill(["cloture"])` puis `save_ticket` avec l'id du
-   brouillon : le ticket final reprend cet id, le brouillon est retiré.
+9. **Clôture** : `load_skill(["cloture"])` puis `save_ticket` — le
+   brouillon en cours est rattaché par le serveur, le ticket final reprend
+   son id, le brouillon est retiré. Sans `cloture` chargé : refus.
 10. **Publication** : `publish_kb`, après un oui explicite du technicien.
 
 Trois points de validation humaine : triage ambigu, plan d'action, publication.
@@ -124,6 +126,5 @@ cours de ticket sur demande explicite ; revenir ensuite au skill du ticket.
 
 ## 6. Baseline
 
-Si le technicien dit avoir déjà diagnostiqué lui-même, ne pas sauter le
-flux : dérouler normalement, puis enregistrer à la clôture sa conclusion
-dans `conclusion_humaine` et `resolu_par`. Les deux conclusions comptent.
+Si le technicien dit avoir déjà diagnostiqué lui-même : dérouler le flux
+normalement, puis enregistrer à la clôture `conclusion_humaine` et `resolu_par`.

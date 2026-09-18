@@ -6,13 +6,22 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { lireVersion, racines } from "./config.js";
 import { ErreurContexte, ecrireSection, obtenirSections, rendreSections } from "./contexte.js";
-import { ETAPES, ErreurEnCours, LIMITES, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
+import { ErreurEnCours, LIMITES, etatBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
 import { ErreurKb, publier, rechercher, rendreRecherche } from "./kb.js";
+import { casInstruit, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
 import { ErreurSkill, chargerSkills } from "./skills.js";
 import { enregistrerTicket } from "./tickets.js";
 
 const r = racines();
 const version = lireVersion(r);
+
+/**
+ * L'état de session (décision 3) : un processus serveur par session Claude
+ * Code (stdio), donc le serveur sait ce qu'il a servi. Le disque reste la
+ * vérité : l'état est recopié dans le brouillon à chaque save_progress et
+ * reconstruit par resume_ticket. Sans brouillon courant, aucun refus.
+ */
+const session = nouvelleSession();
 
 const server = new McpServer({ name: "support-it", version });
 
@@ -38,7 +47,11 @@ server.registerTool(
   },
   async ({ domaines, nature }) => {
     try {
-      return texte(chargerSkills(r, domaines, nature));
+      const rendu = chargerSkills(r, domaines, nature);
+      // Noté après un chargement réussi seulement : un refus ne compte pas.
+      noterSkill(session, rendu.domaines);
+      for (const s of rendu.sectionsServies) noterSection(session, s);
+      return texte(rendu.texte);
     } catch (e) {
       if (e instanceof ErreurSkill) return erreur(e);
       throw e;
@@ -57,7 +70,18 @@ server.registerTool(
       sections: z.array(z.string().regex(/^[a-z0-9-]+\/[a-z0-9-]+$/)).min(1).describe("Identifiants domaine/section"),
     },
   },
-  async ({ sections }) => texte(rendreSections(obtenirSections(r, sections))),
+  async ({ sections }) => {
+    // Avec un brouillon courant, une section déjà servie (requis d'un skill,
+    // ou get_context antérieur) ne repart pas : « déjà chargée », sans contenu.
+    const deja = session.brouillonCourant ? sections.filter((s) => session.sectionsServies.includes(s)) : [];
+    const aServir = sections.filter((s) => !deja.includes(s));
+    const res = obtenirSections(r, aServir);
+    for (const s of res) if (s.etat !== "inconnue") noterSection(session, s.id);
+    const lignes: string[] = [];
+    if (deja.length) lignes.push(`Déjà chargée(s) dans cette session, contenu non renvoyé : ${deja.map((s) => `\`${s}\``).join(", ")}. Relire la réponse qui l'a servie.`);
+    if (res.length) lignes.push(rendreSections(res));
+    return texte(lignes.join("\n\n"));
+  },
 );
 
 server.registerTool(
@@ -72,7 +96,16 @@ server.registerTool(
       limite: z.number().int().min(1).max(20).optional().describe("Nombre maximal de cas renvoyés (défaut 5)"),
     },
   },
-  async ({ tags, limite }) => texte(rendreRecherche(tags, rechercher(r, tags, limite ?? 5))),
+  async ({ tags, limite }) => {
+    // Avec un brouillon courant, chercher avant d'avoir instruit le cas n'a pas de sens :
+    // les tags seraient ceux du symptôme, pas du diagnostic.
+    if (session.brouillonCourant && !casInstruit(session.skillsCharges)) {
+      return erreur(new Error("le cas n'est pas instruit : charger le skill du domaine (load_skill) et poser le diagnostic avant de chercher un cas similaire."));
+    }
+    const res = rechercher(r, tags, limite ?? 5);
+    session.rechercheFaite = true;
+    return texte(rendreRecherche(tags, res));
+  },
 );
 
 server.registerTool(
@@ -82,13 +115,13 @@ server.registerTool(
     description:
       "Enregistre le ticket clôturé. Le serveur fabrique l'identifiant et le chemin ; ne fournir que du contenu. " +
       "Le symptôme initial doit être conservé tel qu'exprimé par le technicien. Les questions posées forment le journal du ticket (un fichier par ticket). " +
-      "S'applique aussi aux tickets résolus à la main pendant la baseline (conclusion_humaine, resolu_par).",
+      "S'applique aussi aux tickets résolus à la main pendant la baseline (conclusion_humaine, resolu_par). " +
+      "Le brouillon courant de la session est rattaché automatiquement (id facultatif) ; les escalades sont dérivées des skills chargés. Refusé si load_skill([\"cloture\"]) n'a pas été appelé dans la session.",
     inputSchema: {
       symptome_initial: z.string().min(1).describe("Le symptôme tel qu'exprimé au départ, sans reformulation"),
       nature: z.enum(["incident", "demande"]),
       domaines_proposes: z.array(z.string()).describe("Domaines proposés par le triage, dans l'ordre"),
       domaines_valides: z.array(z.string()).describe("Domaines retenus après validation du technicien"),
-      escalades: z.array(z.string()).optional().describe("Domaines vers lesquels le diagnostic a escaladé, dans l'ordre"),
       signaux: z.array(z.string()).optional().describe("Signaux discriminants retenus, vérifiés"),
       conclusion: z.string().min(1).describe("Diagnostic posé ou étude de la demande, et cause retenue"),
       conclusion_humaine: z.string().optional().describe("Baseline : conclusion du technicien avant l'outil"),
@@ -117,7 +150,8 @@ server.registerTool(
   },
   async (entree) => {
     try {
-      const t = enregistrerTicket(r, entree);
+      const t = enregistrerTicket(r, entree, session);
+      vider(session);
       return texte(
         `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n\n` +
           `La publication en base de connaissances est une étape distincte, après validation du technicien : publish_kb(ticket_id="${t.id}").`,
@@ -157,18 +191,17 @@ server.registerTool(
     title: "Point d'étape : enregistrer l'avancement du ticket en cours",
     description:
       "Écrit ou met à jour le brouillon du ticket en cours (installation/en-cours/), pour pouvoir le mettre en pause, le reprendre plus tard ou le passer à un collègue. " +
-      "Premier appel sans id : crée le brouillon (symptome_initial obligatoire) et renvoie l'id ; appels suivants avec id et seulement ce qui est nouveau — les listes s'ajoutent, l'étape et la prochaine étape se remplacent. " +
-      "À appeler à chaque point d'étape : triage validé, cran validé, réponse obtenue, plan validé, action rapportée, et sur « je mets en pause ». Toujours noter prochaine_etape.",
+      "Premier appel sans id, DÈS LE TRIAGE VALIDÉ et avant le premier load_skill d'un domaine : crée le brouillon (symptome_initial obligatoire) et renvoie l'id ; appels suivants avec id et seulement ce qui est nouveau — les listes s'ajoutent, la prochaine étape se remplace. " +
+      "À appeler à chaque point d'étape : cran validé, réponse obtenue, plan validé, action rapportée (une par appel), et sur « je mets en pause » (pause: true). Toujours noter prochaine_etape. " +
+      "L'étape, les skills chargés, les sections servies et les escalades sont calculés par le serveur : ne pas les fournir.",
     inputSchema: {
       id: z.string().optional().describe("Id du brouillon, renvoyé par le premier appel ; absent = création, ou rattachement par référence, sinon par symptôme initial identique"),
       reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing, telle que donnée. Jamais inventée ; ne change plus une fois posée"),
-      etape: z.enum(ETAPES as [string, ...string[]]).describe("Étape du flux atteinte : triage, instruction, recherche, plan, actions, cloture, ou pause"),
+      pause: z.boolean().optional().describe("Vrai sur « je mets en pause » du technicien — le seul mot d'étape que le serveur ne voit pas ; levé au prochain appel"),
       symptome_initial: z.string().optional().describe("Tel qu'exprimé par le technicien — obligatoire à la création"),
       nature: z.enum(["incident", "demande"]).optional(),
       domaines_proposes: z.array(z.string()).optional(),
       domaines_valides: z.array(z.string()).optional(),
-      escalades: z.array(z.string()).optional().describe("Ajoutées à la liste"),
-      skill_charge: z.object({ domaines: z.array(z.string()), nature: z.enum(["incident", "demande"]) }).optional().describe("Ce que la reprise devra recharger"),
       prochaine_etape: z.string().optional().describe(`Une ligne (≤ ${LIMITES.prochaine_etape} car.) : ce qu'on fait en premier à la reprise`),
       signaux: z.array(z.string()).optional().describe(`Un fait observé qui a servi au triage, une ligne (≤ ${LIMITES.signal} car.), sans le raisonnement ni « → domaine » — ajoutés`),
       verifications: z.array(z.string()).optional().describe(`Un ACQUIS par entrée : « cran N : commande → résultat », une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
@@ -180,7 +213,13 @@ server.registerTool(
   },
   async (entree) => {
     try {
-      const p = sauverProgression(r, { ...entree, etape: entree.etape as (typeof ETAPES)[number] });
+      // Un nouveau brouillon alors qu'un autre est courant : l'état repart de zéro pour lui.
+      if (!entree.id && session.brouillonCourant) {
+        const existant = entree.reference ? trouverBrouillon(r, entree.reference) : null;
+        if (!existant || existant.id !== session.brouillonCourant) vider(session);
+      }
+      const p = sauverProgression(r, entree, session);
+      session.brouillonCourant = p.id;
       const lignes = [
         `${p.cree ? "Brouillon créé" : p.lie === "reference" ? "Brouillon rattaché par la référence et mis à jour" : p.lie === "symptome" ? "Brouillon rattaché par le symptôme (même ticket, id oublié) et mis à jour" : "Brouillon mis à jour"} : ${p.id} · étape ${p.etape}`,
         `- fichier : ${p.fichier}`,
@@ -212,6 +251,7 @@ server.registerTool(
     if (!b) {
       return erreur(new Error(`aucun ticket en cours pour « ${ticket} ». ${rendreListe(listerBrouillons(r))}`));
     }
+    reconstruire(session, b.id, etatBrouillon(b));
     return texte(rendreReprise(b));
   },
 );
@@ -232,6 +272,7 @@ server.registerTool(
   async ({ section, contenu }) => {
     try {
       const e = ecrireSection(r, section, contenu);
+      oublierSection(session, section);
       const lignes = [
         `Section écrite : ${e.id}`,
         `- fichier : ${e.fichier}${e.fichierCree ? " (créé depuis le gabarit)" : ""}`,
