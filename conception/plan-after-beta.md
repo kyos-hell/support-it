@@ -1080,7 +1080,7 @@ pas ça, on s'arrête là et c'est une ligne dans `retours-beta.md`.
 | 4 | `cat .claude/settings.json` | Le `deny` de la décision 5 |
 | 5 | `node produit/serveur/dist/cli.js etat` | Sept fichiers, 45 sections vides, `tags.yaml` « vide (0 tag client) », 0 ticket en cours |
 | 6 | `ls installation` | `VERSION`, `tags.yaml`, `contexte/`, `en-cours/`, `tickets/`, `kb/`, `journal/`, `audits/` |
-| 7 | `node outils/jeu-de-test.mjs` | Journal du script : 43 sections écrites, 13 tickets clôturés, 12 publiés, 1 brouillon, 19 anomalies posées, durée |
+| 7 | `node outils/jeu-de-test.mjs --reinitialiser` (l'installation créée à l'étape 3 n'est pas vide : le script la vide et la recrée) | Journal du script : 44 sections écrites, 13 tickets clôturés, 12 publiés, 1 brouillon, les anomalies posées ; `installation/jeu-de-test.log` |
 | 8 | `node produit/serveur/dist/cli.js etat` | 44 remplies, 1 vide (`materiel/salles-techniques`), 1 volumineuse ; 1 brouillon actif (ancien), 1 zombie et 1 orphelin signalés |
 | 9 | `node produit/serveur/dist/cli.js audit` | **Les 19 anomalies, chacune dans sa rubrique** (le compteur en tête du rapport compte par élément — une copie d'`historique/` par fichier, un candidat par ligne — et affiche donc plus que 19), T-P7 à 13 lignes, fichier `audits/<date>.md` écrit, code retour 1 (constats C3 présents). Une anomalie absente de sa rubrique, ou un constat imprévu = rouge |
 | 10 | `node produit/serveur/dist/cli.js valider` | Zéro erreur (le jeu ne touche pas `produit/`) |
