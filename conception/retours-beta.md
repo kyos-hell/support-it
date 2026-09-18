@@ -222,4 +222,6 @@ l'hôte.
 
 | Date | Ticket ou test | Observation | Périmètre | Gravité | Suite donnée |
 | --- | --- | --- | --- | --- | --- |
+| 2026-09-18 | génération du jeu de test (§3.1) | Une convention écrite avec des chevrons dans le contexte (`srv-<rôle>-<nn>`, `PC-<nnnn>`, `g-<usage>-<niveau>`) passe pour un placeholder : `get_context` annote « contient encore des placeholders », l'audit la liste. C'est la détection C2, volontairement simple. | C, D | friction | Le jeu écrit ses conventions en capitales sans chevrons (`PC-NNNN`). À trancher plus tard : réserver les placeholders à `<…>` en début de cellule, ou accepter le faux positif. Noté dans le YAML. |
+| 2026-09-18 | génération du jeu de test (§3.1) | Deux tags du jeu ont été refusés à la clôture, à raison : `app-compta` (poste de travail, applicatif) sur un ticket réseau, `droits-acces` (identité) sur un ticket système. Le message renvoie la liste filtrée. | D, F | — | Le jeu corrigé ; premier refus « injustifié » testé et… justifié. Un tag client rattaché à deux domaines n'est pas transverse pour autant. |
 | | | | | | |

@@ -1,0 +1,664 @@
+# Jeu de données de test (plan-after-beta.md §3.1) — entreprise fictive « Exemple SAS ».
+# Lu par outils/jeu-de-test.mjs, qui pilote le serveur MCP construit : les fichiers
+# de l'installation sont ceux que le serveur fabrique. Rien ici n'est livré ;
+# tout est fictif (plages 10.x et 192.0.2.x, noms inventés).
+#
+# Ce qu'on modifie ici, pas dans le script : le contenu des sections, les tickets,
+# les tags client. Les anomalies sont listées en fin de fichier ; celles marquées
+# « édition » sont posées par le script après la génération.
+
+entreprise: Exemple SAS
+
+# L'étage client de la bibliothèque de tags (installation/tags.yaml).
+tags_client:
+  general: [m365, azure, agence-nord]
+  reseau: [vpn-site-a-site]
+  poste-de-travail: [app-compta]
+  applicatif: [app-compta, erp-heberge]
+
+# 44 sections remplies sur 45 ; materiel/salles-techniques reste vide exprès (anomalie 9).
+# Pas de « <…> » dans un contenu légitime : le serveur y verrait un placeholder (C2).
+# general/sites est écrite trois fois (anomalie 16 : copies dans historique/).
+contexte:
+  general/sites: |
+    | Site | Localisation | Liaison | Utilisateurs |
+    | --- | --- | --- | --- |
+    | Siège | Paris, bâtiment principal | fibre opérateur + VPN site à site vers Agence Nord | 120 |
+    | Agence Nord | Lille, plateau unique | VPN site à site vers le Siège (IPsec) | 35 |
+    | Télétravail | domicile | VPN client vers le Siège | 60 |
+  general/plateformes: |
+    | Plateforme | Type | Identifiants utiles | Pièges connus | Conventions | Administration |
+    | --- | --- | --- | --- | --- | --- |
+    | Salle serveur Siège | salle serveur, deux baies | hyperviseur hv-siege-01 et hv-siege-02, stockage partagé baie-siege | les deux hyperviseurs n'ont pas la même version de firmware ; une VM migrée sur hv-siege-02 perd parfois sa carte réseau virtuelle si le VLAN n'est pas déclaré sur le second hôte | VM nommées srv-ROLE-NN, un VLAN par usage, snapshots supprimés sous 48 h | console de l'hyperviseur, compte admin nominatif, MFA obligatoire depuis 2026 |
+    | Tenant M365 | SaaS (exemplesas.onmicrosoft.com) | tenant unique, licences E3 pour tous, E5 pour la direction | la synchronisation avec l'AD passe par srv-ad-01 (Entra Connect) : un compte créé directement dans le portail n'est pas repris par l'AD et finit en doublon ; le password writeback est activé, ce qui masque un mot de passe expiré côté AD | boîtes partagées préfixées bp-, groupes M365 préfixés g365- | centre d'administration M365, rôles délégués au support (helpdesk, gestionnaire de licences) |
+    | Abonnement Azure « Prod » | cloud IaaS/PaaS | un abonnement, région France Centre, groupe de ressources par application (rg-APP-prod) | les NSG sont gérés à part par le réseau : ouvrir un flux vers une VM Azure demande une règle NSG ET une règle sur le pare-feu du Siège ; les coûts partent vite avec les disques premium oubliés après suppression d'une VM | ressources taguées Application, Environnement, Propriétaire ; pas de ressource hors groupe | portail Azure, rôle Contributeur par groupe de ressources, Lecteur pour le support |
+    | ERP hébergé | SaaS métier (éditeur Logiciels du Nord) | instance dédiée, accès par navigateur, SSO M365 | l'éditeur applique ses mises à jour le dimanche matin sans prévenir ; une interface CSV vers app-compta tourne la nuit et casse si l'export contient un caractère spécial | comptes créés par l'éditeur sur demande du référent métier, jamais par le support | portail client de l'éditeur, ticket obligatoire |
+    | Sauvegarde | appliance de sauvegarde srv-bkp-01 | dépôt local + copie externalisée chiffrée chez un prestataire | la rétention n'est pas appliquée automatiquement sur le dépôt local : il faut lancer la purge à la main quand le volume dépasse 85 % ; la copie externalisée n'inclut pas les VM de test | un job par serveur, nommé bkp-SERVEUR | console de l'appliance, compte partagé de l'équipe infra (à nominativiser) |
+  general/criticite-services: |
+    | Service | Criticité | Population concernée |
+    | --- | --- | --- |
+    | Messagerie M365 | bloquant entreprise | tous |
+    | Partage fichiers srv-fs-01 | bloquant entreprise | tous |
+    | ERP hébergé | bloquant équipe | ventes, logistique |
+    | app-compta | bloquant équipe | comptabilité (8 personnes) |
+    | Impression | gênant | tous |
+  general/contacts-escalade: |
+    | Périmètre | Contact | Canal | Disponibilité |
+    | --- | --- | --- | --- |
+    | opérateur fibre Siège | opérateur, contrat pro | portail + numéro d'astreinte | 24/7 |
+    | éditeur ERP | Logiciels du Nord, support niveau 2 | portail client | jours ouvrés 8h-18h |
+    | prestataire sauvegarde externalisée | prestataire | mail + téléphone | jours ouvrés |
+    | infogérance réseau | prestataire réseau | portail | jours ouvrés, astreinte payante |
+  general/referents: |
+    | Domaine | Référent |
+    | --- | --- |
+    | general | responsable informatique |
+    | reseau | administrateur réseau |
+    | systeme | administrateur systèmes |
+    | poste-de-travail | technicien support niveau 2 |
+    | materiel | technicien support niveau 1 |
+    | identite | administrateur systèmes |
+    | applicatif | responsable applications |
+
+  reseau/topologie: |
+    | Site | Réseau | Passerelle | Remarques |
+    | --- | --- | --- | --- |
+    | Siège | 10.10.0.0/16 | 10.10.0.1 | VLAN 10 postes, 20 serveurs, 30 voix, 90 invités |
+    | Agence Nord | 10.20.0.0/16 | 10.20.0.1 | VLAN 10 postes, 90 invités ; sort par le Siège |
+    | VPN client | 10.99.0.0/22 | — | attribué par le concentrateur, accès aux VLAN 10 et 20 du Siège |
+    Dernière mise à jour : 2026-09-01
+  reseau/equipements: |
+    | Équipement | Rôle | Site / emplacement | Administration |
+    | --- | --- | --- | --- |
+    | fw-siege | pare-feu et concentrateur VPN | Siège, baie 1 | interface web, compte admin nominatif |
+    | sw-coeur-siege | cœur de réseau | Siège, baie 1 | SSH |
+    | sw-etage-1, sw-etage-2 | commutateurs d'étage | Siège | SSH |
+    | fw-nord | pare-feu Agence Nord, tête de tunnel | Lille, local technique | interface web |
+    | bornes wifi (6) | wifi employés et invités | Siège et Agence Nord | contrôleur cloud |
+  reseau/acces-distant: |
+    VPN client sur fw-siege · tous les salariés (groupe AD g-vpn) · authentification AD + MFA par application mobile ·
+    accessibles : partages, intranet, applications internes ; non accessibles : administration des équipements, réseau invités.
+    Le profil VPN pousse le suffixe DNS exemple.local et les serveurs DNS internes.
+    Dernière mise à jour : 2026-08-20
+  reseau/dns-dhcp: |
+    DNS : srv-ad-01 et srv-ad-02 (zones exemple.local et zones inverses), redirecteurs vers l'opérateur
+    DHCP : srv-ad-01 pour le Siège (bail 8 jours), fw-nord pour l'Agence Nord (bail 1 jour)
+  reseau/proxy-filtrage: |
+    proxy : aucun proxy explicite ; filtrage web par le pare-feu fw-siege, transparent, pour tous les postes ·
+    filtrage : politique par défaut « autorisé sauf catégories bloquées » ; les exceptions se demandent au référent réseau.
+  reseau/wifi: |
+    | SSID | Population | Authentification | Accès |
+    | --- | --- | --- | --- |
+    | EXEMPLE-PRO | employés | 802.1X, compte AD | VLAN 10 |
+    | EXEMPLE-INVITES | invités | portail captif, code du jour | VLAN 90, internet seulement |
+  reseau/flux-existants: |
+    | Source | Destination | Port / protocole | Motif | Depuis |
+    | --- | --- | --- | --- |
+    | VLAN 10 Siège | srv-app-01 | TCP 8443 | app-compta client lourd | 2024-03 |
+    | Agence Nord VLAN 10 | srv-fs-01 | TCP 445 | partages | 2023-01 |
+    | srv-app-01 | ERP hébergé | TCP 443 sortant | interface CSV nocturne | 2025-06 |
+    Dernière mise à jour : 2026-07-15
+  reseau/plan-adressage: |
+    | VLAN | Nom | Plage | Usage | Site(s) |
+    | --- | --- | --- | --- | --- |
+    | 10 | postes | 10.10.10.0/24, 10.20.10.0/24 | postes de travail | Siège, Agence Nord |
+    | 20 | serveurs | 10.10.20.0/24 | serveurs et hyperviseurs | Siège |
+    | 30 | voix | 10.10.30.0/24 | téléphonie | Siège |
+    | 90 | invites | 10.10.90.0/24, 10.20.90.0/24 | wifi invités | Siège, Agence Nord |
+    Dernière mise à jour : 2026-06-01
+
+  systeme/serveurs: |
+    | Serveur | Rôle | Site | Physique / VM | OS | Administration |
+    | --- | --- | --- | --- | --- | --- |
+    | srv-ad-01 | annuaire, DNS, DHCP, Entra Connect | Siège | VM sur hv-siege-01 | Windows Server 2022 | RDP |
+    | srv-ad-02 | annuaire secondaire, DNS | Siège | VM sur hv-siege-02 | Windows Server 2022 | RDP |
+    | srv-fs-01 | fichiers, impression | Siège | VM sur hv-siege-01 | Windows Server 2022 | RDP |
+    | srv-app-01 | app-compta (serveur) | Siège | VM sur hv-siege-02 | Windows Server 2019 | RDP |
+    | srv-bkp-01 | sauvegarde | Siège | physique | appliance | console web |
+  systeme/services: |
+    | Service | Serveur(s) porteur(s) | Dépend de | Où voir l'état et les journaux |
+    | --- | --- | --- | --- |
+    | partage fichiers | srv-fs-01 | annuaire, baie-siege | observateur d'événements, console de la baie |
+    | app-compta | srv-app-01 | annuaire, base locale, certificat interne | journal de l'application dans D:\app-compta\logs |
+    | portail RH interne | srv-app-01 | certificat rh.exemple.local | journal IIS |
+    | impression | srv-fs-01 | annuaire | gestion de l'impression |
+  systeme/virtualisation: |
+    hyperviseur du constructeur, version 8 · hv-siege-01 et hv-siege-02 au Siège · cluster à deux hôtes, haute
+    disponibilité activée, stockage partagé sur baie-siege · console d'administration, accès infra seulement.
+  systeme/stockage: |
+    | Volume / baie | Serveur(s) | Capacité | Usage | Seuil d'alerte | Où voir l'espace |
+    | --- | --- | --- | --- | --- | --- |
+    | baie-siege LUN-DATA | srv-fs-01 | 4 To | partages | 85 % | console de la baie |
+    | baie-siege LUN-VM | hyperviseurs | 6 To | disques des VM | 80 % | console hyperviseur |
+    | srv-bkp-01 dépôt local | srv-bkp-01 | 12 To | sauvegardes | 85 % (purge manuelle) | console de l'appliance |
+  systeme/partages: |
+    | Partage | Chemin d'accès | Serveur | Usage | Groupe lecture | Groupe modification |
+    | --- | --- | --- | --- | --- | --- |
+    | Commun | \\srv-fs-01\Commun | srv-fs-01 | tous | g-fs-commun-l | g-fs-commun-m |
+    | Compta | \\srv-fs-01\Compta | srv-fs-01 | comptabilité | g-fs-compta-l | g-fs-compta-m |
+    | Direction | \\srv-fs-01\Direction | srv-fs-01 | direction | g-fs-direction-l | g-fs-direction-m |
+    Dernière mise à jour : 2026-08-28
+  systeme/sauvegardes: |
+    | Périmètre sauvegardé | Solution | Fréquence | Rétention | Où voir les rapports |
+    | --- | --- | --- | --- | --- |
+    | toutes les VM du cluster | appliance srv-bkp-01 | chaque nuit 22h | 30 jours local, 90 jours externalisé | console de l'appliance, rapport mail au matin |
+    | srv-fs-01 partages (niveau fichier) | appliance srv-bkp-01 | chaque nuit 23h | 30 jours | idem |
+  systeme/messagerie: |
+    M365 Exchange Online · relais sortant srv-app-01 pour app-compta et le scan-to-mail des copieurs (SMTP authentifié, compte de service svc-smtp) ·
+    files et rejets dans le centre d'administration Exchange ; quotas 50 Go par boîte.
+  systeme/certificats: |
+    | Certificat | Service(s) concerné(s) | Émetteur | Échéance | Qui renouvelle |
+    | --- | --- | --- | --- | --- |
+    | rh.exemple.local | portail RH interne | PKI interne (srv-ad-01) | 2026-09-23 | infra |
+    | app-compta interne | srv-app-01, client lourd | PKI interne | 2027-03-01 | infra |
+    | vpn.exemple.fr | fw-siege (VPN client) | autorité publique | 2027-01-10 | réseau |
+    Dernière mise à jour : 2026-09-05
+  systeme/ordonnancement: |
+    | Tâche | Serveur | Horaire | Effet si échec | Où voir le résultat |
+    | --- | --- | --- | --- | --- |
+    | export CSV app-compta → ERP | srv-app-01 | 02:00 | l'ERP n'a pas les écritures de la veille | D:\app-compta\logs\export.log |
+    | purge des journaux | srv-app-01 | dimanche 03:00 | disque D: se remplit | planificateur de tâches |
+    | rapport de sauvegarde | srv-bkp-01 | 06:30 | pas de mail au matin | console de l'appliance |
+
+  poste-de-travail/parc: |
+    | Famille | Modèle standard | OS et version | Gestion | Population | Convention de nommage |
+    | --- | --- | --- | --- | --- | --- |
+    | portable | portable 14 pouces du constructeur, génération 2024 | Windows 11 23H2 | domaine AD + MDM M365 | tous sauf accueil | PC-NNNN |
+    | fixe | mini PC | Windows 11 23H2 | domaine AD | accueil, salle de réunion | PC-NNNN |
+  poste-de-travail/deploiement: |
+    Outil de déploiement : MDM M365 (Autopilot), droits à l'équipe support
+    Procédure pour un poste neuf : enregistrer le numéro de série, démarrer, se connecter avec le compte de l'utilisateur, attendre le socle (45 min), remettre
+    Mises à jour : Windows Update for Business, anneau pilote support puis tous à J+7
+  poste-de-travail/applications-standard: |
+    | Application | Version cible | Installée par défaut | Mode d'installation | Remarques |
+    | --- | --- | --- | --- | --- |
+    | suite bureautique M365 | canal entreprise | oui | MDM | licence par compte |
+    | navigateur | dernière stable | oui | MDM | — |
+    | agent EDR | géré | oui | MDM | ne jamais désinstaller |
+    | app-compta client lourd | 5.2 | non | portail d'entreprise, sur demande | prérequis .NET 4.8 |
+    | lecteur PDF | dernière | oui | MDM | — |
+  poste-de-travail/profils: |
+    Type de profil : local, avec dossiers connus redirigés vers le cloud (OneDrive)
+    Données synchronisées ou redirigées : Bureau, Documents, Images
+    Piège : un profil Outlook corrompu se recrée depuis le panneau Courrier ; ne jamais supprimer le profil Windows.
+  poste-de-travail/securite-poste: |
+    | Agent | Rôle | Où voir les blocages | Qui arbitre une exception |
+    | --- | --- | --- | --- |
+    | EDR M365 | antivirus, EDR | portail sécurité M365 | responsable informatique |
+    | chiffrement disque | chiffrement | clé de récupération dans l'annuaire cloud | support niveau 2 |
+    | pare-feu Windows | pare-feu | stratégie MDM | support niveau 2 |
+  poste-de-travail/impression: |
+    Service d'impression : srv-fs-01, files déployées par stratégie de groupe selon le site
+    | Site | Imprimante ou file | Modèle | Pilote | Remarques |
+    | --- | --- | --- | --- | --- |
+    | Siège | IMP-SIEGE-RDC, IMP-SIEGE-ETAGE | copieurs A3 couleur | pilote universel | scan-to-mail via svc-smtp |
+    | Agence Nord | IMP-NORD | copieur A4 | pilote universel | — |
+
+  materiel/parc-materiel: |
+    | Type d'objet | Modèle standard | Anciens modèles en parc | Garantie habituelle | Renouvellement |
+    | --- | --- | --- | --- | --- |
+    | portable | 14 pouces génération 2024 | génération 2021 (une vingtaine) | 3 ans sur site | tous les 4 ans |
+    | écran | 24 pouces | 22 pouces | 3 ans | à la panne |
+    | station d'accueil | dock USB-C du constructeur | dock ancienne génération | 3 ans | avec le portable |
+  materiel/fournisseurs-sav: |
+    | Fournisseur / contrat | Couvre | Comment ouvrir un dossier | À fournir | Délai habituel | Qui peut commander |
+    | --- | --- | --- | --- | --- | --- |
+    | constructeur, contrat pro | portables, docks, écrans | portail constructeur | numéro de série, description | J+1 sur site | support niveau 1 |
+    | revendeur local | commandes, écrans, câbles | devis par mail | référence | 5 jours | responsable informatique |
+  materiel/stock: |
+    | Type | Modèle | Quantité | Où | Règle d'usage |
+    | --- | --- | --- | --- | --- |
+    | portable | 14 pouces génération 2024 | 3 | Siège, armoire support | prêt et remplacement |
+    | écran | 24 pouces | 0 | — | commander |
+    | chargeur | USB-C 65 W | 6 | Siège, armoire support | remplacement |
+    Dernière mise à jour : 2026-09-10
+  materiel/peripheriques: |
+    | Périphérique | Modèle standard | Compatible avec | Pièges connus |
+    | --- | --- | --- | --- |
+    | dock | dock USB-C du constructeur | portables 2021 et 2024 | les portables 2021 ne chargent pas via le dock ancienne génération |
+    | casque | casque USB certifié | tous | — |
+    | écran salle de réunion | 55 pouces | fixe salle de réunion | entrée HDMI 2 seulement |
+  # materiel/salles-techniques : laissée vide (anomalie 9).
+
+  identite/annuaires: |
+    | Annuaire | Type | Fait autorité pour | Conventions de nommage | Administration |
+    | --- | --- | --- | --- | --- |
+    | exemple.local | domaine interne (AD) | comptes utilisateurs, groupes, postes | prenom.nom, groupes g-USAGE-NIVEAU | consoles AD sur srv-ad-01 |
+    | Entra ID | annuaire cloud | messagerie, M365, SSO | même identifiant que l'AD (UPN = mail) | centre d'administration Entra |
+  identite/synchronisation: |
+    | Source → cible | Connecteur | Serveur porteur | Fréquence | Ce qui passe | Où voir l'état |
+    | --- | --- | --- | --- | --- | --- |
+    | exemple.local → Entra ID | Entra Connect | srv-ad-01 | 30 min | comptes, groupes, mot de passe (hash), réécriture du mot de passe | console Entra Connect, centre Entra |
+    Dernière mise à jour : 2026-08-30
+  identite/authentification: |
+    SSO / fédération : Entra ID pour M365, l'ERP hébergé et le VPN (MFA)
+    MFA : application mobile, enregistrement à l'arrivée, tous les comptes
+    Politique de mot de passe : 14 caractères, expiration 180 jours, verrouillage après 5 essais pendant 15 min
+    Service de référence pour tester un compte : ouverture de session sur un poste du domaine
+  identite/groupes-droits: |
+    Convention de nommage : g-RESSOURCE-l (lecture), g-RESSOURCE-m (modification), g-app-APPLICATION-ROLE
+    Modèle : un groupe par ressource et par niveau, pas d'imbrication, les groupes M365 préfixés g365-
+    Approbation : le propriétaire de la ressource (référent métier) par mail
+  identite/cycle-de-vie: |
+    | Événement | Qui demande | Étapes dans l'ordre | Délais |
+    | --- | --- | --- | --- |
+    | arrivée | RH par mail au support | compte AD, groupes du profil, licence M365, MFA, remise du mot de passe au responsable | J-2 |
+    | mobilité | responsable | groupes retirés puis ajoutés, boîte conservée | J |
+    | départ | RH | désactivation, retrait des groupes, délégation de la boîte, suppression à J+90 | J |
+  identite/comptes-service: |
+    | Compte | Porte | Utilisé sur | Mot de passe | Responsable |
+    | --- | --- | --- | --- | --- |
+    | svc-smtp | scan-to-mail, relais app-compta | srv-app-01, copieurs | expire (180 jours) | infra |
+    | svc-bkp | sauvegarde des VM | srv-bkp-01 | n'expire pas | infra |
+    | svc-compta-export | export CSV nocturne | srv-app-01 | n'expire pas | responsable applications |
+
+  applicatif/catalogue: |
+    | Application | Usage | Éditeur | Version en production | Hébergement | Criticité | Où voir le journal |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | app-compta | comptabilité | Logiciels du Nord | 5.2 | srv-app-01 + client lourd | bloquant équipe | D:\app-compta\logs |
+    | ERP hébergé | ventes, logistique | Logiciels du Nord | SaaS | SaaS | bloquant équipe | portail éditeur |
+    | portail RH interne | congés, notes de frais | interne | 2.1 | srv-app-01 | gênant | journal IIS |
+  applicatif/responsables: |
+    | Application | Référent métier (rôle) | Référent technique (rôle) | Comment les joindre |
+    | --- | --- | --- | --- |
+    | app-compta | responsable comptabilité | responsable applications | mail, canal d'équipe |
+    | ERP hébergé | directeur des opérations | responsable applications | mail |
+    | portail RH interne | RH | responsable applications | mail |
+  applicatif/editeurs-support: |
+    | Éditeur | Applications | Contrat | Ouvrir un ticket | À fournir | Délai / horaires | Base de connaissances |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | Logiciels du Nord | app-compta, ERP hébergé | maintenance annuelle, échéance 2027-01 | portail client | numéro client, version, extrait du journal | 4 h ouvrées | portail client, section FAQ |
+    Dernière mise à jour : 2026-09-02
+  applicatif/integrations: |
+    | Source → cible | Ce qui passe | Moyen | Rythme | Où voir l'état | Qui relance |
+    | --- | --- | --- | --- | --- | --- |
+    | app-compta → ERP hébergé | écritures de la veille | fichier CSV déposé par HTTPS | nuit, 02:00 | D:\app-compta\logs\export.log | responsable applications |
+    | Entra ID → ERP hébergé | comptes et rôles | SSO, provisionnement manuel | à la demande | portail éditeur | responsable applications |
+  applicatif/environnements: |
+    | Application | Environnements | Accès | Chaîne de livraison | Fenêtre habituelle |
+    | --- | --- | --- | --- | --- |
+    | app-compta | production, recette (srv-app-01, instance recette) | client lourd, deux raccourcis | l'éditeur livre, la compta recette, le responsable applications valide | mardi 18h |
+    | ERP hébergé | production seule | navigateur | l'éditeur seul | dimanche matin, sans préavis |
+  applicatif/acces-applicatifs: |
+    | Application | Rôle / profil | Permet | Attribué par | Qui peut l'attribuer | Contraintes |
+    | --- | --- | --- | --- | --- | --- |
+    | app-compta | Saisie | saisir des écritures | groupe AD g-app-compta-saisie | responsable applications | — |
+    | app-compta | Factures | émettre et modifier des factures | groupe AD g-app-compta-factures | responsable applications, sur accord du responsable comptabilité | pas cumulable avec Validation |
+    | app-compta | Validation | valider les écritures | groupe AD g-app-compta-validation | responsable comptabilité | séparation des tâches |
+
+# Les 13 tickets, dans l'ordre de génération. EX-1011 lit EX-1001 : EX-1001 doit exister avant.
+# Champs : reference, nature, domaines (validés ; le premier est celui chargé en premier),
+# proposes (défaut = domaines), premier_domaine (domaine chargé en premier quand il diffère :
+# le serveur dérive l'escalade), signaux [{id, preuve}], selon_cas (une section chargée par get_context),
+# questions, verifications, recherche (tags), lit (référence d'un cas publié à lire),
+# plan, actions (une par appel ; actions_en_un_appel: true pour l'anomalie 17),
+# contradictions, mises_a_jour_contexte, conclusion, tags (≤ 5, bibliothèque),
+# resolu_par, duree (minutes, par antidatage du brouillon), publier (défaut true).
+tickets:
+  - reference: EX-1001
+    nature: incident
+    domaines: [reseau]
+    symptome: "Depuis ce matin les télétravailleurs en VPN n'accèdent plus au partage sur srv-fs-01, au bureau ça marche"
+    signaux:
+      - { id: depend-du-lieu, preuve: "en VPN non, au bureau ça marche" }
+      - { id: population-lieu-lien, preuve: "les télétravailleurs" }
+    selon_cas: reseau/acces-distant
+    questions:
+      - { question: "Le concentrateur VPN a-t-il été mis à jour récemment ?", reponse: "Oui, firmware de fw-siege passé hier soir", section: reseau/equipements }
+      - { question: "Le partage répond-il par adresse IP depuis le VPN ?", reponse: "Oui, \\\\10.10.20.11\\Commun s'ouvre", section: systeme/partages }
+    verifications:
+      - "cran 2 : ipconfig sur un poste VPN → IP 10.99.1.23, suffixe DNS absent"
+      - "cran 5 : nslookup srv-fs-01 → échec ; nslookup srv-fs-01.exemple.local → OK"
+    recherche: [vpn, dns]
+    plan: |
+      1. Sur fw-siege, profil VPN client : remettre le suffixe DNS exemple.local → profil enregistré
+      2. Sur un poste VPN, se déconnecter et se reconnecter → ipconfig montre le suffixe
+      3. nslookup srv-fs-01 → réponse 10.10.20.11
+      Impact : aucun ; retour arrière : retirer le suffixe ; mise à jour de contexte : reseau/acces-distant si le profil change
+    actions:
+      - "1 : suffixe remis dans le profil VPN → enregistré"
+      - "2 : reconnexion d'un poste → suffixe présent"
+      - "3 : nslookup srv-fs-01 → 10.10.20.11"
+    conclusion: "Le profil VPN client ne poussait plus le suffixe DNS exemple.local après la mise à jour du firmware de fw-siege : les noms courts ne se résolvaient plus. Suffixe remis, résolution rétablie."
+    tags: [vpn, dns]
+    duree: 50
+  - reference: EX-1002
+    nature: demande
+    domaines: [reseau]
+    symptome: "Il faut ouvrir l'accès à app-compta depuis l'Agence Nord"
+    selon_cas: reseau/flux-existants
+    questions:
+      - { question: "Qui demande, et pour combien de postes ?", reponse: "La responsable comptabilité, pour 2 postes de l'Agence Nord", section: applicatif/responsables }
+      - { question: "Besoin permanent ou temporaire ?", reponse: "Permanent" }
+    verifications:
+      - "flux existant : VLAN 10 Siège → srv-app-01:8443 seulement, rien depuis l'Agence Nord"
+      - "app-compta est bloquant équipe (criticité) : le signaler dans le plan"
+    recherche: [ouverture-flux, app-compta]
+    plan: |
+      1. Sur fw-nord, règle : 10.20.10.0/24 → 10.10.20.14 TCP 8443, sens sortant → règle créée
+      2. Sur fw-siege, règle miroir en entrée du tunnel → règle créée
+      3. Depuis un poste de l'Agence Nord, Test-NetConnection 10.10.20.14 -Port 8443 → TcpTestSucceeded True
+      4. Mise à jour de reseau/flux-existants
+      Impact : aucun sur l'existant ; retour arrière : suppression des deux règles
+    actions:
+      - "1 : règle fw-nord créée → OK"
+      - "2 : règle fw-siege créée → OK"
+      - "3 : Test-NetConnection → True"
+    mises_a_jour_contexte:
+      - { section: reseau/flux-existants, contenu: "| Agence Nord VLAN 10 | srv-app-01 | TCP 8443 | app-compta, 2 postes compta | 2026-09 |" }
+    conclusion: "Flux TCP 8443 ouvert de l'Agence Nord vers srv-app-01 sur les deux pare-feux ; testé depuis un poste de l'agence."
+    tags: [ouverture-flux, agence-nord]
+    duree: 35
+  - reference: EX-1003
+    nature: incident
+    domaines: [systeme]
+    proposes: [reseau, systeme]
+    symptome: "La sauvegarde de srv-fs-01 est en échec depuis trois nuits"
+    signaux:
+      - { id: un-service-touche, preuve: "la sauvegarde, tout le reste va" }
+      - { id: symptomes-serveur, preuve: "sauvegarde en échec" }
+      - { id: tous-services-touches, preuve: "le rapport du matin parle de tous les jobs" }
+    selon_cas: systeme/sauvegardes
+    questions:
+      - { question: "Que dit le rapport de l'appliance ?", reponse: "« destination pleine » sur tous les jobs depuis lundi", section: systeme/sauvegardes }
+      - { question: "Le dépôt local a-t-il été purgé récemment ?", reponse: "Non, jamais depuis l'installation" }
+    verifications:
+      - "cran 1 : console de l'appliance → dépôt local à 100 %, 12 To utilisés"
+      - "cran 2 : rétention 30 jours affichée mais non appliquée sur le dépôt local"
+    recherche: [sauvegarde, stockage]
+    plan: |
+      1. Console de l'appliance : purger les points de restauration de plus de 30 jours → espace libéré
+      2. Relancer le job bkp-srv-fs-01 → succès
+      3. Planifier la purge hebdomadaire → tâche créée
+      Impact : aucun ; retour arrière : sans objet ; mise à jour de contexte : general/plateformes (purge manuelle) déjà noté
+    actions:
+      - "1 : purge → 4,2 To libérés"
+      - "2 : job relancé → succès en 40 min"
+      - "3 : purge planifiée le dimanche → OK"
+    conclusion: "Le dépôt local de srv-bkp-01 était plein : la rétention n'est pas appliquée automatiquement sur le dépôt local. Purge faite et planifiée, sauvegarde rétablie."
+    tags: [sauvegarde, stockage]
+    duree: 70
+  - reference: EX-1004
+    nature: demande
+    domaines: [systeme]
+    symptome: "Créer un partage Projets sur srv-fs-01 pour l'équipe études"
+    selon_cas: systeme/partages
+    questions:
+      - { question: "Qui doit pouvoir modifier, qui doit pouvoir lire ?", reponse: "Modification : les 6 personnes des études ; lecture : la direction", section: systeme/partages }
+      - { question: "Quel volume prévu ?", reponse: "Environ 200 Go la première année", section: systeme/stockage }
+    verifications:
+      - "LUN-DATA à 61 % : 200 Go tiennent sous le seuil de 85 %"
+      - "convention respectée : g-fs-projets-l et g-fs-projets-m à créer"
+    recherche: [creation-partage, stockage]
+    plan: |
+      1. Créer les groupes AD g-fs-projets-l et g-fs-projets-m → groupes créés
+      2. Créer le dossier D:\Partages\Projets sur srv-fs-01 → dossier créé
+      3. Droits NTFS : lecture g-fs-projets-l, modification g-fs-projets-m, héritage coupé → appliqués
+      4. Partager en \\srv-fs-01\Projets, droits de partage « Tout le monde : contrôle total » → partage visible
+      5. Tester depuis un poste des études → écriture OK
+      6. Mise à jour de systeme/partages
+      Impact : aucun ; retour arrière : retirer le partage et les groupes
+    actions:
+      - "1 : groupes créés → OK"
+      - "2 : dossier créé → OK"
+      - "3 : NTFS appliqués → OK"
+      - "4 : partage créé → visible"
+      - "5 : test écriture → OK"
+    mises_a_jour_contexte:
+      - { section: systeme/stockage, contenu: "| baie-siege LUN-DATA | srv-fs-01 | 4 To | partages (dont Projets, 200 Go prévus) | 85 % | console de la baie |" }
+    conclusion: "Partage Projets créé sur srv-fs-01 avec deux groupes selon la convention ; testé. La mise à jour de systeme/partages a été faite ; celle de systeme/stockage est proposée au référent."
+    tags: [creation-partage]
+    duree: 40
+  - reference: EX-1005
+    nature: incident
+    domaines: [poste-de-travail]
+    symptome: "Outlook plante à l'ouverture sur le poste de M. Durand, sur un autre poste ça va"
+    signaux:
+      - { id: suit-la-machine, preuve: "sur un autre poste ça va" }
+      - { id: un-seul-poste, preuve: "le poste de M. Durand" }
+    selon_cas: poste-de-travail/profils
+    questions:
+      - { question: "Le plantage survient-il aussi en mode sans échec d'Outlook ?", reponse: "Non, en mode sans échec Outlook s'ouvre", section: poste-de-travail/applications-standard }
+      - { question: "La version installée est-elle celle du socle ?", reponse: "Non : le poste est en canal mensuel, pas canal entreprise" }
+    verifications:
+      - "cran 1 : observateur d'événements → erreur 1000 Outlook, module de complément"
+      - "cran 2 : compléments désactivés → Outlook s'ouvre"
+    contradictions:
+      - { section: poste-de-travail/applications-standard, constat: "la suite bureautique est en canal mensuel sur ce poste, pas en canal entreprise comme l'indique le contexte" }
+    recherche: [application, profil]
+    plan: |
+      1. Panneau Courrier : créer un nouveau profil Outlook → profil créé
+      2. Ouvrir Outlook avec le nouveau profil → boîte chargée
+      3. Réactiver les compléments un par un → le complément fautif identifié et laissé désactivé
+      Impact : aucun ; retour arrière : ancien profil conservé 7 jours
+    actions:
+      - "1 : nouveau profil créé → OK"
+      - "2 : Outlook s'ouvre → OK"
+      - "3 : complément PDF fautif désactivé → stable"
+    conclusion: "Profil Outlook corrompu par un complément PDF tiers ; profil recréé, complément laissé désactivé. Le poste n'est pas sur le canal entreprise : contradiction avec le contexte, à corriger."
+    tags: [application, profil, m365]
+    duree: 45
+  - reference: EX-1006
+    nature: demande
+    domaines: [poste-de-travail]
+    symptome: "Installer le client lourd app-compta sur trois postes de la compta"
+    selon_cas: poste-de-travail/applications-standard
+    questions:
+      - { question: "Quels postes exactement ?", reponse: "PC-0412, PC-0415, PC-0418", section: poste-de-travail/parc }
+      - { question: "Les trois utilisateurs ont-ils déjà un rôle app-compta ?", reponse: "Oui, rôle Saisie via g-app-compta-saisie" }
+    verifications:
+      - "prérequis .NET 4.8 présent sur PC-0412 et PC-0415, absent sur PC-0418"
+      - "paquet app-compta 5.2 disponible sur le portail d'entreprise"
+    recherche: [installation-logiciel, app-compta]
+    plan: |
+      1. PC-0418 : installer .NET 4.8 depuis le portail d'entreprise → installé, redémarrage
+      2. Sur chaque poste : installer app-compta 5.2 depuis le portail d'entreprise → installé
+      3. Sur chaque poste : ouvrir app-compta, connexion SSO → écran d'accueil
+      Impact : redémarrage de PC-0418 ; retour arrière : désinstallation
+    actions_en_un_appel: true
+    actions:
+      - "1 : .NET 4.8 sur PC-0418 → installé"
+      - "2 : app-compta installé sur les trois postes → OK"
+      - "3 : connexion SSO testée sur les trois → OK"
+    conclusion: "Client lourd app-compta 5.2 installé sur les trois postes, prérequis .NET ajouté sur l'un d'eux."
+    tags: [installation-logiciel, app-compta]
+    duree: 55
+  - reference: EX-1007
+    nature: incident
+    domaines: [materiel]
+    symptome: "Le portable de la comptable ne s'allume plus, aucun voyant"
+    signaux:
+      - { id: symptomes-physiques, preuve: "aucun voyant" }
+      - { id: echange-objet-resout, preuve: "avec un autre chargeur le voyant s'allume" }
+    selon_cas: materiel/stock
+    questions:
+      - { question: "Avec un autre chargeur, un voyant s'allume-t-il ?", reponse: "Oui, voyant orange puis démarrage", section: materiel/peripheriques }
+      - { question: "Où est rangé le stock de chargeurs ?", reponse: "Dans l'armoire du local technique du rez-de-chaussée, pas dans l'armoire support", section: materiel/salles-techniques }
+    verifications:
+      - "cran 1 : échange du chargeur → le portable démarre"
+    recherche: [sav, remplacement-materiel]
+    plan: |
+      1. Remettre un chargeur USB-C 65 W du stock → portable alimenté
+      2. Ouvrir un dossier SAV pour le chargeur défectueux (garantie 3 ans) → numéro de dossier
+      3. Mise à jour de materiel/stock (5 chargeurs restants)
+      Impact : aucun ; retour arrière : sans objet
+    actions:
+      - "1 : chargeur remplacé → OK"
+      - "2 : dossier SAV ouvert → numéro reçu"
+    conclusion: "Chargeur défectueux ; remplacé depuis le stock, dossier SAV ouvert."
+    tags: [sav, remplacement-materiel]
+    duree: 20
+  - reference: EX-1008
+    nature: demande
+    domaines: [materiel]
+    symptome: "Commander un second écran pour le nouveau poste de l'accueil"
+    selon_cas: materiel/stock
+    questions:
+      - { question: "Le stock a-t-il un écran 24 pouces ?", reponse: "Non, quantité 0", section: materiel/stock }
+      - { question: "Qui valide l'achat ?", reponse: "Le responsable informatique" }
+    verifications:
+      - "modèle standard : écran 24 pouces ; revendeur local, délai 5 jours"
+    recherche: [commande-materiel, stock]
+    plan: |
+      1. Demander un devis au revendeur local pour un écran 24 pouces → devis reçu
+      2. Validation par le responsable informatique → accord
+      3. Commande → livraison sous 5 jours, à ranger puis installer
+      Impact : aucun ; retour arrière : annulation avant expédition
+    actions:
+      - "1 : devis demandé → reçu le jour même"
+      - "2 : accord du responsable → OK"
+    conclusion: "Écran commandé chez le revendeur local après devis et accord ; installation à la livraison."
+    tags: [commande-materiel, stock]
+    duree: 25
+  - reference: EX-1009
+    nature: incident
+    domaines: [identite]
+    premier_domaine: poste-de-travail
+    proposes: [poste-de-travail]
+    symptome: "Mme Martin se fait verrouiller son compte toutes les heures depuis son changement de mot de passe"
+    signaux:
+      - { id: suit-la-personne, preuve: "verrouillée sur son poste et sur son téléphone" }
+      - { id: correle-evenement-compte, preuve: "depuis son changement de mot de passe" }
+      - { id: un-seul-poste, preuve: "le poste de Mme Martin (au départ)" }
+    selon_cas: identite/authentification
+    questions:
+      - { question: "Le verrouillage survient-il même poste éteint ?", reponse: "Oui, ce matin poste éteint, compte verrouillé à 9h", section: identite/authentification }
+      - { question: "Son téléphone a-t-il la messagerie configurée avec l'ancien mot de passe ?", reponse: "Oui, l'application mail du téléphone n'a pas été mise à jour" }
+    verifications:
+      - "cran 1 : journal de sécurité srv-ad-01 → source des verrouillages : relais ActiveSync (téléphone)"
+    recherche: [verrouillage, m365]
+    plan: |
+      1. Sur le téléphone, mettre à jour le mot de passe du compte de messagerie → synchronisation OK
+      2. Déverrouiller le compte AD → déverrouillé
+      3. Attendre une heure, vérifier le journal → aucun nouveau verrouillage
+      Impact : aucun ; retour arrière : sans objet
+    actions:
+      - "1 : mot de passe mis à jour sur le téléphone → OK"
+      - "2 : compte déverrouillé → OK"
+      - "3 : après 1 h → aucun verrouillage"
+    conclusion: "L'application mail du téléphone rejouait l'ancien mot de passe et verrouillait le compte. Le ticket est parti en poste de travail (un seul poste) avant l'escalade vers identité : le signal « suit la personne » n'est apparu qu'au diagnostic."
+    tags: [verrouillage, m365]
+    duree: 60
+  - reference: EX-1010
+    nature: demande
+    domaines: [identite]
+    symptome: "Créer le compte de la nouvelle alternante compta, arrivée lundi"
+    selon_cas: identite/cycle-de-vie
+    questions:
+      - { question: "La demande vient-elle des RH ?", reponse: "Oui, mail des RH reçu jeudi", section: identite/cycle-de-vie }
+      - { question: "Quel profil reproduire ?", reponse: "Celui d'un comptable : g-fs-compta-m, g-app-compta-saisie, licence E3" }
+    verifications:
+      - "convention prenom.nom : identifiant libre"
+      - "licence E3 disponible : 3 restantes"
+    recherche: [creation-compte, attribution-droits]
+    plan: |
+      1. Créer le compte AD prenom.nom dans l'OU Comptabilité → compte créé
+      2. Ajouter aux groupes g-fs-compta-m et g-app-compta-saisie → OK
+      3. Attendre la synchronisation Entra Connect (30 min), attribuer la licence E3 → licence active
+      4. Remettre le mot de passe initial au responsable, enregistrement MFA à l'arrivée
+      Impact : aucun ; retour arrière : désactivation
+    actions:
+      - "1 : compte créé → OK"
+      - "2 : groupes ajoutés → OK"
+      - "3 : licence attribuée après synchronisation → OK"
+    conclusion: "Compte créé selon le processus d'arrivée, groupes du profil comptable, licence E3 ; mot de passe remis au responsable."
+    tags: [creation-compte, attribution-droits]
+    duree: 30
+  - reference: EX-1011
+    nature: incident
+    domaines: [applicatif]
+    symptome: "Dans app-compta l'export PDF plante sur l'écriture 2026-0412, les autres passent"
+    signaux:
+      - { id: acces-ok-dedans-ko, preuve: "l'application s'ouvre, c'est l'export qui plante" }
+      - { id: lie-action-ou-donnee, preuve: "sur l'écriture 2026-0412, les autres passent" }
+    selon_cas: applicatif/editeurs-support
+    questions:
+      - { question: "Le plantage est-il reproductible depuis un autre poste et un autre compte ?", reponse: "Oui, même écriture, même plantage", section: applicatif/environnements }
+      - { question: "Que dit le journal de l'application ?", reponse: "Exception sur un caractère non imprimable dans le libellé" }
+    verifications:
+      - "cran 1 : reproduit autre poste, autre compte → même plantage"
+      - "cran 3 : libellé de l'écriture contient un caractère de contrôle collé depuis un mail"
+    recherche: [editeur, parametrage, app-compta]
+    lit: EX-1001
+    plan: |
+      1. Par la comptable, corriger le libellé de l'écriture 2026-0412 (retaper, sans coller) → enregistré
+      2. Relancer l'export PDF → PDF produit
+      3. Ouvrir un ticket éditeur pour que l'export tolère les caractères de contrôle → numéro reçu
+      Impact : aucun ; retour arrière : sans objet
+    actions:
+      - "1 : libellé retapé → OK"
+      - "2 : export PDF → produit"
+      - "3 : ticket éditeur ouvert → numéro reçu"
+    conclusion: "Caractère de contrôle dans le libellé de l'écriture ; corrigé côté données, ticket éditeur ouvert. Le cas EX-1001 lu en base ne s'appliquait pas (VPN/DNS)."
+    tags: [editeur, parametrage, app-compta]
+    duree: 40
+  - reference: EX-1012
+    nature: demande
+    domaines: [applicatif]
+    symptome: "Donner à la nouvelle alternante l'accès au module Factures de app-compta"
+    selon_cas: applicatif/acces-applicatifs
+    questions:
+      - { question: "Le responsable comptabilité a-t-il donné son accord ?", reponse: "Oui, par mail ce matin", section: applicatif/acces-applicatifs }
+      - { question: "A-t-elle déjà le rôle Validation ?", reponse: "Non, seulement Saisie" }
+    verifications:
+      - "rôle Factures = groupe g-app-compta-factures, non cumulable avec Validation : OK"
+    recherche: [habilitation-applicative, app-compta]
+    plan: |
+      1. Ajouter le compte au groupe AD g-app-compta-factures → OK
+      2. Nouvelle session sur le poste, ouvrir app-compta → module Factures visible
+      Impact : aucun ; retour arrière : retrait du groupe
+    actions:
+      - "1 : groupe ajouté → OK"
+      - "2 : module Factures visible → OK"
+    conclusion: "Rôle Factures attribué par le groupe AD, sur accord du responsable comptabilité ; vérifié à l'ouverture."
+    tags: [habilitation-applicative, app-compta]
+    duree: 15
+  - reference: EX-1013
+    nature: incident
+    domaines: [systeme]
+    symptome: "Le certificat du portail RH expire dans 5 jours d'après l'alerte"
+    signaux:
+      - { id: un-service-touche, preuve: "le portail RH" }
+      - { id: symptomes-serveur, preuve: "certificat qui expire" }
+    selon_cas: systeme/certificats
+    questions:
+      - { question: "La PKI interne est-elle joignable depuis srv-app-01 ?", reponse: "Oui", section: systeme/certificats }
+    verifications:
+      - "cran 1 : certificat rh.exemple.local expire le 2026-09-23"
+    recherche: [certificat]
+    plan: |
+      1. Sur srv-app-01, demander un nouveau certificat à la PKI interne → certificat délivré
+      2. Lier le certificat au site IIS du portail RH → liaison mise à jour
+      3. Ouvrir le portail en navigation privée → cadenas valide, nouvelle échéance
+      Impact : aucun ; retour arrière : ancienne liaison conservée
+    actions:
+      - "1 : certificat délivré → OK"
+      - "2 : liaison IIS → OK"
+      - "3 : portail testé → cadenas valide"
+    conclusion: "Certificat renouvelé auprès de la PKI interne et lié au portail RH."
+    tags: [certificat]
+    duree: 20
+    publier: false   # anomalie 4 : résolu, jamais publié
+
+# Les anomalies (plan §3.1). « serveur » : produite par le jeu ci-dessus ; « édition » :
+# posée par le script après la génération, en modifiant les fichiers listés.
+anomalies:
+  - { n: 1, constat: "brouillon ancien", mode: édition, ou: "en-cours/<EX-2001>.md", quoi: "un brouillon EX-2001 (réseau, instruction) dont derniere_mise_a_jour est reculée de 45 jours" }
+  - { n: 2, constat: "brouillon zombie", mode: édition, ou: "en-cours/<id EX-1005>.md", quoi: "copie du ticket EX-1005 dans en-cours/ (même id)" }
+  - { n: 3, constat: "brouillon orphelin", mode: édition, ou: "en-cours/orphelin.md", quoi: "fichier sans en-tête id" }
+  - { n: 4, constat: "résolu jamais publié", mode: serveur, ou: "tickets/<id EX-1013>.md", quoi: "publier: false" }
+  - { n: 5, constat: "tag hors bibliothèque en base", mode: édition, ou: "kb/<id EX-1009>.md", quoi: "tag identite-manageee ajouté à l'en-tête" }
+  - { n: 6, constat: "domaine inconnu dans un ticket", mode: édition, ou: "tickets/<id EX-1008>.md", quoi: "domaines_valides: [cloud]" }
+  - { n: 7, constat: "entrée kb illisible", mode: édition, ou: "kb/casse.md", quoi: "copie de EX-1010 sans le second ---" }
+  - { n: 8, constat: "section périmée", mode: édition, ou: "contexte/reseau.md", quoi: "reseau/acces-distant datée de 120 jours en arrière (topologie n'a pas de date dans le gabarit)" }
+  - { n: 9, constat: "section vide rencontrée en ticket", mode: serveur, ou: "journal/<id EX-1007>.md", quoi: "question avec section candidate materiel/salles-techniques, section jamais remplie" }
+  - { n: 10, constat: "mise à jour proposée jamais appliquée", mode: serveur, ou: "tickets/<id EX-1004>.md", quoi: "mises_a_jour_contexte sur systeme/stockage, contexte inchangé" }
+  - { n: 11, constat: "contradiction notée", mode: serveur, ou: "tickets/<id EX-1005>.md", quoi: "contradictions sur poste-de-travail/applications-standard" }
+  - { n: 12, constat: "volumineuse", mode: serveur, ou: "contexte/general.md", quoi: "general/plateformes à plus de 2 500 caractères" }
+  - { n: 13, constat: "placeholders restants", mode: édition, ou: "contexte/systeme.md", quoi: "une cellule <à compléter> dans systeme/serveurs" }
+  - { n: 14, constat: "titre mal formé", mode: édition, ou: "contexte/general.md", quoi: "## Sites ajouté en fin de fichier" }
+  - { n: 15, constat: "sections en double", mode: édition, ou: "contexte/reseau.md", quoi: "## dns-dhcp — … dupliquée" }
+  - { n: 16, constat: "copies dans historique/", mode: serveur, ou: "contexte/historique/", quoi: "43 update_context, general/sites écrite trois fois" }
+  - { n: 17, constat: "save_progress à plusieurs actions", mode: serveur, ou: "tickets/<id EX-1006>.md", quoi: "actions_en_un_appel" }
+  - { n: 18, constat: "cas lu et suite donnée", mode: serveur, ou: "tickets/<id EX-1011>.md", quoi: "read_kb(EX-1001), conclusion différente" }
+  - { n: 19, constat: "jeu de test du triage", mode: serveur, ou: "tickets/<id EX-1003>, <id EX-1009>", quoi: "proposé ≠ validé ; escalade" }
