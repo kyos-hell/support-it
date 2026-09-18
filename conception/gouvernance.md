@@ -58,3 +58,15 @@ critique ou non d'après `general/criticite-services`), **le retour arrière**,
 et **la mise à jour de contexte** qui en découle. Pour un incident, c'est la
 même trame avec une seule opération corrective la plupart du temps. Les
 `demandes.md` le détaillent par demande ; `triage.md` étape 7 l'impose.
+
+**Forme des opérations (décision 10, 2026-09-18).** Chaque opération
+numérotée est **une commande ou une manipulation, exécutable seule**, avec
+la sortie attendue en regard. Une commande = une invocation : pas de `;`,
+`&&` ni `|` pour en enchaîner deux. Le technicien exécute l'opération N,
+colle la sortie ; l'IA la lit, puis seulement propose N+1. Un résultat
+inattendu **arrête** le plan — on ne saute pas à N+2, on ne contourne pas.
+Le protocole est celui du skill `debug-support` de l'hôte (« l'utilisateur
+tape chaque commande, une seule à la fois »). Il est tenu par le prompt
+seul (`format-skill.md` §6, `triage.md` étape 8) ; l'audit signale un
+`save_progress` qui ajoute plusieurs `actions` d'un coup — un indice, pas
+une preuve. Le test T-B8 est la vérification de référence.

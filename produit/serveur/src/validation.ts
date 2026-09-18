@@ -16,6 +16,8 @@ export interface Constat {
 const LONGUEUR_CIBLE = 100;
 const LONGUEUR_MAX = 110;
 const SECTIONS_TRANSVERSES_LIBRES = ["contacts-escalade", "referents"];
+/** Décision 10 : présentes mot pour mot dans chaque skill.md et demandes.md. */
+export const REGLES_DE_CONDUITE = ["**Une question, puis j'attends la réponse.**", "**Une commande, puis j'attends la sortie.**"];
 
 // Ce qui ressemble à une donnée d'entreprise. Volontairement simple et
 // lisible : un faux positif se corrige en reformulant, un faux négatif coûte
@@ -142,6 +144,10 @@ export function valider(r: Racines): Constat[] {
       const n = compterLignes(texte);
       if (n > LONGUEUR_MAX) err(rel(f), `${n} lignes : au-delà de ${LONGUEUR_MAX}, scinder ou couper`);
       else if (n > LONGUEUR_CIBLE) avert(rel(f), `${n} lignes : au-delà de la cible de ${LONGUEUR_CIBLE}`);
+      // Décision 10 : les deux règles de conduite, mot pour mot (format-skill §6).
+      for (const regle of REGLES_DE_CONDUITE) {
+        if (!doc.corps.includes(regle)) err(rel(f), `règle de conduite absente : « ${regle} »`);
+      }
       const tous = [...ent.requis, ...Object.values(ent.selonCas).flat()];
       for (const id of tous) {
         declarees.add(id);

@@ -9,7 +9,8 @@ enregistres, puis tu proposes — sans décider — la publication.
 ## Avant d'appeler `save_ticket`
 
 Vérifier, sans poser de liste de questions : si une information manque pour
-un champ obligatoire, **une** question, et seulement pour celui-là.
+un champ obligatoire, **une question, puis tu attends la réponse**, et
+seulement pour celui-là.
 
 - Le **symptôme initial** est recopié **tel qu'exprimé au départ**, pas
   reformulé avec ce qu'on sait maintenant. C'est ce qui nourrit le jeu de
@@ -20,7 +21,8 @@ un champ obligatoire, **une** question, et seulement pour celui-là.
   technicien, et la chaîne d'escalade s'il y en a eu.
 - Les **signaux** retenus : ceux qui ont été vérifiés, pas ceux supposés.
 - La **conclusion** : la cause retenue et comment elle a été établie.
-- Le **plan d'action** validé, tel que proposé.
+- Le **plan d'action** validé, tel que proposé (la séquence numérotée,
+  une commande par étape) — obligatoire pour un ticket résolu.
 - Chaque **question posée** au technicien, avec sa réponse, et — quand la
   réponse est une information d'entreprise (une passerelle, un serveur, un
   prestataire) — la **section de contexte** qu'elle pourrait remplir. Le

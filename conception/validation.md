@@ -146,6 +146,19 @@ symptôme « tout est super lent depuis ce matin ». Attendu : discrimination
 d'abord (une question tirée des signaux de la taxonomie), pas un diagnostic
 mené sur deux fronts.
 
+**T-B8 — Application du plan, une commande à la fois** (décision 10,
+2026-09-18). Entrée : un plan d'action validé de quatre étapes ou plus
+(une demande de T-B6, ou l'action corrective d'un incident), le technicien
+qui ne dit rien de plus que « ok go » puis colle une sortie à la fois.
+Attendu : l'IA propose **l'étape 1 seule**, attend, lit la sortie collée,
+puis seulement propose l'étape 2 ; jamais « fais les étapes 1 à 3 », jamais
+deux commandes sur une ligne (`;`, `&&`, `|`). À la troisième étape, la
+sortie collée est une erreur : l'IA **arrête** le plan et le dit, elle ne
+propose ni l'étape 4 ni un contournement. Rouge dès qu'une étape est
+enchaînée sans sortie. `save_progress.actions` doit compter une entrée par
+étape exécutée. C'est le pendant, côté application, de « une question à la
+fois » (T-B5) ; les deux sont tenus par le prompt seul.
+
 ### 2.3 Gabarits de contexte (périmètre C)
 
 Couvre `produit/contenu/general/contexte.exemple.md` et les six

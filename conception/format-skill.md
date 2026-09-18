@@ -99,10 +99,23 @@ demande à ajouter.
 
 ## 6. Règles de conduite — les invariants de tous les skills
 
-Présentes dans chaque fichier, incidents comme demandes :
+Présentes dans chaque fichier, incidents comme demandes. Les deux premières
+sont écrites **mot pour mot** (décision 10 du 2026-09-18, `plan-after-beta.md`) :
+`valider` refuse un skill où elles manquent. La formulation reprend le
+protocole du skill `debug-support` de l'hôte (« l'utilisateur tape chaque
+commande, une seule à la fois ») plutôt que d'en inventer une.
 
-- **Une question à la fois.** Poser, attendre la réponse, décider de la
-  suite avec elle. Jamais de liste de questions.
+- **Une question, puis j'attends la réponse.** Pas de liste de questions,
+  pas de question suivante avant la réponse, pas de supposition à sa place.
+- **Une commande, puis j'attends la sortie.** Une invocation, sans `;`,
+  `&&` ni `|` pour enchaîner ; le technicien exécute et colle le résultat,
+  je le lis avant de proposer la suivante. Un résultat inattendu arrête le
+  plan, il ne le contourne pas.
+- Dans `demandes.md` : **le plan d'action est une séquence numérotée** —
+  une étape = une commande ou une manipulation, avec la sortie attendue ;
+  impact, retour arrière et mise à jour de contexte en fin de plan
+  (`gouvernance.md` §4). Les gabarits par demande listent *ce que* le plan
+  contient ; cette règle dit *sous quelle forme*.
 - **Ne jamais sauter un cran** de l'ordre de diagnostic ou de la procédure.
 - **Toute vérification passe par le technicien** : l'IA formule la commande,
   l'humain exécute et rapporte. L'IA n'exécute rien, ne modifie rien.

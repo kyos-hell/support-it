@@ -98,7 +98,8 @@ il est fragile et il faut le savoir.
 | Le contexte n'est jamais écrit sans un oui explicite du technicien. | **Prompt seulement** (`remplissage.md`, `cloture.md`, description de l'outil). |
 | Trois points de validation humaine : triage ambigu, plan d'action, publication. Pas de quatrième. | Prompt (`triage.md`, `cloture.md`) + contrat (`publish_kb` distinct de `save_ticket`). |
 | L'IA n'exécute rien : le technicien exécute et rapporte. | **Prompt + mode de permission de Claude Code.** Aucun appel MCP n'exécute quoi que ce soit, mais l'outil hôte, lui, pourrait. |
-| Une question à la fois. | Prompt seulement. |
+| Une question, puis j'attends la réponse. | Prompt seulement (`format-skill.md` §6, mot pour mot dans chaque skill ; `valider` contrôle la présence, pas le respect). |
+| Une commande, puis j'attends la sortie — le plan s'applique une étape à la fois, un résultat inattendu l'arrête. | **Prompt seulement** (décision 10 du 2026-09-18). Les actions se passent hors de tout appel : aucun garde-fou serveur possible. L'audit signale un `save_progress` à plusieurs `actions` (indice). Test de référence : T-B8. |
 | Un skill fait ~100 lignes (110 max), pas de persona au-delà d'une ligne, chaque ligne passe le test de valeur. | `valider` (longueur) + relecture (T-B1). |
 | Les identifiants de sections (`domaine/section`) sont le contrat entre skills, gabarits et serveur ; renommer un `id` est interdit sans note de version. | `valider` (contrat B/C dans les deux sens). |
 | Le symptôme initial est conservé tel qu'exprimé. | Prompt + obligatoire à la création d'un brouillon et d'un ticket. |
