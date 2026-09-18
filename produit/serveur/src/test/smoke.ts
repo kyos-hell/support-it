@@ -378,7 +378,7 @@ async function main() {
   assert.match(texte(p5), /étape recherche/);
   const p6 = await clientB.callTool({ name: "save_progress", arguments: { id: pid, plan_action: "1. Libérer de l'espace → 20 % libres" } });
   assert.match(texte(p6), /étape plan/);
-  const p7 = await clientB.callTool({ name: "save_progress", arguments: { id: pid, actions: ["1 : purge des journaux → 25 % libres"] } });
+  const p7 = await clientB.callTool({ name: "save_progress", arguments: { id: pid, actions: ["1 : purge des journaux → 25 % libres", "2 : redémarrage du service → OK"] } });
   assert.match(texte(p7), /étape actions/);
   const liste = await clientB.callTool({ name: "resume_ticket", arguments: {} });
   assert.match(texte(liste), /1 ticket\(s\) en cours[\s\S]*INC-PAUSE-1[\s\S]*actions/);
@@ -584,6 +584,28 @@ async function main() {
   const finalC = fs.readFileSync(path.join(installation, "tickets", `${pid2}.md`), "utf8");
   assert.match(finalC, /^escalades:\n  - systeme$/m, "escalade dérivée à travers un redémarrage du serveur");
   assert.match(finalC, new RegExp(`^cas_lus:\n  - ${id}$`, "m"), "le cas lu est noté dans le ticket");
+  // 8b. L'audit (décision 8) : un brouillon antidaté, un titre cassé dans le contexte, puis le rapport — calculé, écrit, injecté.
+  const pAudit = await clientC.callTool({ name: "save_progress", arguments: { reference: "INC-VIEUX", symptome_initial: "Test : brouillon abandonné", nature: "incident" } });
+  const idVieux = texte(pAudit).match(/Brouillon créé : (\S+) ·/)![1];
+  const fVieux = path.join(installation, "en-cours", `${idVieux}.md`);
+  fs.writeFileSync(fVieux, fs.readFileSync(fVieux, "utf8").replace(/^derniere_mise_a_jour: .*$/m, "derniere_mise_a_jour: 2026-01-01T00:00:00.000Z"), "utf8");
+  fs.appendFileSync(path.join(installation, "contexte", "general.md"), "\n## Sites\n\nun titre sans identifiant\n", "utf8");
+  const auditSkill = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["audit"] } });
+  assert.ok(!estErreur(auditSkill), texte(auditSkill));
+  const ta = texte(auditSkill);
+  assert.match(ta, /# Audit de l'installation/);
+  assert.match(ta, /Rapport écrit dans [^\n]*audits/);
+  assert.equal(fs.readdirSync(path.join(installation, "audits")).length, 1, "un rapport écrit, daté");
+  const depuis = (titre: string) => ta.slice(ta.indexOf(titre));
+  assert.ok(/^- `\S+` \(INC-VIEUX\) : 2\d\d j/m.test(depuis("Brouillons anciens")), "brouillon de plus de 30 jours proposé à la clôture");
+  assert.ok(depuis("résolus jamais publiés").includes(`\`${pid}\` (INC-PAUSE-1)`), "ticket résolu non publié proposé à la publication");
+  assert.match(depuis("Santé des fichiers"), /contexte\/general\.md[^\n]*titre\(s\) sans identifiant[^\n]*## Sites/, "titre mal formé signalé");
+  assert.ok(depuis("plusieurs actions").includes(`\`${pid}\` : 2 action`), "save_progress à deux actions signalé (décision 10) — " + depuis("plusieurs actions").slice(0, 300));
+  assert.ok(depuis("Cas lus").includes(`\`${pid2}\` a lu \`${id}\``), "cas lu et suite donnée");
+  assert.match(depuis("Jeu de test du triage"), /un-service-touche, independant-du-chemin, population-lieu-lien \| systeme > reseau \| systeme, reseau \| systeme \| identite \| \*\*oui\*\*/, "signaux cochés → calculés → validés, écart désigné");
+  assert.match(depuis("Sections périmées"), /`reseau\/plan-adressage` : datée du 2020-01-01/, "section périmée proposée à confirmation");
+  assert.match(depuis("Mesures (T-P7)"), /INC-TEST-42[^\n]*\| incident \| reseau \| 1 \| 3 \| — \| resolu/, "T-P7 rempli");
+  fs.rmSync(fVieux);
   const remplissageC = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["remplissage"] } });
   assert.match(texte(remplissageC), /Candidats au remplissage/);
   assert.match(texte(remplissageC), /`reseau\/topologie` \| question \|[^\n]*\| TEST \|/, "question journalisée sur une section vide → candidat");
@@ -605,7 +627,7 @@ async function main() {
 
   // 9. Rien d'écrit hors de installation/.
   const ecrits = fs.readdirSync(installation);
-  assert.deepEqual(ecrits.sort(), ["contexte", "en-cours", "journal", "kb", "tags.yaml", "tickets"]);
+  assert.deepEqual(ecrits.sort(), ["audits", "contexte", "en-cours", "journal", "kb", "tags.yaml", "tickets"]);
 
   fs.rmSync(installation, { recursive: true, force: true });
   console.log("smoke : OK — neuf appels, six domaines, un domaine décrit synthétique, trois sessions ; ticket", id);

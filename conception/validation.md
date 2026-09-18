@@ -392,10 +392,13 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
   fichier** : le triage ne passe pas à vingt domaines avec le manifeste rendu
   en entier (`plan.md` §5). À faire quand un troisième domaine entre en bêta,
   pas avant.
-- **Commande `mesures`** du CLI, dès la porte 2 : questions par ticket,
-  `save_progress` oubliés (T-P9), appels par ticket, sections `vide` les plus
-  rencontrées, documents les plus cités — tout dérivé des fichiers
-  d'`installation/`. Sans elle, à dix techniciens personne ne voit l'usage.
+- **Commande `mesures`** du CLI — **absorbée par l'audit le 2026-09-18**
+  (décision 8, `outillage.md`) : le tableau T-P7 (nature, domaines,
+  questions, durée, résolu par), le jeu de test du triage, les cas lus, les
+  points d'étape à plusieurs actions sortent dans `node dist/cli.js audit`
+  et `/support audit`, rapport daté conservé dans `installation/audits/`.
+  Restent hors audit : les `save_progress` oubliés (T-P9, invisibles dans
+  les fichiers) et les documents cités (périmètre I, non implémenté).
 - **Règle de compatibilité produit / installation** : quelle version de
   `produit/` accepte quelle version d'`installation/`, vérifiée par `install.*`
   et `etat`. À écrire avant la première installation chez un tiers

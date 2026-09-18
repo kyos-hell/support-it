@@ -2,7 +2,7 @@
 // résolues, et sa table selon-cas. Valeurs réservées : triage, cloture, remplissage.
 import fs from "node:fs";
 import path from "node:path";
-import { candidats, rendreCandidats } from "./audit.js";
+import { calculerAudit, candidats, ecrireAudit, rendreAudit, rendreCandidats } from "./audit.js";
 import { chemins, type Racines } from "./config.js";
 import { etatRemplissage, obtenirSections, rendreEtat, rendreSections } from "./contexte.js";
 import { BROUILLONS_LISTES_MAX, listerBrouillons, rendreListe } from "./encours.js";
@@ -46,8 +46,8 @@ function listeDomaines(m: Manifeste): string {
     .join(", ");
 }
 
-export type Reserve = "triage" | "cloture" | "remplissage";
-const RESERVES: Reserve[] = ["triage", "cloture", "remplissage"];
+export type Reserve = "triage" | "cloture" | "remplissage" | "audit";
+const RESERVES: Reserve[] = ["triage", "cloture", "remplissage", "audit"];
 
 export interface OptionsChargement {
   biblio?: Bibliotheque;
@@ -70,7 +70,7 @@ function rendreTagsCandidats(o: OptionsChargement): string {
 
 function chargerReserve(r: Racines, nom: Reserve, m: Manifeste, o: OptionsChargement = {}): string {
   const c = chemins(r);
-  const fichier = nom === "triage" ? c.triage : nom === "cloture" ? c.cloture : c.remplissage;
+  const fichier = nom === "triage" ? c.triage : nom === "cloture" ? c.cloture : nom === "audit" ? c.audit : c.remplissage;
   if (!fs.existsSync(fichier)) throw new ErreurSkill(`fichier produit manquant : ${path.basename(fichier)}`);
   const corps = sansCommentaires(lireDocument(fs.readFileSync(fichier, "utf8")).corps).trim();
   if (nom === "triage") {
@@ -86,6 +86,18 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste, o: OptionsCharge
     );
   }
   if (nom === "cloture") return corps + rendreTagsCandidats(o);
+  if (nom === "audit") {
+    // Décision 8 : le serveur calcule et écrit le rapport (daté, conservé), le skill dit comment le présenter.
+    const a = calculerAudit(r);
+    const fichierRapport = ecrireAudit(r, a);
+    return `${corps}
+
+---
+
+_Rapport écrit dans ${fichierRapport}._
+
+${rendreAudit(a)}`;
+  }
   return corps;
 }
 
@@ -146,7 +158,7 @@ export function chargerSkills(r: Racines, domaines: string[], nature?: Nature, o
   if (domaines.length === 0) throw new ErreurSkill("aucun domaine demandé");
   const reserves = domaines.filter((d): d is Reserve => (RESERVES as string[]).includes(d));
   if (reserves.length > 0) {
-    if (domaines.length !== 1) throw new ErreurSkill("`triage`, `cloture` et `remplissage` se chargent seuls, sans autre domaine");
+    if (domaines.length !== 1) throw new ErreurSkill("`triage`, `cloture`, `remplissage` et `audit` se chargent seuls, sans autre domaine");
     return { texte: chargerReserve(r, reserves[0], m, o), domaines: [reserves[0]], sectionsServies: [] };
   }
   if (!nature) throw new ErreurSkill("`nature` est obligatoire pour charger un domaine : incident ou demande");

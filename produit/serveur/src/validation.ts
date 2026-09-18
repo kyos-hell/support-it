@@ -57,7 +57,7 @@ export function valider(r: Racines): Constat[] {
 
   // 1. Fichiers produit indispensables.
   if (!fs.existsSync(c.contenu)) err("contenu/", "dossier du contenu livré manquant");
-  for (const f of [c.manifeste, c.version, c.triage, c.cloture, c.remplissage, c.gabaritGeneral]) {
+  for (const f of [c.manifeste, c.version, c.triage, c.cloture, c.remplissage, c.audit, c.gabaritGeneral]) {
     if (!fs.existsSync(f)) err(rel(f), "fichier livré manquant");
   }
   const entree = path.join(r.produit, "entrees", "claude-code", "support", "SKILL.md");
@@ -67,7 +67,7 @@ export function valider(r: Racines): Constat[] {
     if (!doc.entete.name || !doc.entete.description) err(rel(entree), "en-tête SKILL.md : name et description obligatoires");
     if (compterLignes(doc.corps) > 15) avert(rel(entree), "le point d'entrée dépasse quinze lignes : l'intelligence doit rester derrière le serveur");
   }
-  for (const f of [c.triage, c.cloture]) {
+  for (const f of [c.triage, c.cloture, c.remplissage, c.audit]) {
     if (fs.existsSync(f) && compterLignes(lire(f)) > LONGUEUR_MAX + 20) {
       avert(rel(f), `dépasse ${LONGUEUR_MAX + 20} lignes`);
     }

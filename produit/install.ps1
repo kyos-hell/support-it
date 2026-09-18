@@ -105,8 +105,10 @@ if ($SansClaude) {
   if ($LASTEXITCODE -ne 0) { Echec "dépôt des permissions Claude Code (.claude/settings.json) en échec" }
 }
 
-Etape 6 "État de remplissage du contexte"
+Etape 6 "État de remplissage du contexte et audit"
 & node $Cli etat
+& node $Cli audit
+if ($LASTEXITCODE -ne 0) { Write-Host "  audit : des constats de santé des fichiers sont à corriger à la main (voir installationaudits)" -ForegroundColor Yellow }
 
 Write-Host ""
 Write-Host "Installation terminée ($Version)." -ForegroundColor Green

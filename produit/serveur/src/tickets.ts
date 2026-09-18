@@ -29,6 +29,8 @@ export interface EntreeTicket {
   /** Jamais fournis par le modèle : dérivés des skills chargés et des cas lus (brouillon ∪ session). */
   escalades?: string[];
   cas_lus?: string[];
+  /** Décision 10 : recopié du brouillon — actions ajoutées par appel. */
+  actions_par_appel?: number[];
   /** Cochés : { id, preuve }. Le serveur écrit la section « Signaux retenus » par libellé. */
   signaux?: SignalCoche[];
   conclusion: string;
@@ -92,6 +94,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
     escalades: e.escalades ?? [],
     cas_lus: e.cas_lus ?? [],
     contradictions: e.contradictions ?? [],
+    actions_par_appel: e.actions_par_appel ?? [],
     signaux: e.signaux ?? [],
     tags: tagsAutomatiques(e),
     questions: (e.questions ?? []).length,
@@ -217,6 +220,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       // Décision 9 : les contradictions notées en cours de ticket sont reprises, et deviennent
       // des mises à jour de contexte proposées — sans compter sur la mémoire du modèle.
       contradictions: brouillon.contradictions,
+      actions_par_appel: brouillon.actions_par_appel,
       mises_a_jour_contexte: [
         ...(e.mises_a_jour_contexte ?? []),
         ...brouillon.contradictions

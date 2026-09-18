@@ -95,6 +95,8 @@ export interface Brouillon {
   sections_servies: string[];
   cas_lus: string[];
   recherche_faite: boolean;
+  /** Décision 10 : nombre d'actions ajoutées par chaque save_progress qui en a ajouté — écrit par le serveur. Plus d'une = un indice. */
+  actions_par_appel: number[];
   passations: Passation[];
   symptome_initial: string;
   prochaine_etape: string;
@@ -211,6 +213,7 @@ function lireFichier(fichier: string): Brouillon | null {
     sections_servies: e.sections_servies ?? [],
     cas_lus: e.cas_lus ?? [],
     recherche_faite: Boolean(e.recherche_faite),
+    actions_par_appel: Array.isArray(e.actions_par_appel) ? (e.actions_par_appel as number[]).map(Number) : [],
     passations: e.passations ?? [],
     symptome_initial: String(e.symptome_initial ?? ""),
     prochaine_etape: String(e.prochaine_etape ?? ""),
@@ -464,6 +467,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
       sections_servies: [],
       cas_lus: [],
       recherche_faite: false,
+      actions_par_appel: [],
       passations: [],
       symptome_initial: "",
       prochaine_etape: "",
@@ -498,7 +502,9 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   if (texte(e.plan_action ?? "")) b.plan_action = texte(e.plan_action!);
   b.signaux = ajouter(b.signaux, e.signaux, (x) => x.id || x.preuve);
   b.verifications = ajouter(b.verifications, e.verifications, (x) => x.trim());
+  const avantActions = b.actions.length;
   b.actions = ajouter(b.actions, e.actions, (x) => x.trim());
+  if (b.actions.length > avantActions) b.actions_par_appel = [...b.actions_par_appel, b.actions.length - avantActions];
   b.notes = ajouter(b.notes, e.notes, (x) => x.trim());
   b.questions = ajouter(b.questions, e.questions, (q) => q.question.trim());
   b.contradictions = ajouter(b.contradictions, e.contradictions, (x) => `${x.section} ${x.constat}`);

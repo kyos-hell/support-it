@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { calculerAudit, constatsSante, ecrireAudit, nombreConstats, rendreAudit } from "./audit.js";
 import { assurerInstallation, chemins, lireVersion, racines } from "./config.js";
 import { etatRemplissage, gabaritsLivres } from "./contexte.js";
 import { ageJours, JOURS_BROUILLON_ANCIEN, lireEnCours } from "./encours.js";
@@ -26,6 +27,8 @@ Usage : node dist/cli.js <commande>
   init         Initialise installation/ : dossiers et gabarits copiés — n'écrase jamais un fichier existant ;
                note la version du produit dans installation/VERSION et annonce une mise à jour.
   etat         État de remplissage du contexte, par fichier et par section.
+  audit        Le rapport d'audit (tickets, base, brouillons, contexte) : affiché et écrit dans installation/audits/ ;
+               code 1 si un constat de santé des fichiers (C3) est trouvé. Le même rapport que /support audit.
   enregistrer  Enregistre le serveur MCP dans ~/.claude.json (portée utilisateur), avec sauvegarde.
   entree       Installe le point d'entrée /support dans ~/.claude/skills/support/.
   hote         Dépose .claude/settings.json dans le dossier de lancement (permissions refusées au modèle), en fusionnant.
@@ -87,7 +90,7 @@ function init(): void {
   for (const f of gardes) console.log(`  gardé   ${f} (existant, non touché)`);
   if (!copies.length) console.log("  aucun nouveau gabarit à copier");
   console.log(`  ${tagsCrees ? "créé    " : "gardé   "}${c.tagsClient}${tagsCrees ? " (étage client des tags, vide)" : " (existant, non touché)"}`);
-  console.log(`  dossiers : contexte/, en-cours/, tickets/, kb/, journal/`);
+  console.log(`  dossiers : contexte/, en-cours/, tickets/, kb/, journal/, audits/`);
 }
 
 /** Lance le test de fumée du serveur construit : n'écrit que dans un dossier temporaire. */
@@ -136,6 +139,17 @@ function etat(): number {
       : `${vides} section(s) vide(s) : l'outil fonctionne, il posera la question au technicien au moment utile. Remplir avant le premier ticket est recommandé, pas obligatoire.`,
   );
   return 0;
+}
+
+/** Décision 8 : le même rapport que load_skill(["audit"]), lisible sans modèle. */
+function audit(): number {
+  const a = calculerAudit(r);
+  const fichier = ecrireAudit(r, a);
+  console.log(rendreAudit(a));
+  console.log(`Rapport écrit : ${fichier}`);
+  const sante = constatsSante(a);
+  console.log(`${nombreConstats(a)} constat(s), dont ${sante} de santé des fichiers (C3).`);
+  return sante > 0 ? 1 : 0;
 }
 
 function enregistrer(): number {
@@ -252,6 +266,9 @@ switch (commande) {
     break;
   case "etat":
     code = etat();
+    break;
+  case "audit":
+    code = audit();
     break;
   case "enregistrer":
     code = enregistrer();

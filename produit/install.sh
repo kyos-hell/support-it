@@ -89,8 +89,9 @@ else
   node "$CLI" hote || echec "dépôt des permissions Claude Code (.claude/settings.json) en échec"
 fi
 
-etape 6 "État de remplissage du contexte"
+etape 6 "État de remplissage du contexte et audit"
 node "$CLI" etat
+node "$CLI" audit || echo "  audit : des constats de santé des fichiers sont à corriger à la main (voir installation/audits/)"
 
 echo
 echo "Installation terminée ($VERSION)."

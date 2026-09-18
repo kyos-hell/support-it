@@ -59,10 +59,10 @@ server.registerTool(
     title: "Charger un périmètre de travail",
     description:
       "Renvoie le skill d'un ou deux domaines (au plus deux), avec les sections de contexte requises déjà résolues et la table des sections selon le cas. " +
-      "Valeurs réservées : domaines=[\"triage\"] au début de tout ticket (règles de triage + manifeste des domaines) ; domaines=[\"cloture\"] avant save_ticket ; domaines=[\"remplissage\"] pour remplir le contexte hors ticket. " +
+      "Valeurs réservées : domaines=[\"triage\"] au début de tout ticket (règles de triage + manifeste des domaines) ; domaines=[\"cloture\"] avant save_ticket (avec les tags cochables) ; domaines=[\"remplissage\"] pour remplir le contexte hors ticket (avec la file des candidats) ; domaines=[\"audit\"] hors ticket, sur « /support audit » (le rapport est calculé et écrit par le serveur). " +
       "`nature` (incident ou demande) est obligatoire pour un domaine : elle choisit skill.md ou demandes.md.",
     inputSchema: {
-      domaines: z.array(z.string().min(1)).min(1).describe("Identifiants de domaine du manifeste, ou triage, cloture, remplissage"),
+      domaines: z.array(z.string().min(1)).min(1).describe("Identifiants de domaine du manifeste, ou triage, cloture, remplissage, audit"),
       nature: z.enum(["incident", "demande"]).optional().describe("Nature du ticket, décidée par le triage"),
     },
   },

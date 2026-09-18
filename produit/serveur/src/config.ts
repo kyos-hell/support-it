@@ -49,6 +49,9 @@ export function chemins(r: Racines) {
     journal: path.join(r.installation, "journal"),
     /** L'étage client de la bibliothèque de tags (décision 1) : créé vide par init, édité par le référent. */
     tagsClient: path.join(r.installation, "tags.yaml"),
+    /** Les rapports d'audit, datés, écrits une fois (décision 8). */
+    audits: path.join(r.installation, "audits"),
+    audit: path.join(contenu, "general", "audit.md"),
   };
 }
 
@@ -70,7 +73,7 @@ export function lireVersion(r: Racines): string {
 /** Crée les dossiers de l'installation s'ils manquent. Seule écriture hors ticket. */
 export function assurerInstallation(r: Racines): void {
   const c = chemins(r);
-  for (const d of [c.contexte, c.tickets, c.kb, c.journal, c.enCours]) {
+  for (const d of [c.contexte, c.tickets, c.kb, c.journal, c.enCours, c.audits]) {
     fs.mkdirSync(d, { recursive: true });
   }
 }
