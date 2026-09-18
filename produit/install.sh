@@ -11,7 +11,10 @@
 # Mise à jour : remplacer produit/ (ou git pull), relancer ce script — les nouveaux
 # gabarits sont copiés, les fichiers remplis ne sont pas touchés.
 #
-# Usage : ./install.sh [--installation <chemin>] [--sans-claude] [--sans-build] [--sans-test]
+# Usage : ./install.sh [--installation <chemin>] [--sans-claude] [--sans-build] [--sans-test] [--jeu-de-test]
+#   --jeu-de-test : phase de test seulement (plan-after-beta.md §3) — après l'étape 4, VIDE
+#   l'installation et la remplace par le jeu fictif « Exemple SAS » (outils/jeu-de-test.mjs,
+#   dépôt de développement uniquement). Jamais sur une installation réelle.
 set -euo pipefail
 
 PRODUIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,6 +23,7 @@ INSTALLATION=""
 SANS_CLAUDE=0
 SANS_BUILD=0
 SANS_TEST=0
+JEU_DE_TEST=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --sans-claude) SANS_CLAUDE=1; shift ;;
     --sans-build) SANS_BUILD=1; shift ;;
     --sans-test) SANS_TEST=1; shift ;;
+    --jeu-de-test) JEU_DE_TEST=1; shift ;;
     -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "option inconnue : $1" >&2; exit 2 ;;
   esac
@@ -79,6 +84,12 @@ fi
 
 etape 4 "Arborescence client"
 node "$CLI" init || echec "initialisation de installation/ en échec"
+if [[ "$JEU_DE_TEST" -eq 1 ]]; then
+  JEU="$(dirname "$PRODUIT")/outils/jeu-de-test.mjs"
+  [[ -f "$JEU" ]] || echec "jeu de test introuvable : $JEU (option réservée au dépôt de développement, outils/ n'est pas livré)"
+  echo "  JEU DE TEST : l'installation est VIDÉE puis remplacée par le jeu fictif « Exemple SAS »"
+  node "$JEU" --reinitialiser || echec "génération du jeu de test en échec"
+fi
 
 etape 5 "Claude Code : serveur MCP et point d'entrée /support"
 if [[ "$SANS_CLAUDE" -eq 1 ]]; then

@@ -23,12 +23,17 @@
   Ne relance ni npm install ni la compilation (déjà faits).
 .PARAMETER SansTest
   Ne lance pas le test de fumée à l'étape 3 (poste très lent, ou test déjà joué).
+.PARAMETER JeuDeTest
+  Phase de test seulement (plan-after-beta.md §3) : après l'étape 4, VIDE l'installation et la
+  remplace par le jeu de données fictif « Exemple SAS » (outils/jeu-de-test.mjs, dépôt de
+  développement uniquement — outils/ n'est pas livré). Jamais sur une installation réelle.
 #>
 param(
   [string]$Installation = "",
   [switch]$SansClaude,
   [switch]$SansBuild,
-  [switch]$SansTest
+  [switch]$SansTest,
+  [switch]$JeuDeTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,6 +97,13 @@ if ($SansTest) {
 Etape 4 "Arborescence client"
 & node $Cli init
 if ($LASTEXITCODE -ne 0) { Echec "initialisation de installation/ en échec" }
+if ($JeuDeTest) {
+  $Jeu = Join-Path (Split-Path $Produit -Parent) "outils\jeu-de-test.mjs"
+  if (-not (Test-Path $Jeu)) { Echec "jeu de test introuvable : $Jeu (option réservée au dépôt de développement, outils/ n'est pas livré)" }
+  Write-Host "  JEU DE TEST : l'installation est VIDÉE puis remplacée par le jeu fictif « Exemple SAS »" -ForegroundColor Yellow
+  & node $Jeu --reinitialiser
+  if ($LASTEXITCODE -ne 0) { Echec "génération du jeu de test en échec" }
+}
 
 Etape 5 "Claude Code : serveur MCP et point d'entrée /support"
 if ($SansClaude) {

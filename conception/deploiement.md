@@ -32,11 +32,18 @@ toujours en `contenu/<X>/contexte.exemple.md` (`general` ou `domaines/<id>`).
 Une commande, à la racine de `produit/` :
 
 ```powershell
-.\install.ps1 [-Installation <chemin>] [-SansClaude] [-SansBuild] [-SansTest]
+.\install.ps1 [-Installation <chemin>] [-SansClaude] [-SansBuild] [-SansTest] [-JeuDeTest]
 ```
 ```bash
-./install.sh [--installation <chemin>] [--sans-claude] [--sans-build] [--sans-test]
+./install.sh [--installation <chemin>] [--sans-claude] [--sans-build] [--sans-test] [--jeu-de-test]
 ```
+
+`-JeuDeTest` / `--jeu-de-test` (2026-09-18, phase de test du plan
+`plan-after-beta.md` §3) : après l'étape 4, **vide** l'installation et la
+remplace par le jeu fictif « Exemple SAS » (`outils/jeu-de-test.mjs`).
+Réservé au dépôt de développement : `outils/` n'est pas livré, le script
+refuse si le fichier manque. Jamais sur une installation réelle — l'option
+le dit en jaune.
 
 Six étapes identiques dans les deux scripts, tout le travail délégué à
 `node dist/cli.js` (une implémentation, `outillage.md`) : prérequis, build,

@@ -1,5 +1,6 @@
 # Appartient au client, jamais livré ni versionné (décision H)
 installation/
+installation_old/
 
 # Serveur MCP : dépendances et build
 produit/serveur/node_modules/

@@ -1075,12 +1075,12 @@ pas ça, on s'arrête là et c'est une ligne dans `retours-beta.md`.
 | # | Commande (Git Bash, racine du dépôt) | Attendu |
 | --- | --- | --- |
 | 1 | `git switch v0.3.0-beta && git log --oneline -1` | Le dernier commit de 2.10 (j7, version) |
-| 2 | `rm -rf installation && mkdir installation` | Dossier vide (`installation/` est ignoré par git) |
-| 3 | `powershell -ExecutionPolicy Bypass -File produit/install.ps1` | Six étapes ; étape 3 : `valider` zéro erreur, `tester` vert ; étape 5 : `hote` annonce le `settings.json` et les cinq interdits ; message final « neuf outils » |
+| 2 | (rien : l'étape 3 vide l'installation) | Si les tickets réels de la bêta doivent être gardés, copier `installation/` ailleurs d'abord |
+| 3 | `powershell -ExecutionPolicy Bypass -File produit/install.ps1 -JeuDeTest` | Six étapes ; étape 3 : `valider` zéro erreur, `tester` vert ; étape 4 : « JEU DE TEST : l'installation est VIDÉE » puis le journal du générateur (44 sections, 13 tickets, 12 publiés, les anomalies) ; étape 5 : `hote` annonce le `settings.json` et les cinq interdits ; étape 6 : `etat` puis `audit` ; message final « neuf outils » |
 | 4 | `cat .claude/settings.json` | Le `deny` de la décision 5 |
-| 5 | `node produit/serveur/dist/cli.js etat` | Sept fichiers, 45 sections vides, `tags.yaml` « vide (0 tag client) », 0 ticket en cours |
-| 6 | `ls installation` | `VERSION`, `tags.yaml`, `contexte/`, `en-cours/`, `tickets/`, `kb/`, `journal/`, `audits/` |
-| 7 | `node outils/jeu-de-test.mjs --reinitialiser` (l'installation créée à l'étape 3 n'est pas vide : le script la vide et la recrée) | Journal du script : 44 sections écrites, 13 tickets clôturés, 12 publiés, 1 brouillon, les anomalies posées ; `installation/jeu-de-test.log` |
+| 5 | `ls installation` | `VERSION`, `tags.yaml`, `jeu-de-test.log`, `contexte/`, `en-cours/`, `tickets/`, `kb/`, `journal/`, `audits/` |
+| 6 | `cat installation/jeu-de-test.log` | Les identifiants attribués à EX-1001…EX-1013 et EX-2001 (utiles pour B3 et B10) |
+| 7 | (régénérer à tout moment : `node outils/jeu-de-test.mjs --reinitialiser`) | Même résultat, nouveaux identifiants |
 | 8 | `node produit/serveur/dist/cli.js etat` | 44 remplies, 1 vide (`materiel/salles-techniques`), 1 volumineuse ; 1 brouillon actif (ancien), 1 zombie et 1 orphelin signalés |
 | 9 | `node produit/serveur/dist/cli.js audit` | **Les 19 anomalies, chacune dans sa rubrique** (le compteur en tête du rapport compte par élément — une copie d'`historique/` par fichier, un candidat par ligne — et affiche donc plus que 19), T-P7 à 13 lignes, fichier `audits/<date>.md` écrit, code retour 1 (constats C3 présents). Une anomalie absente de sa rubrique, ou un constat imprévu = rouge |
 | 10 | `node produit/serveur/dist/cli.js valider` | Zéro erreur (le jeu ne touche pas `produit/`) |
