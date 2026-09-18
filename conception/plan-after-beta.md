@@ -19,10 +19,11 @@ Ordre de discussion. Une décision n'est écrite ici qu'une fois prise.
 | 3 | Le serveur sait à quel ticket un appel appartient | prise |
 | 4 | Lire un cas de la base : neuvième appel `read_kb` | prise |
 | 5 | L'hôte : `settings.json` livré par `install`, `Bash` interdit, pas de hooks | prise |
-| 6 | L'ordre des chantiers : corrections sans contrat, puis domaines joués + décisions 3-4-5, puis signaux et tags | prise |
-| 7 | Ce qu'on ne fait pas dans ce cycle | à discuter |
-| 8 | **Ajout** — skill `audit` des tickets : jeu de test du triage, brouillons anciens, tickets résolus non publiés, mesures T-P7 | à discuter |
-| 9 | **Ajout** — validité du contexte : péremption, file des candidats, contradictions en ticket (boucle de fraîcheur, `validation.md` §6) | à discuter |
+| 6 | L'ordre des chantiers : corrections sans contrat, puis domaines joués + décisions 3-4-5, puis signaux et tags | prise, amendée le 2026-09-18 (section 2.0 : tout en une passe, puis dix tickets) |
+| 7 | Ce qu'on ne fait pas dans ce cycle | prise |
+| 8 | **Ajout** — skill `audit` des tickets : jeu de test du triage, brouillons anciens, tickets résolus non publiés, mesures T-P7 | prise |
+| 9 | **Ajout** — validité du contexte : péremption, file des candidats, contradictions en ticket (boucle de fraîcheur, `validation.md` §6) | prise |
+| 10 | **Ajout** — durcir les skills : une question à la fois, une commande à la fois, attendre le retour | prise |
 
 ### Décision 1 — Les tags (2026-09-14)
 
@@ -475,8 +476,458 @@ avant de corriger produit des tickets corrompus en silence.
 manifeste se fait sans nouveaux tickets. c → a : chaque ticket produit un
 symptôme paraphrasé et un `resolu_par: outil` que personne n'a dit.
 
+### Décision 7 — Ce qu'on ne fait pas dans ce cycle (2026-09-18)
+
+Nommé pour que ça ne revienne pas par la fenêtre pendant l'implémentation.
+
+| Sujet | Pourquoi ça attend | Quand |
+| --- | --- | --- |
+| **Empreinte optimiste** sur contexte et brouillons (deux serveurs, dernier-écrit-gagne) | Porte 2 par définition : collègues, partage réseau. A4 et A5 sont les garde-fous mono-poste | Porte 2 |
+| **Périmètre I — documentation d'entreprise** (documents existants dans le flux) | Contrat neutre déjà écrit ; rien à coder avant que le contexte lui-même soit tenu à jour (décision 9) | Après la porte 1 |
+| **Paliers de montée en charge** (vingt domaines, manifeste à deux niveaux) | Six domaines dont quatre pas joués. La règle « ne rien construire qui empêche le palier suivant » suffit | Quand un septième domaine arrive |
+| **Une installation par poste** (`~/.claude.json` en dur) | Palier 4 ; un technicien qui sert deux entités n'existe pas en bêta | Porte 2 ou 3 |
+| **Rétention d'`historique/`** | Des fichiers de quelques Ko ; pas de dommage avant des mois | L'audit (décision 9) le signale ; rien d'automatique |
+| **Hooks Claude Code** | Écarté en décision 5 | Porte 2 si les oublis persistent |
+| **`creation-vm`** et **« une demande par fichier »** | `creation-vm` n'est pas une demande à part entière : une création de VM se traite avec les règles générales de système et `general/plateformes` en contexte, comme les deux builds réels l'ont montré. Le point « reste à faire » de la ligne cloud du 2026-09-09 est fermé sans écriture. « Une demande par fichier » n'a donc plus de déclencheur | Quand un domaine dépasse trois demandes |
+| **Nuance dans `ouverture-flux`** (« la destination existe » vs créée par le même plan) | Même ligne cloud ; pas de ticket réel qui l'ait demandée depuis | Si un ticket la réclame |
+| **Migration des tickets existants** (tags libres, signaux libres) | Décision 6, point 4 | Jamais : on lit à la main |
+| **Commande `mesures`** du CLI (`validation.md` §6) | Absorbée par l'audit (décision 8) | Avec la décision 8 |
+| **Règle de compatibilité produit / installation** | Avant la première installation chez un tiers | Porte 2 |
+
+**Ce qui n'est pas dans cette liste, exprès.** C3 (commande `verifier`) et
+la purge des brouillons anciens : ils deviennent la moitié déterministe de
+l'audit (décision 8) et se font avec lui.
+
+### Décision 8 — Le skill `audit`, volet tickets (2026-09-18)
+
+**Problème.** Tickets, journaux, brouillons et entrées de base
+s'accumulent dans `installation/` et rien ne les relit. Le jeu de test du
+triage promis par `plan.md` n'est construit par rien ; le tableau T-P7 de
+`retours-beta.md` est vide depuis le premier jour ; un brouillon ancien ne
+produit qu'un avertissement ; un ticket résolu ne monte en base que si le
+modèle y pense à la clôture ; rien ne valide les fichiers d'`installation/`
+(C3). Le projet produit des données mais n'a pas d'outil pour se regarder.
+
+**Ce qui est décidé.**
+
+1. **Un skill réservé `audit`**, `load_skill(["audit"])`, hors ticket, au
+   même titre que `triage`, `cloture`, `remplissage`. Sur le modèle de
+   `triage` qui arrive avec le manifeste et la liste des brouillons : le
+   **serveur calcule un rapport**, le skill dit au modèle comment le
+   présenter et quoi proposer. Le modèle ne compte rien.
+
+2. **Tout le monde peut lancer un audit** — technicien ou référent. Les
+   écritures que l'audit propose restent soumises au oui, comme partout ;
+   ce n'est pas le lanceur qui change l'invariant.
+
+3. **Chaque rapport est daté et conservé** : `installation/audits/<date>.md`,
+   écrit par le serveur. On trace tout. C'est la seule preuve que la bêta a
+   été regardée, et c'est la matière de T-P7 et de la porte 1.
+
+4. **Ce que le serveur calcule, volet tickets :**
+
+   | Constat | Source | Ce que le skill propose |
+   | --- | --- | --- |
+   | Tickets où `domaines_proposes ≠ domaines_valides`, escalades | `tickets/` | Le **jeu de test du triage** : « signaux cochés → domaine calculé → domaine validé » ; un écart désigne un signal du manifeste à revoir. Calculable avec la décision 2 ; lu à la main avant |
+   | Brouillons de plus de `JOURS_BROUILLON_ANCIEN` | `en-cours/` | Clôture en `non-resolu`, un par un, sur oui → `save_ticket`. Ferme le point « purge » sans automatisme |
+   | Brouillons orphelins (illisibles) ou zombies (ticket déjà clôturé) | `en-cours/` + `tickets/` | Signaler ; A8 retire le zombie |
+   | Tickets `resolu` jamais publiés | `tickets/` − `kb/` | Candidats à `publish_kb`, un par un, sur oui |
+   | Tags hors vocabulaire dans la base (D1) | `kb/` + manifeste + `tags.yaml` | Signaler ; correction manuelle (décision 6, point 4) |
+   | Cas lus par `read_kb` (décision 4) et suite donnée | brouillons, tickets | Une base qui sert, ou pas |
+   | Santé des fichiers (C3) : titres sans `id —`, sections en double, YAML cassé, domaines inconnus dans un ticket | tout `installation/` | Signaler ; correction manuelle |
+   | Mesures T-P7 : nature, domaines, questions posées, durée, résolu par | `tickets/` | Le tableau, rempli, dans le rapport |
+
+5. **L'audit n'écrit jamais de lui-même.** Ses seules sorties sont les
+   appels existants sur un oui : `save_ticket` (clôturer un vieux
+   brouillon), `publish_kb`. Il ne modifie jamais un ticket clôturé, un
+   journal ou une entrée de base — ce sont des archives.
+
+6. **Le même rapport est une commande CLI** `audit` : lisible sans modèle,
+   comme `etat` et `valider`. Une seule fonction, deux rendus.
+
+**Conséquences à reporter dans le plan.**
+
+- `audit.ts` (nouveau) : les calculs ; `cli.ts` : la commande ;
+  `skills.ts` : `audit` comme skill réservé, rapport injecté ;
+  `produit/contenu/general/audit.md` : le skill.
+- `installation/audits/` créé par `init` ; `config.ts` le connaît.
+- Le point d'entrée : « `/support audit` » ; `gouvernance.md` : qui lance,
+  qui valide.
+- Le volet contexte du rapport est la décision 9.
+- La commande `mesures` de `validation.md` §6 est absorbée.
+
+**Ce qui est écarté.** Réserver l'audit au référent : les écritures sont
+déjà protégées par le oui, restreindre le lanceur n'ajoute rien. Un
+rapport à la volée jamais écrit : on ne verrait pas l'évolution, et T-P7
+resterait vide. Une purge automatique des brouillons : un humain dit oui.
+
+### Décision 9 — Le skill `audit`, volet contexte : la validité (2026-09-18)
+
+**Problème.** Le contexte se remplit par l'usage mais rien ne l'entretient
+(`retours-beta.md`, 2026-09-11). Les questions journalisées avec
+`section_candidate` et les `mises_a_jour_contexte` refusées à la clôture ne
+sont jamais relues ; l'âge d'une section (`Dernière mise à jour`) est lu
+mais jamais signalé ; une vérification qui contredit le contexte en cours
+de ticket n'est tenue que par le prompt de clôture. La boucle de fraîcheur
+en trois temps de `validation.md` §6 était différée après la porte 1 ; elle
+entre ici comme second volet du rapport d'audit.
+
+**Ce qui est décidé.**
+
+1. **Seuil de péremption : 90 jours, global.** Une section datée de plus
+   de 90 jours est périmée. Pas de seuil par section dans ce cycle : un
+   seul chiffre, connu de tous, dans `config.ts`.
+
+2. **La confirmation « toujours vrai » passe par `update_context` à contenu
+   identique.** Le serveur compare au contenu en place : identique → il
+   repose la date seulement, sans copie dans `historique/` ; différent →
+   écriture normale. Pas d'appel `confirm_context`. Le oui du technicien
+   reste requis, comme pour toute écriture.
+
+3. **Un champ `contradictions` dans `save_progress`** :
+   `[{ section, constat }]`, `section` en enum des identifiants de sections
+   des gabarits (construit au démarrage, même mécanisme que les signaux),
+   `constat` ≤ 240 caractères. Le modèle le renseigne quand une
+   vérification contredit une valeur chargée du contexte ; le serveur
+   l'accumule dans le brouillon, la clôture le reprend dans
+   `mises_a_jour_contexte` sans compter sur la mémoire du modèle. Le champ
+   est du diagnostic (le modèle a *constaté*) ; la section est de la
+   mécanique (vérifiée).
+
+4. **Ce que le serveur calcule, volet contexte :**
+
+   | Constat | Source | Ce que le skill propose |
+   | --- | --- | --- |
+   | Section périmée (> 90 jours) | `Dernière mise à jour` | « Toujours vrai ? » — oui → `update_context` identique (re-date) ; non → `update_context` avec le nouveau contenu |
+   | Section vide rencontrée en ticket | `journal/` (`section_candidate` dont la section est encore vide) | Le contenu candidat de la réponse du technicien, sur oui |
+   | Mise à jour proposée à la clôture, jamais appliquée | `mises_a_jour_contexte` des tickets, comparé au contexte | Idem ; en tête si plusieurs tickets proposent la même section |
+   | Contradiction notée en ticket | `contradictions` des brouillons et tickets | « Le contexte dit X, le ticket a constaté Y » — corriger, sur oui |
+   | Volumineuse (C1), placeholders restants (C2), titres mal formés (C3) | `etat` | Élaguer, compléter, corriger |
+   | `historique/` : nombre de copies par fichier | `contexte/historique/` | Signaler seulement (décision 7 : pas de rétention automatique) |
+
+5. **Péremption à l'usage** (mécanisme 1 de la boucle) : `load_skill` et
+   `get_context` annotent une section périmée (« à confirmer, datée du … »)
+   — le skill fait confirmer la valeur au moment où il s'apprête à s'en
+   servir, pas seulement à l'audit. Même règle : oui → re-date, non →
+   `update_context`.
+
+6. Comme au volet tickets : l'audit **n'écrit jamais de lui-même**, sa
+   seule sortie est `update_context` sur oui ; le rapport est daté et
+   conservé dans `installation/audits/` ; la commande CLI `audit` rend le
+   même rapport.
+
+**Conséquences à reporter dans le plan.**
+
+- `config.ts` : `JOURS_PEREMPTION = 90`.
+- `contexte.ts` : détection de l'identique dans `ecrireSection` (re-date
+  sans historique) ; âge des sections dans `obtenirSections` et dans le
+  rendu ; croisement journal / tickets / contexte pour la file des
+  candidats.
+- `encours.ts`, `tickets.ts`, `index.ts` : champ `contradictions`, enum
+  des sections, reprise à la clôture.
+- `audit.ts` : le volet contexte du rapport.
+- `remplissage.md` : propose les candidats un par un depuis le rapport ;
+  `cloture.md` : reprend `contradictions` ; les skills de domaine : « à
+  confirmer » sur une section périmée.
+- `format-contexte.md` §5 : la boucle devient le quatrième canal, comme
+  prévu ; `validation.md` §6 : la ligne « fraîcheur » passe en décidé.
+- Le point ouvert de `plan.md` (seuil, forme de la confirmation) se ferme.
+
+**Ce qui est écarté.** Un seuil par section dans le gabarit : plus juste,
+mais un second chiffre à expliquer avant d'avoir mesuré si 90 jours pose
+problème. Un appel `confirm_context` : une signature de plus pour ce que
+`update_context` peut dériver. Laisser la contradiction au prompt de
+clôture : c'est ce qui existe, et la mémoire du modèle à la clôture est
+justement ce qu'on ne veut plus.
+
+### Décision 10 — Durcir les skills : une question, une commande, attendre (2026-09-18)
+
+**Problème.** Les skills disent déjà « une question à la fois » et les
+tests T-B vérifient « aucun cran sauté ». Mais rien n'est aussi net sur
+l'**application du plan** : une fois le plan validé, le modèle peut dérouler
+plusieurs commandes d'un coup, ou enchaîner la suivante sans avoir vu la
+sortie de la précédente. Et « une question à la fois » n'est pas partout
+formulé comme « puis j'attends la réponse avant toute autre chose ».
+
+**Ce qui est décidé.**
+
+1. **Deux règles de conduite, dans tous les skills et toutes les
+   demandes**, formulées à l'identique :
+   - *Collecte* : **une question, puis j'attends la réponse.** Pas de
+     liste de questions, pas de question suivante avant la réponse, pas de
+     supposition à la place d'une réponse.
+   - *Application du plan* : **une commande, puis j'attends la sortie.**
+     Le technicien exécute, colle le résultat ; le modèle le lit, puis
+     seulement propose la suivante. Un résultat inattendu arrête le plan,
+     il ne le contourne pas.
+
+2. **Le gabarit de plan d'action** de chaque demande devient une séquence
+   numérotée d'étapes exécutables une à une, avec pour chacune ce qu'on
+   attend en sortie — pas un paragraphe.
+
+3. **Ce que le serveur peut tenir**, parce que c'est une règle de prompt
+   par nature : `save_progress.actions` est une liste d'entrées
+   « commande → résultat », une par tour ; l'audit (décision 8) compte les
+   actions par ticket et signale un `save_progress` qui en ajoute plusieurs
+   d'un coup — un indice, pas une preuve. Les tests T-B restent la
+   vérification de référence.
+
+**Conséquences à reporter dans le plan.**
+
+- `format-skill.md` : les deux règles dans le squelette des règles de
+  conduite, mot pour mot ; `valider` contrôle leur présence.
+- Les six `skill.md`, les six `demandes.md`, `cloture.md` : réécriture de
+  la règle et des gabarits de plan.
+- `validation.md` : un test T-B « application du plan, une commande à la
+  fois » à côté de « une question à la fois ».
+- Le protocole existe déjà tel quel dans le skill `debug-support` de
+  l'hôte (« l'utilisateur tape chaque commande, une seule à la fois ») :
+  reprendre sa formulation plutôt qu'en inventer une.
+
+**Ce qui est écarté.** Tenir cette règle côté serveur : il ne voit pas la
+conversation. Un hook `Stop` qui bloquerait un message contenant deux
+commandes : décision 5, pas de hooks dans ce cycle.
+
 ---
 
 ## 2. Plan
 
-_À rédiger une fois toutes les décisions prises._
+> Rédigé le 2026-09-18, toutes les décisions prises. Chaque point est un
+> commit ; entre deux points, depuis `produit/serveur/` :
+> `npm run build && node dist/cli.js valider && npm test`. Un point qui ne
+> passe pas ces trois commandes n'est pas fini.
+
+### 2.0 Ordre d'exécution — amendement de la décision 6 (2026-09-18)
+
+**Ce qui change.** La décision 6 étalait le travail sur trois lots, avec
+les signaux et les tags en dernier, après des tickets réels joués entre
+temps. Décision du 2026-09-18 : **tout est implémenté en une passe**, sans
+ticket réel intercalé, puis une **phase de test** sur une installation
+neuve avec dix tickets (section 2.10). La raison : tester le produit
+complet plutôt qu'un produit à moitié transformé, et éviter de jouer des
+tickets avec des skills qu'on sait devoir réécrire (décision 10).
+
+**Ce que ça coûte, et comment on le paie.** L'enum des 24 signaux est
+figé avant tout ticket réel sur quatre domaines sur six. Un signal mal
+formulé produira des refus injustifiés (« domaine sans signal coché ») ou
+des tickets où `domaines_proposes ≠ domaines_valides` sans que la taxonomie
+soit en cause. Donc : la **passe sur le manifeste** (décision 2) est le
+dernier point de la phase de test, pas une étape de l'implémentation ; et
+pendant les dix tickets, un refus injustifié = une ligne dans
+`retours-beta.md`, on ne corrige pas le manifeste au fil de l'eau.
+
+**L'ordre d'implémentation** n'est plus celui des lots mais celui des
+dépendances :
+
+| # | Chantier | Décision | Dépend de |
+| --- | --- | --- | --- |
+| 2.1 | Corrections sans contrat | 6 (lot a) | — |
+| 2.2 | Une question, une commande | 10 | — |
+| 2.3 | L'hôte : `settings.json` | 5 | — |
+| 2.4 | État de session | 3 | 2.1 (A4, A8) |
+| 2.5 | `read_kb` et D2 | 4 | 2.4 |
+| 2.6 | Signaux identifiés | 2 | 2.4 (classement rendu par `save_progress`) |
+| 2.7 | Tags fermés | 1 | 2.4, 2.6 (domaines validés, même mécanisme d'enum) |
+| 2.8 | Validité du contexte | 9 | 2.4 (accumulation de `contradictions`), 2.6 (enum) |
+| 2.9 | Audit | 8 | tout ce qui précède (le rapport les consomme) |
+| 2.10 | Documentation transverse et version | — | tout |
+| 2.11 | Phase de test | — | 2.10 |
+
+**Ce qui est ajouté au lot a depuis `retours-beta.md`.** La décision 6
+listait A1, A4, A6, A7, A8, C1, C2, E1 et trois points du complément.
+Restaient « à corriger » sans être placés : A2 (clé de dédoublonnage
+normalisée), A3 (domaines contrôlés contre le manifeste — cité par la
+décision 2), A5 (rattachement par symptôme — cité par les décisions 3 et
+7), B1 (liste des brouillons plafonnée, `resume_ticket` d'abord). Ils sont
+petits, sans changement de signature, et cohérents avec les décisions :
+ils entrent dans 2.1. Rien d'autre du complément n'est repris sans une
+ligne ici.
+
+### 2.1 Corrections sans contrat (décision 6, lot a)
+
+Aucune signature ne bouge, les fichiers existants restent valides.
+Groupés par fichier ; un commit par ligne.
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| a1 | A7 | `ids.ts`, `contexte.ts` | `getUTC*` dans `horodatage`, `dateDuJour`, `horodatageCompact`. Format inchangé |
+| a2 | A2 | `encours.ts`, `tickets.ts` | Clé de dédoublonnage normalisée (minuscules, sans accents ni ponctuation, espaces réduits) pour `ajouter` et `fusion` |
+| a3 | E1 | `skills.ts` | Dédoublonner `domaines` avant le test `max_domaines` ; smoke ajusté |
+| a4 | A8 | `encours.ts`, `cli.ts`, `tickets.ts` | `listerBrouillons` ignore un brouillon dont le ticket existe ; `etat` le signale « zombie » ; « déjà clôturé » retire le brouillon |
+| a5 | A3 | `encours.ts`, `tickets.ts` | `domaines_proposes`, `domaines_valides`, `escalades` contrôlés contre le manifeste (`trim`, minuscules) ; erreur `isError` qui liste les domaines. Remplacé par l'enum en 2.6, mais le contrôle reste utile pour les brouillons lus |
+| a6 | A5 | `encours.ts` | À la création sans `id` ni `reference` : si un brouillon porte le même `symptome_initial` normalisé, rattacher (réponse « brouillon rattaché par le symptôme ») au lieu de créer |
+| a7 | A4 | `encours.ts`, `tickets.ts` | Refus si le brouillon a une référence et qu'on en donne une autre (casse exceptée) : « mauvais id ? » |
+| a8 | A6 | `encours.ts`, `tickets.ts`, `triage.md` | Refus d'une référence commençant par `SANS-REF`, `AUCUNE`, `N/A`, `NA`, `NONE`, ou vide après `trim` ; une ligne dans `triage.md` : « ne jamais en inventer » |
+| a9 | A1 + complément | `tickets.ts` | Quand un brouillon existe, le serveur prend **son** `symptome_initial`, `domaines_proposes`, `plan_action`, `questions` ; ceux de la clôture ne servent que si le brouillon n'en a pas. `plan_action` obligatoire si `statut: resolu` |
+| a10 | complément | `tickets.ts` | `resolu_par` : `null` si omis, jamais `outil` par défaut. `duree_minutes` : si un brouillon existe, calculée `cree → clôture` par le serveur ; le champ ne reste que pour la baseline sans brouillon |
+| a11 | complément | `kb.ts` | `publish_kb` refuse un ticket dont le statut n'est pas `resolu` ; la réponse cite le symptôme publié (première ligne) |
+| a12 | C1 | `contexte.ts`, `cli.ts` | `CARACTERES_MAX_SECTION = 2500` en plus de `LIGNES_MAX_SECTION` ; « volumineuse » si l'un des deux dépasse. Signal seulement, pas de refus à l'écriture |
+| a13 | C2 | `contexte.ts` | « Vide » aussi si, après retrait des commentaires, des lignes ne contenant que des `<…>` et des séparateurs de table, il ne reste rien — indépendant de la version du gabarit |
+| a14 | B1 | `encours.ts`, `triage.md` | Liste des brouillons plafonnée à 10 (+ « N autres, `resume_ticket()` pour tout voir ») ; règle de triage : une référence donnée → `resume_ticket(référence)` d'abord, avant tout triage |
+
+Après 2.1, tout ce qui corrompt silencieusement est fermé.
+
+### 2.2 Une question, une commande, attendre (décision 10)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| b1 | Les deux règles | `format-skill.md` §6 | Deux règles ajoutées au squelette des règles de conduite, mot pour mot, formulation reprise du protocole `debug-support` : « *Collecte* : une question, puis j'attends la réponse. » ; « *Application du plan* : une commande, puis j'attends la sortie. Une commande = une invocation, sans `;`, `&&` ni `\|` pour enchaîner. Un résultat inattendu arrête le plan. » |
+| b2 | Contrôle | `validation.ts` | `valider` erreur si un `skill.md` ou `demandes.md` ne contient pas les deux formulations |
+| b3 | Les skills | les six `skill.md`, les six `demandes.md` | Règles réécrites ; gabarit de plan d'action en **séquence numérotée**, une commande par étape, avec la sortie attendue. Rester sous 110 lignes ; si un fichier déborde, scinder (`format-skill.md` §7) |
+| b4 | Le flux | `triage.md` étape 8, `cloture.md`, `gouvernance.md` §4 | Étape 8 : la règle d'application ; §4 : une commande par opération numérotée, exécutée et rapportée avant la suivante |
+| b5 | Le test | `validation.md` §3 | Un test T-B8 « application du plan, une commande à la fois » à côté de T-B5 |
+| b6 | L'invariant | `etat-d-avancement.md` §3 | Ligne « une commande à la fois — tenu par le prompt seul ; l'audit signale un `save_progress` à plusieurs actions » |
+
+### 2.3 L'hôte : ce que Claude Code ne peut plus faire (décision 5)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| c1 | Le fichier | `produit/entrees/claude-code/settings.json` (nouveau) | Le `permissions.deny` de la décision 5 : `Edit(installation/**)`, `Write(installation/**)`, `Read(installation/kb/**)`, `Read(installation/en-cours/**)`, `Bash`. Motifs relatifs au dossier de lancement |
+| c2 | La commande | `cli.ts` : `hote` (nouvelle) | Dépose `<dossier de lancement>/.claude/settings.json` ; **fusionne** dans un fichier existant (ajoute les entrées manquantes de `deny`, ne retire rien, sauvegarde `.support-it.bak`) ; annonce ce qui est interdit. Le dossier de lancement est le parent de `produit/` et `installation/` (déjà supposé par le point d'entrée) |
+| c3 | Les scripts | `install.ps1`, `install.sh` | Appel de `hote` à l'étape 5, mêmes messages ; encodages tenus (BOM / LF) |
+| c4 | Le doc | `deploiement.md` §2 | Le fichier, son contenu, pourquoi, comment le retirer |
+| c5 | À vérifier à l'implémentation | — | La syntaxe exacte des motifs (relatifs ou absolus) dans la doc Claude Code ; le message reçu par le modèle quand le refus tombe. Consigner dans `deploiement.md`. Test manuel en 2.11 (T-H4) |
+
+### 2.4 L'état de session (décision 3)
+
+Le socle : tout ce qui suit s'appuie dessus.
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| d1 | L'objet | `session.ts` (nouveau) | `{ brouillonCourant: string \| null, skillsCharges: string[], sectionsServies: string[], casLus: string[] }` en mémoire du processus. Fonctions : `poserBrouillon`, `viderBrouillon`, `noterSkill`, `noterSection`, `noterCas`, `reconstruire(brouillon)`. Aucune dépendance vers les autres modules (`D-serveur-mcp.md` §2) |
+| d2 | Le brouillon | `encours.ts` | Champs `skills_charges: string[]`, `sections_servies: string[]`, `cas_lus: string[]`, écrits par le serveur (pas dans `EntreeProgression`). `etape` calculée (voir d6). Entrée : `etape` remplacée par `pause?: boolean` ; `escalades` et `skill_charge` retirés de l'entrée, gardés en lecture pour les brouillons existants |
+| d3 | Les handlers | `index.ts` | `load_skill` note le skill et pose l'étape ; `get_context` note la section ; `save_progress` pose le brouillon courant et recopie l'état ; `save_ticket` vide ; `resume_ticket(id)` reconstruit depuis le brouillon |
+| d4 | Les refus | `index.ts`, `tickets.ts`, `kb.ts` | Quand un brouillon est courant : `save_ticket` sans `cloture` chargé → « charge `cloture` d'abord » ; `search_kb` sans aucun `load_skill(domaine)` → « le cas n'est pas instruit » ; `save_ticket.id` ≠ courant → refus (« un autre brouillon est en cours : `resume_ticket` pour basculer »). Sans brouillon courant : aucun refus |
+| d5 | Les dérivés | `tickets.ts` | `escalades` = les `skills_charges` de domaine au-delà du premier, dans l'ordre ; `save_ticket.id` optionnel, rattaché au courant ; `get_context` sur une section déjà servie → « déjà chargée dans cette session » sans le contenu |
+| d6 | L'étape | `encours.ts` | Calculée par le serveur : création → `triage` ; skill de domaine chargé → `instruction` ; `search_kb` → `recherche` ; `plan_action` non vide → `plan` ; `actions` non vide → `actions` ; `pause: true` → `pause` (levée au `save_progress` suivant). L'étape ne peut plus contredire le contenu |
+| d7 | Le classement | `encours.ts`, `index.ts` | La réponse de `save_progress` rend le classement des domaines depuis les signaux cochés (branché en 2.6 ; en 2.4, la réponse rend les domaines validés et l'étape calculée) |
+| d8 | Le rendu | `encours.ts` | `rendreReprise` : « recharger `load_skill(domaines_valides, nature)` » (plus de `skill_charge`) ; le corps du brouillon montre skills chargés et sections servies |
+| d9 | Les textes | `triage.md`, `cloture.md`, `index.ts` (descriptions) | Triage : « le brouillon se crée au triage, **avant** le premier `load_skill(domaine)` » (le point ouvert de l'ordre se ferme) ; plus de `escalades` ni `skill_charge` à fournir ; clôture : « `id` facultatif, le brouillon courant est rattaché » |
+| d10 | Le smoke | `smoke.ts` | Joue une **séquence complète** (triage → brouillon → domaine → contexte → recherche → plan → actions → cloture → ticket → publication) et les refus : `save_ticket` sans `cloture`, `search_kb` avant instruction, `id` d'un autre brouillon, `get_context` déjà servie. Puis une reprise après redémarrage du serveur (second client) : l'état est reconstruit |
+| d11 | À vérifier à l'implémentation | — | Cycle de vie du processus dans Claude Code : `/clear`, `--resume`, reconnexion après `CONNECT_TIMEOUT`. Résultat consigné dans `D-serveur-mcp.md` §5. Si le processus est relancé plus souvent que prévu, la reconstruction (d3) est la voie principale |
+| d12 | Les docs | `contrat-mcp.md` §6, `D-serveur-mcp.md` §2 et §5, `plan.md` 0.3 | L'état de session, ce qu'il refuse, ce qu'il dérive |
+
+### 2.5 `read_kb` et D2 (décision 4)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| e1 | La lecture | `kb.ts` : `lireCas(id)` | Conclusion, plan d'action, signaux (identifiants et preuves) d'un cas de `kb/` seulement ; refus hors `kb/` (« ce ticket n'est pas publié ») ; refus d'un id invalide. Jamais les questions ni le texte entier |
+| e2 | L'appel | `index.ts` | Neuvième outil `read_kb(ticket_id)`. Borné par l'état : brouillon courant et étape avant `recherche` → refus (« chercher d'abord ») ; le cas lu est noté dans le brouillon (`cas_lus`) |
+| e3 | D2 : le score | `kb.ts` | Chaque tag commun vaut `1 / nombre d'entrées qui le portent` ; nature, domaines et référence non comptés |
+| e4 | D2 : le rendu | `kb.ts` | Par cas : id, référence, score, tags communs à la recherche + « et N autres », symptôme et conclusion tronqués à 160 caractères. Plafond fixé à 5 par le serveur ; `limite` disparaît ; message « N cas partagent ces tags, 5 affichés — affiner » |
+| e5 | Les textes | `triage.md` étape 6, `contrat-mcp.md` §3 et §3 bis (nouveau) | « Après `search_kb`, lire le cas retenu avec `read_kb` avant de reprendre sa conclusion » |
+| e6 | Le smoke | `smoke.ts` | Recherche → lecture → refus hors `kb/` → refus avant l'étape recherche ; neuf outils dans la liste |
+
+### 2.6 Les signaux (décision 2)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| f1 | Le manifeste | `manifeste.yaml` | Chaque signal devient `{ id, libelle }`, id kebab-case unique dans tout le manifeste ; `max_signaux: 6` en tête. Les 24 identifiants sont posés à la main, courts, sans reprendre le nom du domaine |
+| f2 | Le contrôle | `validation.ts` | Unicité, forme kebab-case, ≤ `max_signaux` par domaine, libellé non vide |
+| f3 | Le module | `manifeste.ts` | Lecture des `{ id, libelle }` (ancien format en chaînes accepté en lecture, id dérivé — pour le manifeste temporaire du smoke) ; `rendreManifeste` rend `id` + libellé ; `classerDomaines(ids)` → `[{ domaine, n }]` trié |
+| f4 | Le schéma | `index.ts` | `signaux: [{ id: z.enum(ids du manifeste), preuve: z.string().max(160) }]` construit au démarrage. Même mécanisme pour `domaines_proposes`, `domaines_valides` (enum des domaines, remplace le contrôle a5 pour les entrées) |
+| f5 | Le brouillon et le ticket | `encours.ts`, `tickets.ts` | `signaux` typé `{ id, preuve }[]`, dédoublonnage sur `id` ; l'ancien format (liste de chaînes) lu tel quel ; rendu « libellé — preuve » ; le serveur écrit la section « Signaux retenus », le modèle ne la formule plus |
+| f6 | Le classement | `encours.ts`, `index.ts` | `save_progress` : classement des domaines depuis les signaux cochés dans la réponse ; refus d'un `domaines_proposes` qui contient un domaine sans signal coché |
+| f7 | Les constats | `index.ts` | Description de `verifications` élargie : « un constat vérifié — commande → résultat, ou lecture d'un portail ou d'un journal » |
+| f8 | Les textes | `triage.md` §2 et §3, `cloture.md`, `contrat-mcp.md` | « Coche les signaux avec l'extrait qui les montre ; les constats vont dans `verifications` » ; la proposition de triage cite les identifiants |
+| f9 | Le smoke | `smoke.ts` | Signal inconnu refusé par le schéma ; preuve trop longue refusée ; classement rendu ; domaine proposé sans signal refusé ; ancien brouillon lu |
+
+### 2.7 Les tags (décision 1)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| g1 | L'étage client | `config.ts`, `cli.ts` (`init`) | `installation/tags.yaml`, créé vide par `init` avec sa consigne en commentaire : même forme que le manifeste (`<domaine>: [tags]`, plus `general: [tags]` pour les transverses). Jamais écrasé |
+| g2 | La bibliothèque | `manifeste.ts` : `bibliotheque(r)` | Produit ∪ client, par domaine ; `general` du client ajouté aux transverses. Refus au démarrage si `tags.yaml` est illisible ou en doublon avec le produit (message clair, le serveur démarre sans l'étage client) |
+| g3 | Le schéma | `index.ts` | `tags: z.array(z.enum(bibliothèque)).max(5)` sur `save_ticket` et `publish_kb`. Un tag inconnu est refusé par le schéma ; au-delà de cinq : « garder ceux qui distinguent ce cas » |
+| g4 | Le filtrage | `tickets.ts` | Contrôle à l'appel : un tag d'un domaine hors des domaines validés du brouillon (transverses exceptés) est refusé, avec la liste filtrée dans le message. Les dérivés (nature, domaines validés, escalades, référence) restent automatiques et hors plafond |
+| g5 | La liste avant l'appel | `skills.ts` | `load_skill(["cloture"])` rend, quand un brouillon est courant, les tags candidats filtrés sur ses domaines validés + transverses ; sans brouillon, la bibliothèque entière |
+| g6 | La recherche | `kb.ts` | `search_kb` : un tag inconnu de la bibliothèque est signalé avec les tags proches (distance d'édition ≤ 2), pas ignoré en silence |
+| g7 | Le contrôle | `validation.ts`, `cli.ts` (`etat`) | `valider` : tags du manifeste uniques, kebab-case ; `etat` : `tags.yaml` lisible, sans doublon avec le produit |
+| g8 | Les textes | `cloture.md`, `contrat-mcp.md` §4 et §5, `manifeste.md`, `gouvernance.md` §3 | « Cocher dans la liste servie, cinq au plus » ; qui ajoute un tag client (le référent), quand il monte au produit (jugement, pas compteur) |
+| g9 | Le smoke | `smoke.ts` | Tag inconnu refusé ; sixième tag refusé ; tag hors domaine refusé avec liste ; `tags.yaml` client pris en compte ; tag inconnu signalé à la recherche |
+| g10 | Les entrées existantes | — | Pas de migration (décision 6, point 4) : l'installation de test est neuve |
+
+### 2.8 Validité du contexte (décision 9)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| h1 | Le seuil | `config.ts` | `JOURS_PEREMPTION = 90` |
+| h2 | Re-dater | `contexte.ts` : `ecrireSection` | Contenu normalisé identique à celui en place → seule la ligne de date change, pas de copie dans `historique/` ; réponse « confirmée, re-datée ». Différent → écriture normale |
+| h3 | L'âge | `contexte.ts` : `obtenirSections`, `rendreSections` | `age` en jours, `perimee: boolean` ; rendu « _à confirmer : datée du …, plus de 90 jours_ » sur une section périmée, dans `get_context` comme dans les requis de `load_skill` |
+| h4 | Les contradictions | `encours.ts`, `tickets.ts`, `index.ts` | `save_progress.contradictions: [{ section: z.enum(ids de sections des gabarits), constat: ≤ 240 }]`, accumulées ; la clôture les reprend dans `mises_a_jour_contexte` (section « Contradictions constatées » du ticket) sans compter sur le modèle. Même enum pour `questions[].section` et `mises_a_jour_contexte[].section` |
+| h5 | La file des candidats | `contexte.ts` : `candidats(r)` | Croise `journal/` (`sections_candidates` dont la section est encore vide), `mises_a_jour_contexte` des tickets jamais appliquées (contenu absent du contexte), `contradictions` des brouillons et tickets ; regroupe par section, en tête si plusieurs tickets |
+| h6 | Les textes | `remplissage.md`, `cloture.md`, les six `skill.md` | Remplissage : « propose les candidats un par un depuis le rapport » ; clôture : les contradictions sont déjà là ; skills : « une section marquée à confirmer se confirme avant de s'en servir — oui → `update_context` identique, non → nouveau contenu » (une ligne, dans les règles de conduite) |
+| h7 | Les docs | `format-contexte.md` §5, `validation.md` §6, `plan.md` §4 | Le quatrième canal ; la ligne « fraîcheur » passe en décidé ; le point ouvert se ferme |
+| h8 | Le smoke | `smoke.ts` | `update_context` identique → date seule, pas d'historique ; section antidatée → annotée ; `contradictions` accumulées et reprises au ticket ; section inconnue refusée |
+
+### 2.9 L'audit (décision 8)
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| i1 | Le dossier | `config.ts`, `cli.ts` (`init`) | `installation/audits/` ; `assurerInstallation` le crée |
+| i2 | Les calculs | `audit.ts` (nouveau) | `calculerAudit(r)` → un objet ; `rendreAudit(a)` → markdown. Volet tickets : jeu de test du triage (signaux cochés → domaines calculés → validés, écarts), brouillons > `JOURS_BROUILLON_ANCIEN`, orphelins et zombies, résolus jamais publiés, tags hors bibliothèque dans `kb/`, cas lus (`cas_lus`) et suite donnée, santé des fichiers (C3 : titres sans `id —`, sections en double, YAML cassé, domaines inconnus), `save_progress` à plusieurs actions (décision 10), mesures T-P7 (nature, domaines, questions, durée, résolu par). Volet contexte : sections périmées, file des candidats (h5), volumineuses, placeholders, titres mal formés, copies dans `historique/` |
+| i3 | L'écriture | `audit.ts` : `ecrireAudit(r)` | `installation/audits/<AAAAMMJJ-HHMMSS>.md`, `flag: "wx"`, jamais modifié |
+| i4 | La commande | `cli.ts` : `audit` | Même rapport sur la sortie standard, écrit aussi dans `audits/`. Code retour 1 si un constat de santé (C3) est trouvé. Lancée à l'étape 6 des scripts après `etat` |
+| i5 | Le skill | `skills.ts`, `produit/contenu/general/audit.md` (nouveau) | `load_skill(["audit"])`, réservé, hors ticket ; le rapport est calculé, écrit, et injecté à la suite du skill (comme le manifeste pour `triage`). Le skill dit comment présenter chaque constat et quoi proposer — clôture d'un vieux brouillon (`save_ticket`, `non-resolu`), publication (`publish_kb`), confirmation ou correction d'une section (`update_context`) — **un par un, sur oui**. Il ne compte rien, n'écrit rien de lui-même, ne touche jamais une archive |
+| i6 | Le point d'entrée | `produit/entrees/claude-code/support/SKILL.md` | « `/support audit` » → `load_skill(["audit"])` |
+| i7 | Les docs | `gouvernance.md` §3, `outillage.md`, `validation.md` §6 | Qui lance (tout le monde), qui valide (le oui, comme partout) ; la commande ; `mesures` absorbée |
+| i8 | Le smoke | `smoke.ts` | Sur l'installation temporaire après la séquence complète : rapport écrit, T-P7 rempli avec le ticket joué, vieux brouillon antidaté signalé, ticket résolu non publié listé, fichier de contexte au titre cassé signalé |
+
+### 2.10 Documentation transverse et version
+
+| # | Point | Fichier | Ce qui est fait |
+| --- | --- | --- | --- |
+| j1 | Neuf appels | `grep -rn "huit appels\|huit outils"` | Tous passés à neuf, en un commit : `plan.md`, `contrat-mcp.md` (titre), `D-serveur-mcp.md`, `fin-de-projet.md`, `etat-d-avancement.md`, `gouvernance.md`, `outillage.md`, `validation.md`, `index.ts`, `smoke.ts`, `install.ps1`, `install.sh` |
+| j2 | Le contrat | `contrat-mcp.md` | Chaque section relue contre `index.ts` ; §6 invariants : l'état de session, les enums, les dérivés ; §7 |
+| j3 | Le flux | `plan.md` 0.3, `architecture/schema/routage_support_v4.svg` | `read_kb` après `search_kb`, `audit` hors ticket, l'étape dérivée |
+| j4 | L'état | `etat-d-avancement.md` | §1 « ce qui reste à faire » réécrit depuis ce fichier ; §3 : les invariants passés de « prompt seul » à « code » (symptôme, référence, domaines, signaux, ordre du flux, écriture hors appels par l'hôte) et les nouveaux tenus par le prompt seul (une commande à la fois, le oui) ; §4.4 : neuf appels, `session.ts`, `audit.ts` |
+| j5 | Les décisions | `fin-de-projet.md` §4 et §10 (nouveau) | Décisions 30 à 39 : une ligne par décision de la section 1, avec le pourquoi ; §10 « Bêta v3 » sur le modèle de §9 |
+| j6 | Les mesures | `retours-beta.md` | Le tableau T-P7 devient « rempli par l'audit » ; les lignes « à corriger » de 2.1 passent en « corrigé le … » |
+| j7 | La version | `produit/VERSION` | `0.3.0-beta` ; `init` annonce la mise à jour |
+
+### 2.11 Phase de test — dix tickets sur une installation neuve
+
+**Préparation.** `produit/` remplacé, `installation/` vide, `install.*`
+complet (les six étapes, `hote` compris), `init` → `tags.yaml` vide,
+`audits/` créé, `etat` : 44 sections vides. `/mcp` : neuf outils. Le
+contexte se remplit **par les tickets**, pas avant (c'est le test du
+remplissage par conversation) ; au plus `general/sites` et
+`general/plateformes` remplis à la main par `remplissage` pour ne pas
+répondre à la même question dix fois.
+
+**Ce que chaque ticket éprouve.** Dix tickets, six domaines, les deux
+natures, et chaque mécanisme au moins une fois :
+
+| # | Domaine · nature | Ce qu'on regarde |
+| --- | --- | --- |
+| T1 | réseau · incident, cas net | Brouillon créé avant `load_skill` ; signaux cochés avec preuve ; classement ; étape dérivée ; `search_kb` vide ; clôture sans `id` ; tags filtrés ≤ 5 ; publication |
+| T2 | système · incident, ambigu avec réseau | Porte asymétrique : une question ; deux domaines chargés ; discrimination ; `domaines_proposes ≠ domaines_valides` (matière du jeu de test) |
+| T3 | identité · incident, avec escalade depuis poste de travail | Escalade dérivée du second `load_skill` ; aucun champ `escalades` fourni |
+| T4 | poste de travail · demande | `demandes.md` ; plan en séquence ; **une commande, une sortie** (T-B8) ; `actions` une par tour |
+| T5 | matériel · incident, mis en pause puis repris | `pause: true` ; `resume_ticket` ; reconstruction de l'état après redémarrage du serveur ; refus si `save_ticket` sans `cloture` |
+| T6 | applicatif · demande, hors domaines couverts au triage | Clôture `hors-domaines-couverts` ; `publish_kb` refusé (non résolu) |
+| T7 | réseau · incident proche de T1 | `search_kb` renvoie T1, score par rareté, rendu compact ; `read_kb` ; `cas_lus` noté ; refus de `read_kb` avant l'étape recherche (à provoquer une fois) |
+| T8 | système · incident avec contradiction du contexte | `contradictions` en cours de ticket ; reprise à la clôture ; `update_context` sur oui ; `update_context` identique → re-datée |
+| T9 | identité · baseline (technicien a déjà diagnostiqué) | `conclusion_humaine`, `resolu_par` donné, durée calculée par le serveur ; `resolu_par` absent → `null` sur un autre ticket |
+| T10 | poste de travail · incident, référence fabriquée puis mauvais id | Refus A6 ; refus A4 ; `save_progress` sans id sur le même symptôme → rattaché (A5) ; tag inconnu et sixième tag refusés ; tag client ajouté dans `tags.yaml` puis accepté |
+
+Puis, hors ticket : `/support audit` (T11) — rapport écrit, T-P7 rempli
+avec les dix tickets, brouillon antidaté proposé à la clôture, résolu non
+publié proposé, section périmée (antidatée à la main) proposée à
+confirmer ; `node dist/cli.js audit` rend le même rapport. Et le test
+manuel de l'hôte (T-H4) : demander au modèle d'éditer
+`installation/contexte/reseau.md` directement et de lancer une commande —
+les deux doivent être refusés, le premier doit se rabattre sur
+`update_context`.
+
+**Ce qu'on note.** Une ligne dans `retours-beta.md` par : refus injustifié
+(avec l'appel et le message), signal du manifeste qui ne colle pas au
+ticket (sans corriger le manifeste), oubli de `save_progress` (T-P9),
+commande enchaînée malgré la règle, question en liste. Le tableau T-P7 est
+lu dans le rapport d'audit, plus tenu à la main.
+
+**Ce qui vient après les dix tickets, et pas avant.** La passe sur le
+manifeste (décision 2) : les identifiants et libellés des signaux revus
+domaine par domaine, à partir des écarts du jeu de test et des lignes de
+`retours-beta.md`. Puis, si le manifeste change, `valider`, `npm test`, et
+un onzième ticket sur le domaine retouché.
