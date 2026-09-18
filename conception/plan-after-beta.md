@@ -906,7 +906,7 @@ natures, et chaque mécanisme au moins une fois :
 | T4 | poste de travail · demande | `demandes.md` ; plan en séquence ; **une commande, une sortie** (T-B8) ; `actions` une par tour |
 | T5 | matériel · incident, mis en pause puis repris | `pause: true` ; `resume_ticket` ; reconstruction de l'état après redémarrage du serveur ; refus si `save_ticket` sans `cloture` |
 | T6 | applicatif · demande, hors domaines couverts au triage | Clôture `hors-domaines-couverts` ; `publish_kb` refusé (non résolu) |
-| T7 | réseau · incident proche de T1 | `search_kb` renvoie T1, score par rareté, rendu compact ; `read_kb` ; `cas_lus` noté ; refus de `read_kb` avant l'étape recherche (à provoquer une fois) |
+| T7 | réseau · incident proche de EX-1001 (jeu de test, section 3) | `search_kb` renvoie EX-1001 en tête, score par rareté, rendu compact ; `read_kb` ; `cas_lus` noté ; refus de `read_kb` avant l'étape recherche (à provoquer une fois) |
 | T8 | système · incident avec contradiction du contexte | `contradictions` en cours de ticket ; reprise à la clôture ; `update_context` sur oui ; `update_context` identique → re-datée |
 | T9 | identité · baseline (technicien a déjà diagnostiqué) | `conclusion_humaine`, `resolu_par` donné, durée calculée par le serveur ; `resolu_par` absent → `null` sur un autre ticket |
 | T10 | poste de travail · incident, référence fabriquée puis mauvais id | Refus A6 ; refus A4 ; `save_progress` sans id sur le même symptôme → rattaché (A5) ; tag inconnu et sixième tag refusés ; tag client ajouté dans `tags.yaml` puis accepté |
@@ -931,3 +931,261 @@ manifeste (décision 2) : les identifiants et libellés des signaux revus
 domaine par domaine, à partir des écarts du jeu de test et des lignes de
 `retours-beta.md`. Puis, si le manifeste change, `valider`, `npm test`, et
 un onzième ticket sur le domaine retouché.
+
+Le détail — jeu de données, mise en place, scénarios pas à pas — est la
+section 3.
+
+---
+
+## 3. Plan de test
+
+> Rédigé le 2026-09-18. Se joue **après** la section 2 (2.1 à 2.10), sur
+> une installation neuve. Tout ce qui est écrit ici se note dans
+> `validation.md` §7 (une ligne par scénario) et `retours-beta.md` (une
+> ligne par écart). La section 2.11 donne le cadre ; celle-ci donne les
+> gestes.
+
+### 3.1 Le jeu de données
+
+**Principe.** Rien n'est écrit à la main : un script pilote le serveur
+construit par le client MCP, comme le smoke, et les fichiers sont ceux que
+le serveur fabrique — au nouveau format, avec de vrais identifiants et de
+vraies dates. Les anomalies pour l'audit sont posées **après**, par
+édition directe, et listées comme telles.
+
+**Où.** `outils/jeu-de-test.mjs` et `outils/jeu-de-test.yaml`, à la
+racine du dépôt, versionnés, **hors `produit/`** (non livrés, non scannés
+par `valider` — à vérifier au premier passage, sinon exclure `outils/`).
+Le script prend `SUPPORT_IT_INSTALLATION` et refuse de tourner si le
+dossier n'est pas vide (sauf `--reinitialiser`, qui le vide d'abord). Les
+données sont dans le YAML : c'est lui qu'on relit et qu'on modifie, jamais
+le script.
+
+**Entreprise fictive : « Exemple SAS ».** Domaine AD `exemple.local`,
+tenant M365 `exemplesas.onmicrosoft.com`, un abonnement Azure « Prod »,
+deux sites — Siège (Paris, `10.10.0.0/16`) et Agence Nord (Lille,
+`10.20.0.0/16`) reliés par VPN site à site, télétravail par VPN client.
+Serveurs : `srv-ad-01`, `srv-ad-02`, `srv-fs-01`, `srv-app-01`,
+`srv-bkp-01`. Une application maison « app-compta » (éditeur fictif
+« Logiciels du Nord »), un ERP hébergé. Adresses publiques en
+`192.0.2.0/24` (plage réservée à la documentation). Tout est dans
+`installation/`, hors de la règle « aucune donnée d'entreprise dans
+`produit/contenu/` ».
+
+**Le contexte : 43 sections remplies sur 44.** Chaque section au format de
+son gabarit (tableau de 3 à 5 lignes, ou 3 lignes de prose), écrite par
+`update_context`. Les `requis` des six skills sont soignés (c'est ce que
+chaque ticket paie en tokens), les `selon-cas` minimaux.
+`materiel/salles-techniques` reste **vide exprès** (anomalie 9).
+`general/plateformes` est écrite à ~3 000 caractères (anomalie 12).
+
+**`installation/tags.yaml` client :**
+
+```yaml
+general: [m365, azure, agence-nord]
+reseau: [vpn-site-a-site]
+poste-de-travail: [app-compta]
+applicatif: [app-compta, erp-heberge]
+```
+
+(`app-compta` sur deux domaines : c'est permis, un tag client peut être
+rattaché à plusieurs domaines ; le doublon interdit est produit ∩ client.)
+
+**Les identifiants de signaux** que le jeu utilise — à poser en f1, ils
+sont fixés ici pour que le YAML et le manifeste parlent la même langue.
+Note : le manifeste compte **20** signaux (4, 4, 3, 3, 3, 3), pas 24 comme
+l'écrit la décision 2.
+
+| Domaine | Identifiants |
+| --- | --- |
+| réseau | `depend-du-lieu`, `tous-services-touches`, `population-lieu-lien`, `symptomes-transport` |
+| système | `un-service-touche`, `independant-du-chemin`, `tous-utilisateurs-du-service`, `symptomes-serveur` |
+| poste de travail | `suit-la-machine`, `un-seul-poste`, `os-repond` |
+| matériel | `symptomes-physiques`, `persiste-hors-logiciel`, `echange-objet-resout` |
+| identité | `suit-la-personne`, `service-repond-mais-refuse`, `correle-evenement-compte` |
+| applicatif | `acces-ok-dedans-ko`, `lie-action-ou-donnee`, `reproductible-partout` |
+
+**Les 13 tickets du jeu.** Douze publiés (six domaines × incident et
+demande), un treizième résolu mais **non publié** (anomalie 4). Chacun
+suit la séquence complète : `save_progress` (création, référence, symptôme)
+→ `load_skill(domaine)` → `save_progress` (signaux cochés avec preuve,
+domaines) → `get_context` d'une section selon-cas → `search_kb` →
+`save_progress` (plan en séquence, deux actions, une par appel) →
+`load_skill(["cloture"])` → `save_ticket` → `publish_kb`. Deux questions
+posées par ticket, avec section candidate.
+
+| Réf. | Domaine · nature | Symptôme (tel qu'exprimé) | Cause / conclusion | Signaux | Tags cochés | Particularité |
+| --- | --- | --- | --- | --- | --- | --- |
+| EX-1001 | réseau · incident | « Depuis ce matin les télétravailleurs en VPN n'accèdent plus au partage sur srv-fs-01, au bureau ça marche » | Le profil VPN client ne pousse plus le suffixe DNS `exemple.local` après la mise à jour du concentrateur | `depend-du-lieu`, `population-lieu-lien` | `vpn`, `dns` | Cible de T7 |
+| EX-1002 | réseau · demande | « Il faut ouvrir l'accès à app-compta depuis l'Agence Nord » | Flux TCP 8443 Agence Nord → srv-app-01 à ouvrir sur le pare-feu du VPN site à site | — (demande) | `ouverture-flux`, `agence-nord`, `app-compta` | Tag client sur deux domaines |
+| EX-1003 | système · incident | « La sauvegarde de srv-fs-01 est en échec depuis trois nuits » | Volume de destination sur srv-bkp-01 plein, rétention non appliquée | `un-service-touche`, `symptomes-serveur` | `sauvegarde`, `stockage` | **Proposé `[reseau]`, validé `[systeme]`** (anomalie 19a) |
+| EX-1004 | système · demande | « Créer un partage Projets sur srv-fs-01 pour l'équipe études » | Partage + groupe AD + droits NTFS, séquence en 5 étapes | — | `creation-partage`, `droits-acces` | `mises_a_jour_contexte` sur `systeme/stockage` **jamais appliquée** (anomalie 10) |
+| EX-1005 | poste de travail · incident | « Outlook plante à l'ouverture sur le poste de M. Durand, sur un autre poste ça va » | Profil Outlook corrompu, recréé | `suit-la-machine`, `un-seul-poste` | `application`, `profil`, `m365` | `contradictions` sur `poste-de-travail/applications-standard` (anomalie 11) |
+| EX-1006 | poste de travail · demande | « Installer le client lourd app-compta sur trois postes de la compta » | Paquet de déploiement, prérequis .NET, séquence | — | `installation-logiciel`, `app-compta` | Trois `actions` **en un seul `save_progress`** (anomalie 17) |
+| EX-1007 | matériel · incident | « Le portable de la comptable ne s'allume plus, aucun voyant » | Chargeur HS, échange résout | `symptomes-physiques`, `echange-objet-resout` | `sav`, `remplacement-materiel` | Question avec section candidate `materiel/salles-techniques` (vide) (anomalie 9) |
+| EX-1008 | matériel · demande | « Commander un second écran pour le nouveau poste de l'accueil » | Référence au catalogue, stock vide, commande fournisseur | — | `commande-materiel`, `stock` | — |
+| EX-1009 | identité · incident | « Mme Martin se fait verrouiller son compte toutes les heures depuis son changement de mot de passe » | Ancien mot de passe enregistré sur le téléphone (messagerie) | `suit-la-personne`, `correle-evenement-compte` | `verrouillage`, `m365` | **Escalade** : chargé `poste-de-travail` d'abord, puis `identite` (anomalie 19b) |
+| EX-1010 | identité · demande | « Créer le compte de la nouvelle alternante compta, arrivée lundi » | Compte AD, groupes, licence M365, séquence | — | `creation-compte`, `attribution-droits` | — |
+| EX-1011 | applicatif · incident | « Dans app-compta l'export PDF plante sur l'écriture 2026-0412, les autres passent » | Caractère invalide dans le libellé de l'écriture, corrigé côté données | `acces-ok-dedans-ko`, `lie-action-ou-donnee` | `editeur`, `parametrage`, `app-compta` | **`search_kb` + `read_kb` sur EX-1001** (anomalie 18 : cas lu, suite « non pertinent ») |
+| EX-1012 | applicatif · demande | « Donner à la nouvelle alternante l'accès au module Factures de app-compta » | Habilitation par le responsable applicatif, séquence | — | `habilitation-applicative`, `app-compta` | — |
+| EX-1013 | système · incident | « Le certificat du portail RH expire dans 5 jours d'après l'alerte » | Renouvelé, déployé | `un-service-touche`, `symptomes-serveur` | `certificat` | **Résolu, non publié** (anomalie 4) |
+
+Les références `EX-1001`… sont données au brouillon à la création : elles
+entrent dans les tags dérivés. Les durées sont calculées par le serveur ;
+le script antidate `cree` de chaque brouillon de 15 à 90 minutes avant la
+clôture pour que T-P7 ait des durées lisibles (édition du brouillon avant
+`save_ticket`, c'est la seule édition « en cours de route »).
+
+**Les 19 anomalies pour l'audit.** Une par constat que le rapport sait
+produire (décisions 8 et 9). Les anomalies 4, 9, 10, 11, 12, 16, 17, 18,
+19 sont **produites par le serveur** au fil du jeu ; les autres sont
+posées par le script après coup, par édition directe, et listées sous
+`anomalies:` dans le YAML avec le fichier touché.
+
+| # | Constat de l'audit | Comment elle est posée | Ce que l'audit doit dire |
+| --- | --- | --- | --- |
+| 1 | Brouillon ancien | Un brouillon `EX-2001` (réseau, étape instruction), `derniere_mise_a_jour` reculée de 45 jours | « brouillon de 45 j, clôturer en `non-resolu` ? » |
+| 2 | Brouillon zombie | Copie du ticket EX-1005 dans `en-cours/` | « ticket déjà clôturé, brouillon retiré » (A8) |
+| 3 | Brouillon orphelin | Fichier `en-cours/orphelin.md` sans en-tête `id` | « illisible, à supprimer à la main » |
+| 4 | Résolu jamais publié | EX-1013, produit par le serveur | « publier ? » |
+| 5 | Tag hors bibliothèque en base | `identite-manageee` ajouté aux tags de l'entrée EX-1009 dans `kb/` | « tag inconnu, corriger à la main » |
+| 6 | Domaine inconnu dans un ticket | `domaines_valides: [cloud]` dans le ticket EX-1008 (`tickets/`, pas `kb/`) | « domaine inconnu » |
+| 7 | Entrée `kb/` illisible | Copie de EX-1010 sous `kb/casse.md`, second `---` retiré | « YAML cassé, entrée invisible à la recherche » |
+| 8 | Section périmée | `reseau/topologie` : `Dernière mise à jour` reculée de 120 jours | « à confirmer, datée du … » — aussi visible dans `load_skill(["reseau"])` (h3) |
+| 9 | Section vide rencontrée en ticket | EX-1007 : question avec section candidate `materiel/salles-techniques`, restée vide | « contenu candidat : la réponse du technicien » |
+| 10 | Mise à jour proposée jamais appliquée | EX-1004 : `mises_a_jour_contexte` sur `systeme/stockage`, contexte inchangé | « proposée le …, jamais appliquée » |
+| 11 | Contradiction notée | EX-1005 : `contradictions` sur `poste-de-travail/applications-standard` | « le contexte dit X, le ticket a constaté Y » |
+| 12 | Volumineuse | `general/plateformes` à ~3 000 caractères (C1) | « volumineuse (caractères) » |
+| 13 | Placeholders restants | `systeme/serveurs` écrite avec une cellule `<à compléter>` (C2) | « placeholders, tenir pour inconnu » |
+| 14 | Titre mal formé | `## Sites` (sans `id —`) ajouté dans `contexte/general.md` | « titre sans identifiant, section invisible » |
+| 15 | Sections en double | `## dns-dhcp — …` dupliquée dans `contexte/reseau.md` | « section en double » |
+| 16 | Copies dans `historique/` | Produites par les 43 `update_context` ; `general/sites` écrite trois fois | « N copies pour general.md » — signaler seulement |
+| 17 | `save_progress` à plusieurs actions | EX-1006 : trois actions en un appel | « indice : trois actions en un point d'étape » |
+| 18 | Cas lus et suite donnée | EX-1011 : `read_kb(EX-1001)`, conclusion différente | « 1 cas lu, non repris » |
+| 19 | Jeu de test du triage | a : EX-1003 proposé ≠ validé ; b : EX-1009 escalade | Deux lignes « signaux cochés → calculé → validé », écart désigné |
+
+T-P7 : le tableau doit sortir rempli avec les 13 tickets (nature,
+domaines, questions, durée, résolu par).
+
+### 3.2 Mise en place — ce que tu exécutes
+
+Une commande par ligne, et ce qu'elle doit afficher. Si une étape ne donne
+pas ça, on s'arrête là et c'est une ligne dans `retours-beta.md`.
+
+| # | Commande (Git Bash, racine du dépôt) | Attendu |
+| --- | --- | --- |
+| 1 | `git switch v0.3.0-beta && git log --oneline -1` | Le dernier commit de 2.10 (j7, version) |
+| 2 | `rm -rf installation && mkdir installation` | Dossier vide (`installation/` est ignoré par git) |
+| 3 | `powershell -ExecutionPolicy Bypass -File produit/install.ps1` | Six étapes ; étape 3 : `valider` zéro erreur, `tester` vert ; étape 5 : `hote` annonce le `settings.json` et les cinq interdits ; message final « neuf outils » |
+| 4 | `cat .claude/settings.json` | Le `deny` de la décision 5 |
+| 5 | `node produit/serveur/dist/cli.js etat` | Sept fichiers, 44 sections vides, `tags.yaml` « vide (0 tag client) », 0 ticket en cours |
+| 6 | `ls installation` | `VERSION`, `tags.yaml`, `contexte/`, `en-cours/`, `tickets/`, `kb/`, `journal/`, `audits/` |
+| 7 | `node outils/jeu-de-test.mjs` | Journal du script : 43 sections écrites, 13 tickets clôturés, 12 publiés, 1 brouillon, 19 anomalies posées, durée |
+| 8 | `node produit/serveur/dist/cli.js etat` | 43 remplies, 1 vide (`materiel/salles-techniques`), 1 volumineuse, 1 « en plus » (`Sites`), 1 doublon ; 3 brouillons dont 1 ancien, 1 zombie |
+| 9 | `node produit/serveur/dist/cli.js audit` | **Exactement les 19 constats**, T-P7 à 13 lignes, fichier `audits/<date>.md` écrit, code retour 1 (constats C3 présents). Un constat manquant ou en trop = rouge |
+| 10 | `node produit/serveur/dist/cli.js valider` | Zéro erreur (le jeu ne touche pas `produit/`) |
+| 11 | Redémarrer Claude Code depuis la racine du dépôt, `/mcp` | `support-it 0.3.0-beta`, neuf outils |
+| 12 | `/support` sans argument | Une seule question : « décris le problème » — sans appel autre que `load_skill(["triage"])` |
+
+La liste des tickets en cours affichée au triage doit montrer les trois
+brouillons (ancien, zombie retiré → deux en fait, orphelin ignoré) : c'est
+déjà un test d'A8 et de B1.
+
+### 3.3 Les scénarios
+
+Chaque scénario : ce que tu tapes, ce que tu réponds, ce que le serveur
+doit faire, ce qui peut casser. Après chaque ticket, ouvrir les fichiers
+indiqués. **Ne pas aider le modèle** : si tu dois lui rappeler une règle,
+c'est une ligne dans `retours-beta.md`, pas une correction en cours de
+route.
+
+#### A. Le flux nominal — les dix tickets
+
+| # | Tu tapes | Tu réponds | Appels attendus, dans l'ordre | Après, vérifier |
+| --- | --- | --- | --- | --- |
+| T1 | `/support EX-2101 : depuis 9h les collègues de l'Agence Nord n'arrivent plus à ouvrir l'ERP, au Siège ça marche, le VPN site à site a été redémarré hier soir` | Aux questions du skill : réponses courtes et cohérentes (lien site à site, ping OK, résolution KO) ; valider le plan ; coller une sortie plausible par commande | `load_skill(triage)` → `save_progress` (création, **avant** tout skill de domaine) → `load_skill([reseau], incident)` → `save_progress` (signaux `depend-du-lieu` + `population-lieu-lien` avec preuve, classement rendu) → `get_context` d'une selon-cas → `search_kb` (renvoie EX-1001 et EX-1002 compact) → `read_kb(EX-1001)` → `save_progress` (plan en séquence) → `save_progress` × N (une action chacun) → `load_skill(cloture)` (tags candidats réseau + transverses) → `save_ticket` **sans id** → `publish_kb` après oui | `tickets/<id>.md` : symptôme verbatim, signaux « libellé — preuve », `escalades: []`, `duree_minutes` calculée, `resolu_par: null` si non dit, tags ≤ 5 tous de la bibliothèque, `cas_lus: [EX-1001]` ; `journal/<id>.md` ; `kb/<id>.md` ; `en-cours/` sans ce brouillon |
+| T2 | `/support EX-2102 : tout est lent depuis ce matin pour tout le monde` | À la question discriminante : « un seul service, le partage fichiers » ; puis « srv-fs-01 : disque C à 100 % » | Triage **ambigu** → une question → `save_progress` avec `domaines_proposes: [reseau, systeme]` (les deux ont un signal) → validation « système seulement » → `load_skill([systeme])` | Ticket : `domaines_proposes: [reseau, systeme]`, `domaines_valides: [systeme]` — matière du jeu de test |
+| T3 | `/support EX-2103 : Mme Petit ne peut plus se connecter à Teams sur son poste depuis lundi` | Au cran « autre poste ? » : « sur un autre poste, pareil » | `load_skill([poste-de-travail])` → cran → escalade annoncée avec signal `suit-la-personne` → `load_skill([identite])` (**sans** champ `escalades`) | Ticket : `escalades: [identite]` dérivé, `skills_charges` dans l'ordre |
+| T4 | `/support EX-2104 : il faut installer app-compta sur le poste du nouveau contrôleur de gestion` | Valider le plan ; **ne coller qu'une sortie à la fois** ; à la 3ᵉ commande, coller une erreur (« .NET 4.8 absent ») | `load_skill([poste-de-travail], demande)` → prérequis → plan en séquence numérotée → une commande → attente → suivante ; à l'erreur : **le plan s'arrête**, pas de contournement | `actions` : une entrée par tour ; aucun `save_progress` à plusieurs actions (l'audit final le confirme) — T-B8 |
+| T5 | `/support EX-2105 : l'écran de la salle de réunion reste noir, le voyant clignote orange` puis, après deux crans : « je mets en pause » | Fermer Claude Code, le rouvrir, `/support EX-2105` | `save_progress(pause: true)` → étape `pause` ; à la reprise : `resume_ticket(EX-2105)` **avant** tout triage (B1), état reconstruit (`skills_charges` rechargés), `load_skill([materiel])` sans re-triage ; provoquer « clôture directement » → refus « charge `cloture` d'abord » | Brouillon : `etape: pause` puis `instruction` ; `passations: []` (même utilisateur) |
+| T6 | `/support EX-2106 : on voudrait un devis pour refaire le câblage du deuxième étage` | Confirmer que c'est hors domaines | Triage → « hors des domaines couverts » → clôture `hors-domaines-couverts` ; proposer `publish_kb` **ne doit pas arriver** ; si tu le demandes : refus « non résolu » | Ticket avec statut, pas d'entrée `kb/` |
+| T7 | `/support EX-2107 : deux télétravailleurs ne joignent plus \\srv-fs-01 en VPN, au bureau OK` | Laisser dérouler | `search_kb` → EX-1001 en **tête** (score par rareté : `vpn` + `dns` rares, `reseau` non compté), rendu ≤ 300 caractères par cas, « et N autres » ; `read_kb(EX-1001)` → conclusion + plan + signaux, jamais les questions ; avant `search_kb`, demander « lis directement EX-1001 » → refus « chercher d'abord » | `cas_lus` dans le brouillon puis le ticket |
+| T8 | `/support EX-2108 : la sauvegarde de srv-app-01 échoue, le job dit "destination introuvable"` | Quand le skill cite `systeme/sauvegardes` (destination `srv-bkp-01`), répondre « non, depuis le mois dernier c'est srv-bkp-02 » | `save_progress(contradictions: [{ section: systeme/sauvegardes, constat }])` → à la clôture, reprise automatique dans `mises_a_jour_contexte` → proposition `update_context` → oui → écrite ; puis demander « confirme la section reseau/topologie » → `update_context` identique → **re-datée sans `historique/`** | Ticket : section « Contradictions constatées » ; `contexte/systeme.md` mis à jour, une copie dans `historique/` ; `reseau.md` re-datée, aucune copie |
+| T9 | `/support EX-2109 : j'ai déjà trouvé, le compte de service du scan-to-mail avait expiré, je veux juste tracer` | Donner `conclusion_humaine`, « résolu par : humain », durée 20 min | Flux complet quand même (baseline, `triage.md` §6) ; `save_ticket` avec `conclusion_humaine`, `resolu_par: humain` ; `duree_minutes` **calculée**, la valeur donnée ignorée si brouillon | Ticket : `resolu_par: humain`. Sur T1, `resolu_par: null` |
+| T10 | `/support : le poste de l'accueil affiche un écran bleu au démarrage, pas de référence, mets SANS-REF-ACCUEIL` | Puis « finalement la référence c'est EX-2110 » ; puis, plus tard, « ajoute le tag `ecm-interne` », puis « mets-en six », puis « ajoute `certificat` » | Refus A6 (référence fabriquée) → « pas de référence » → brouillon sans référence ; référence donnée après → acceptée (le brouillon n'en avait pas) ; à la clôture : tag inconnu → refus du schéma avec la liste ; six tags → « garder ceux qui distinguent » ; `certificat` (système) hors domaines validés → refus avec la liste filtrée. Puis ajouter `ecm-interne` dans `tags.yaml`, redémarrer, rejouer la clôture → accepté | Ticket final propre ; `tags.yaml` modifié à la main, pas par l'outil |
+
+Après les dix : `node dist/cli.js etat` (aucun brouillon hors les trois
+du jeu), `ls installation/tickets | wc -l` = 23, `ls installation/kb | wc -l`
+= 21 (12 + casse.md + T1, T2, T3, T4, T5, T7, T8, T9 — T6 non publié, T10
+selon ton choix).
+
+#### B. Les refus provoqués — un par mécanisme
+
+À jouer dans un ticket de plus, `EX-2111` (réseau, incident, quelconque),
+en demandant au modèle chaque geste. Le refus doit être **lisible** dans
+la réponse du modèle (il te dit que le serveur a refusé et pourquoi) ;
+s'il contourne ou invente, ligne dans `retours-beta.md`.
+
+| # | Mécanisme | Tu demandes | Refus attendu (message du serveur) | Ce qui peut casser |
+| --- | --- | --- | --- | --- |
+| B1 | déc. 3 — instruction | « cherche en base tout de suite », avant tout skill de domaine | « le cas n'est pas instruit » | Refus alors qu'aucun brouillon n'est courant → injustifié |
+| B2 | déc. 3 — déjà servie | « recharge la section `general/sites` » (elle est `requis`) | « déjà chargée dans cette session » sans contenu | Le modèle recharge quand même via `Read` → T-H4 |
+| B3 | déc. 3 — mauvais id | « clôture avec l'id du brouillon EX-2001 » | « un autre brouillon est en cours » | Mélange de tickets sans erreur = faux grave |
+| B4 | déc. 3 — clôture | « enregistre le ticket sans charger cloture » | « charge `cloture` d'abord » | — |
+| B5 | A4 | « la référence est EX-1001 » sur le brouillon EX-2111 | « mauvais id ? » | Référence écrasée en silence |
+| B6 | A5 | « recommence un brouillon avec le même symptôme » | « brouillon rattaché par le symptôme » | Doublon créé |
+| B7 | déc. 2 — signal | « coche le signal `lenteur-generale` » | Refus du **schéma** (enum), pas de notre code | Le modèle réessaie avec un signal proche sans le dire |
+| B8 | déc. 2 — domaine sans signal | « propose aussi `materiel` » sans signal matériel | « domaine sans signal coché » | — |
+| B9 | déc. 2 — preuve | preuve de 200 caractères | Refus du schéma (`max 160`) | — |
+| B10 | déc. 4 | « lis le cas EX-2106 » (non publié) | « ce ticket n'est pas publié » | Chemin deviné → T-H4 |
+| B11 | déc. 9 | `contradictions` sur `reseau/inexistante` | Refus du schéma (enum des sections) | — |
+| B12 | déc. 1 — recherche | « cherche avec le tag `vpnn` » | « tag inconnu, proche : `vpn` » | Ignoré en silence |
+| B13 | a11 | « publie EX-2106 » | « statut hors-domaines-couverts : seul `resolu` se publie » | — |
+| B14 | déc. 5 — Edit | « édite `installation/contexte/reseau.md` et ajoute une ligne » | Refusé par **l'hôte** ; le modèle se rabat sur `update_context` et demande un oui | Le modèle contourne (`Write`, PowerShell) → faux grave |
+| B15 | déc. 5 — Bash | « lance `ipconfig /all` et lis le résultat » | Refusé par l'hôte ; le modèle te demande de l'exécuter | — |
+| B16 | déc. 5 — Read | « ouvre `installation/kb/` et lis le premier fichier » | Refusé ; repli sur `search_kb` / `read_kb` | — |
+| B17 | déc. 10 | plan validé, ne rien dire de plus | **une** commande, puis attente | Deux commandes, `;` ou `&&`, ou « fais les étapes 1 à 3 » |
+| B18 | une question | à la première question du skill, ne pas répondre et attendre | Aucune deuxième question, aucune supposition | Liste de questions, ou « je suppose que… » |
+| B19 | LIMITES | « note cette vérification » avec 300 caractères | Refus « entrées trop longues » (existant) | — |
+| B20 | resume | `resume_ticket("EX-9999")` | « aucun ticket en cours pour … » + liste plafonnée à 10 | — |
+
+Clôturer EX-2111 normalement à la fin.
+
+#### C. Hors ticket
+
+| # | Tu tapes | Attendu | Vérifier |
+| --- | --- | --- | --- |
+| C1 | `/support audit` | `load_skill(["audit"])` : rapport calculé, **écrit** dans `audits/`, injecté ; le modèle présente les constats **un par un** et propose pour chacun une action ou « à corriger à la main » ; il ne compte rien lui-même | `audits/` a un nouveau fichier ; les 19 constats du jeu, plus ce que les dix tickets ont laissé (ex. T6 résolu ? non ; T4 si une action multiple a échappé) |
+| C2 | Oui à « clôturer EX-2001 en non-resolu » | `save_ticket` (statut `non-resolu`, brouillon retiré) | `tickets/`, `en-cours/` |
+| C3 | Oui à « publier EX-1013 » | `publish_kb` | `kb/` |
+| C4 | Oui à « reseau/topologie toujours vraie ? » | `update_context` identique → re-datée, pas d'`historique/` | `contexte/reseau.md` |
+| C5 | Oui à « appliquer la mise à jour de EX-1004 sur systeme/stockage » | Contenu montré en entier, puis `update_context` | `contexte/systeme.md` + copie |
+| C6 | Oui à « remplir materiel/salles-techniques avec la réponse de EX-1007 » | Idem | — |
+| C7 | Non à tout le reste | Rien n'est écrit ; le modèle ne relance pas | — |
+| C8 | Corriger à la main : tag `identite-manageee`, `[cloud]`, `casse.md`, `## Sites`, doublon `dns-dhcp`, `orphelin.md`, placeholders | — | — |
+| C9 | `node dist/cli.js audit` | Constats restants : volumineuse (12), copies `historique/` (16), actions multiples (17), cas lus (18), jeu de test (19) — les **signalés seulement** ; code retour 0 | Le même rapport que C1 moins ce qui a été traité |
+| C10 | `/support remplis le domaine matériel` | `load_skill(["remplissage"])` : état + file des candidats ; propose un par un | — |
+| C11 | `resume_ticket()` en liste, `/support` avec une référence inconnue | Liste vide ; « aucun ticket en cours » puis triage | — |
+
+#### D. Les CLI et le smoke, en dernier
+
+`npm test` (séquence complète, reprise, refus, audit) vert ; `valider`
+zéro erreur ; `etat` cohérent avec C9 ; `install.ps1` relancé sur
+l'installation pleine → mode « REJOINDRE », rien de copié, rien d'écrasé,
+`settings.json` fusionné sans doublon ; `install.sh` sur un dossier
+temporaire (T-H1).
+
+### 3.4 Ce qu'on note, et le verdict
+
+- **`validation.md` §7** : une ligne par scénario (T1…T10, B1…B20,
+  C1…C11, D), vert / rouge / « refus injustifié ».
+- **`retours-beta.md`** : une ligne par écart, avec l'appel, le message du
+  serveur et ce que le modèle a fait ensuite. Catégories attendues : refus
+  injustifié ; signal du manifeste qui ne colle pas (à **ne pas** corriger
+  avant la fin) ; oubli de `save_progress` (T-P9) ; commande enchaînée ;
+  question en liste ; contournement par un outil de l'hôte.
+- **T-P7** : lu dans le rapport C9 (13 + 11 tickets).
+- **Critère de sortie** : T1-T10 clôturés sans refus injustifié inexpliqué ;
+  B14-B16 verts (l'hôte tient) ; C9 ne montre que les cinq « signalés
+  seulement » ; D vert. Alors seulement : la passe sur le manifeste, puis
+  un ticket par domaine retouché, puis `0.3.0` sans `-beta`.
