@@ -49,6 +49,24 @@ function texte(res: unknown): string {
 function estErreur(res: unknown): boolean {
   return Boolean((res as { isError?: boolean }).isError);
 }
+/**
+ * Un refus du schéma (enum, longueur) arrive avant notre code : le SDK le
+ * rend comme une erreur -32602 « Input validation error » — en résultat
+ * isError selon la version, en exception sinon.
+ */
+async function refusSchema(p: Promise<unknown>, motif: RegExp, message: string): Promise<void> {
+  let brut: string;
+  try {
+    const res = await p;
+    assert.ok(estErreur(res), `${message} : accepté alors que le schéma devait refuser — ${texte(res)}`);
+    brut = texte(res);
+  } catch (e) {
+    if (e instanceof assert.AssertionError) throw e;
+    brut = String(e);
+  }
+  assert.match(brut, /-32602|Input validation|Invalid/, message);
+  assert.match(brut, motif, message);
+}
 
 async function main() {
   // Contexte : gabarits copiés, puis une section remplie pour tester l'état « ok ».
@@ -239,8 +257,10 @@ async function main() {
   assert.ok(estErreur(sansSymptome) && /symptome_initial/.test(texte(sansSymptome)));
   const refFabriquee = await client.callTool({ name: "save_progress", arguments: { reference: "SANS-REF-20260918", symptome_initial: "Test A6" } });
   assert.ok(estErreur(refFabriquee) && /ne s'invente pas/.test(texte(refFabriquee)), texte(refFabriquee));
-  const domaineInconnu = await client.callTool({ name: "save_progress", arguments: { symptome_initial: "Test A3", domaines_valides: ["Systeme", "cloud"] } });
-  assert.ok(estErreur(domaineInconnu) && /domaine\(s\) inconnu\(s\) du manifeste : cloud/.test(texte(domaineInconnu)), texte(domaineInconnu));
+  // A3 puis décision 2 : les domaines sont un enum construit depuis le manifeste — refus du schéma, avant notre code.
+  await refusSchema(client.callTool({ name: "save_progress", arguments: { symptome_initial: "Test A3", domaines_valides: ["Systeme", "cloud"] } }), /cloud/, "domaine inconnu");
+  await refusSchema(client.callTool({ name: "save_progress", arguments: { symptome_initial: "Test signal", signaux: [{ id: "lenteur-generale", preuve: "x" }] } }), /lenteur-generale/, "signal hors manifeste");
+  await refusSchema(client.callTool({ name: "save_progress", arguments: { symptome_initial: "Test preuve", signaux: [{ id: "depend-du-lieu", preuve: "x".repeat(200) }] } }), /preuve/, "preuve trop longue");
   const ids11: string[] = [];
   for (let i = 1; i <= 11; i++) {
     const p = await client.callTool({ name: "save_progress", arguments: { symptome_initial: `Test B1 numéro ${i}` } });
@@ -259,12 +279,26 @@ async function main() {
   const clientB = await ouvrir("smoke-sequence", produit);
   const tB = await clientB.callTool({ name: "load_skill", arguments: { domaines: ["triage"] } });
   assert.ok(!estErreur(tB));
-  const p1 = await clientB.callTool({
+  // Décision 2, point 7 : un domaine proposé sans signal coché est refusé, avec le classement.
+  const sansSignal = await clientB.callTool({
     name: "save_progress",
-    arguments: { reference: "INC-PAUSE-1", symptome_initial: "Test : le partage ne répond plus", nature: "incident", domaines_proposes: ["systeme", "reseau"], domaines_valides: ["systeme"], prochaine_etape: "cran 1 : le serveur répond-il ?" },
+    arguments: { reference: "INC-PAUSE-1", symptome_initial: "Test : le partage ne répond plus", nature: "incident", signaux: [{ id: "un-service-touche", preuve: "le partage ne répond plus, le reste va" }], domaines_proposes: ["systeme", "reseau"] },
   });
-  assert.ok(!estErreur(p1), texte(p1));
-  assert.match(texte(p1), /Brouillon créé : \S+ · étape triage/);
+  assert.ok(estErreur(sansSignal) && /reseau sans aucun signal coché/.test(texte(sansSignal)) && /systeme \(1 : un-service-touche\)/.test(texte(sansSignal)), texte(sansSignal));
+  assert.equal(fs.readdirSync(path.join(installation, "en-cours")).length, 0, "un refus ne crée rien");
+  const p1a = await clientB.callTool({
+    name: "save_progress",
+    arguments: { reference: "INC-PAUSE-1", symptome_initial: "Test : le partage ne répond plus", nature: "incident", signaux: [{ id: "un-service-touche", preuve: "le partage ne répond plus, le reste va" }, { id: "independant-du-chemin", preuve: "pareil en VPN et sur site" }], domaines_proposes: ["systeme", "reseau"], domaines_valides: ["systeme"], prochaine_etape: "cran 1 : le serveur répond-il ?" },
+  });
+  assert.ok(estErreur(p1a), "reseau toujours sans signal : " + texte(p1a));
+  const p1b = await clientB.callTool({
+    name: "save_progress",
+    arguments: { reference: "INC-PAUSE-1", symptome_initial: "Test : le partage ne répond plus", nature: "incident", signaux: [{ id: "un-service-touche", preuve: "le partage ne répond plus, le reste va" }, { id: "independant-du-chemin", preuve: "pareil en VPN et sur site" }, { id: "population-lieu-lien", preuve: "surtout les télétravailleurs" }], domaines_proposes: ["systeme", "reseau"], domaines_valides: ["systeme"], prochaine_etape: "cran 1 : le serveur répond-il ?" },
+  });
+  assert.ok(!estErreur(p1b), texte(p1b));
+  assert.match(texte(p1b), /Brouillon créé : \S+ · étape triage/);
+  assert.match(texte(p1b), /domaines classés par les signaux cochés : systeme \(2 : un-service-touche, independant-du-chemin\) > reseau \(1 : population-lieu-lien\)/, "classement calculé par le serveur");
+  const p1 = p1b;
   const pid = texte(p1).match(/Brouillon créé : (\S+) ·/)?.[1];
   assert.ok(pid, "id du brouillon");
   assert.ok(fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)));
@@ -397,7 +431,7 @@ async function main() {
       nature: "incident",
       domaines_proposes: ["reseau", "identite"],
       domaines_valides: ["reseau"],
-      signaux: ["uniquement via VPN", "tous les services touchés"],
+      signaux: [{ id: "depend-du-lieu", preuve: "uniquement via VPN" }, { id: "tous-services-touches", preuve: "tous les services touchés" }],
       conclusion: "Test : concentrateur VPN saturé",
       plan_action: "Test : rien",
       questions: [{ question: "Quelle est la passerelle du site ?", reponse: "TEST", section: "reseau/topologie" }],
@@ -447,8 +481,10 @@ async function main() {
   assert.match(texte(lu), /# Cas \S+ — INC-TEST-42/);
   assert.match(texte(lu), /## Conclusion\n\nTest : concentrateur VPN saturé/);
   assert.match(texte(lu), /## Plan d'action\n\nTest : rien/);
-  assert.match(texte(lu), /- uniquement via VPN/);
+  assert.match(texte(lu), /- dépend du lieu[^\n]*\(`depend-du-lieu`\) — uniquement via VPN/, "signal rendu par libellé, identifiant et preuve");
   assert.doesNotMatch(texte(lu), /Quelle est la passerelle/, "les questions ne sont pas renvoyées");
+  const ticketVpn = fs.readFileSync(path.join(installation, "tickets", `${id}.md`), "utf8");
+  assert.match(ticketVpn, /^signaux:\n  - id: depend-du-lieu\n    preuve: uniquement via VPN$/m, "signaux { id, preuve } dans l'en-tête du ticket");
   const luInconnu = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
   assert.ok(estErreur(luInconnu) && /aucun cas publié/.test(texte(luInconnu)), texte(luInconnu));
   const rien = await clientB.callTool({ name: "search_kb", arguments: { tags: ["imprimante"] } });
@@ -466,6 +502,14 @@ async function main() {
   assert.ok(!fs.existsSync(path.join(installation, "kb", `${idNonResolu}.md`)));
   const luNonPublie = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: idNonResolu } });
   assert.ok(estErreur(luNonPublie) && /n'est pas publié/.test(texte(luNonPublie)), texte(luNonPublie));
+  // Ancien format (avant 2.6) : un brouillon aux signaux libres se lit tel quel, sans migration.
+  const ancien = await clientB.callTool({ name: "save_progress", arguments: { symptome_initial: "Test : ancien format", nature: "incident" } });
+  const idAncien = texte(ancien).match(/Brouillon créé : (\S+) ·/)![1];
+  const fAncien = path.join(installation, "en-cours", `${idAncien}.md`);
+  fs.writeFileSync(fAncien, fs.readFileSync(fAncien, "utf8").replace(/^signaux: \[\]$/m, "signaux:\n  - un signal rédigé à l'ancienne"), "utf8");
+  const repriseAncien = await clientB.callTool({ name: "resume_ticket", arguments: { ticket: idAncien } });
+  assert.match(texte(repriseAncien), /- un signal rédigé à l'ancienne/, "ancien format lu tel quel");
+  fs.rmSync(fAncien);
   // Un second brouillon, laissé en instruction : la reprise après redémarrage se teste au client C.
   await clientB.callTool({ name: "load_skill", arguments: { domaines: ["triage"] } });
   const p8 = await clientB.callTool({ name: "save_progress", arguments: { reference: "INC-SEQ-2", symptome_initial: "Test : reprise après redémarrage", nature: "incident", domaines_valides: ["reseau"] } });

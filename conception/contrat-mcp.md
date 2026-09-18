@@ -140,7 +140,7 @@ est un choix du modèle sur la mécanique.
 
 | | |
 | --- | --- |
-| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides`, `conclusion`, `statut`. Optionnels : `escalades`, `signaux`, `conclusion_humaine`, `resolu_par`, `plan_action`, `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags`, `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise), `id` (identifiant du brouillon en cours — voir §5 ter). |
+| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides` (enum des domaines du manifeste), `conclusion`, `statut`. Optionnels : `signaux[{id, preuve}]` (id : enum des signaux du manifeste), `conclusion_humaine`, `resolu_par`, `plan_action` (obligatoire si `resolu`), `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags`, `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise), `id` (identifiant du brouillon — facultatif, voir §5 ter). **Disparu le 2026-09-18** : `escalades`, dérivées des skills chargés. |
 | Lit | Rien. |
 | Écrit | `installation/tickets/<id>.md` et, s'il y a eu des questions, **un** journal `installation/journal/<id>.md` (une section par question, sections candidates en en-tête — un fichier par ticket depuis le 2026-09-11, un par question avant). |
 
@@ -255,7 +255,7 @@ un récit).** Un champ, une nature, une longueur, imposée par le serveur :
 
 | Champ | Nature | Limite |
 | --- | --- | --- |
-| `signaux` | Un fait observé qui a servi au triage, sans raisonnement ni « → domaine » | 160 car. |
+| `signaux` | Depuis le 2026-09-18 (décision 2) : `{ id, preuve }` — `id` est un **enum** des identifiants du manifeste (une chaîne libre est rejetée par le schéma), `preuve` l'extrait du ticket qui montre le signal. Dédoublonnés sur `id`. Un constat de diagnostic n'est pas un signal : `verifications` | preuve : 160 car. |
 | `verifications` | Un **acquis** : « cran N : commande → résultat » | 240 car. |
 | `questions` | Une **décision** du technicien : question et réponse ; la référence n'en est pas une | 300 car. chacune |
 | `actions` | Ce que le technicien a exécuté et le résultat | 240 car. |
@@ -337,6 +337,18 @@ brouillon zombie est retiré au passage (A8).
   `SUPPORT_IT_INSTALLATION` change (H1).
 - Une erreur d'usage renvoie un texte avec `isError` ; une erreur de
   livraison (fichier produit manquant) aussi, mais en nommant le fichier.
+- **Les signaux et les domaines sont des enums** construits depuis le
+  manifeste au démarrage du serveur (décision 2, 2026-09-18) : le modèle
+  coche, il ne rédige pas. Le serveur rend l'identifiant avec le libellé
+  dans la table du triage, **classe les domaines** depuis les signaux cochés
+  et le renvoie dans la réponse de `save_progress`, et **refuse** un
+  `domaines_proposes` dont un domaine n'a aucun signal coché — pour un
+  incident, dès qu'au moins un signal est coché (une demande n'a pas de
+  signaux ; un triage sans aucun signal passe par les questions de
+  rattrapage). Le ticket écrit la section « Signaux retenus » par libellé,
+  identifiant et preuve ; les brouillons et tickets antérieurs (chaînes
+  libres) se lisent tels quels, sans migration. Un manifeste modifié est
+  vu au redémarrage du serveur.
 - **L'état de session** (décision 3, 2026-09-18). Un processus serveur par
   session (stdio) : le serveur garde en mémoire le brouillon courant, les
   skills chargés (un élément par `load_skill`, domaines joints par `+`),

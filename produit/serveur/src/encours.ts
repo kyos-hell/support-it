@@ -7,7 +7,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
 import { fabriquerId, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
-import { domainesInconnus, lireManifeste } from "./manifeste.js";
+import { classerDomaines, domainesInconnus, libelleSignal, lireManifeste, type Manifeste } from "./manifeste.js";
 import { lireDocument } from "./markdown.js";
 import { casInstruit, domainesInstruits, escaladesDerivees, etatDepuisSession, fusionnerEtat, type EtatBrouillon, type Session } from "./session.js";
 
@@ -18,6 +18,31 @@ import { casInstruit, domainesInstruits, escaladesDerivees, etatDepuisSession, f
  */
 export type Etape = "triage" | "instruction" | "recherche" | "plan" | "actions" | "pause";
 export const ETAPES: Etape[] = ["triage", "instruction", "recherche", "plan", "actions", "pause"];
+
+/**
+ * Un signal coché (décision 2) : l'identifiant du manifeste, et la preuve —
+ * l'extrait du ticket qui le montre. La preuve est du diagnostic ; l'id est
+ * de la mécanique, vérifié par le schéma.
+ */
+export interface SignalCoche {
+  id: string;
+  preuve: string;
+}
+
+/** Les brouillons et tickets antérieurs à 2.6 portent des chaînes libres : lues telles quelles, jamais migrées. */
+export function lireSignaux(bruts: unknown): SignalCoche[] {
+  if (!Array.isArray(bruts)) return [];
+  return bruts
+    .map((x) => (typeof x === "string" ? { id: "", preuve: x } : { id: String((x as SignalCoche)?.id ?? ""), preuve: String((x as SignalCoche)?.preuve ?? "") }))
+    .filter((x) => x.id || x.preuve);
+}
+
+/** Rendu d'un signal : « libellé — preuve » ; un signal libre (ancien format) tel quel. */
+export function rendreSignal(m: Manifeste | null, s: SignalCoche): string {
+  if (!s.id) return s.preuve;
+  const libelle = m ? libelleSignal(m, s.id) : s.id;
+  return `${libelle} (\`${s.id}\`)${s.preuve ? ` — ${s.preuve}` : ""}`;
+}
 
 export interface QuestionPosee {
   question: string;
@@ -62,7 +87,7 @@ export interface Brouillon {
   passations: Passation[];
   symptome_initial: string;
   prochaine_etape: string;
-  signaux: string[];
+  signaux: SignalCoche[];
   verifications: string[];
   questions: QuestionPosee[];
   plan_action: string;
@@ -80,7 +105,7 @@ export interface EntreeProgression {
   domaines_proposes?: string[];
   domaines_valides?: string[];
   prochaine_etape?: string;
-  signaux?: string[];
+  signaux?: SignalCoche[];
   verifications?: string[];
   questions?: QuestionPosee[];
   plan_action?: string;
@@ -96,6 +121,8 @@ export interface ProgressionEcrite {
   lie: "reference" | "symptome" | null;
   passation: Passation | null;
   etape: Etape;
+  /** Décision 2, point 7 : les domaines classés depuis les signaux cochés. */
+  classement: string;
 }
 
 export class ErreurEnCours extends Error {}
@@ -174,7 +201,7 @@ function lireFichier(fichier: string): Brouillon | null {
     passations: e.passations ?? [],
     symptome_initial: String(e.symptome_initial ?? ""),
     prochaine_etape: String(e.prochaine_etape ?? ""),
-    signaux: e.signaux ?? [],
+    signaux: lireSignaux(e.signaux),
     verifications: e.verifications ?? [],
     questions: e.questions ?? [],
     plan_action: String(e.plan_action ?? ""),
@@ -270,7 +297,7 @@ function verifierLongueurs(e: EntreeProgression): void {
       if (v && v.trim().length > max) trop.push(`${nom} (${v.trim().length} > ${max}) : ${regle} — « ${v.trim().slice(0, 60)}… »`);
     }
   };
-  check("signaux", "un fait observé, une ligne, sans le raisonnement ni le domaine", e.signaux, LIMITES.signal);
+  check("signaux.preuve", "l'extrait du ticket qui montre le signal, une ligne", e.signaux?.map((s) => s.preuve), LIMITES.signal);
   check("verifications", "un acquis : « cran N : commande → résultat », une ligne — le raisonnement et les fausses pistes vont dans notes", e.verifications, LIMITES.verification);
   check("actions", "ce que le technicien a exécuté et le résultat, une ligne", e.actions, LIMITES.action);
   check("notes", "un piège ou une fausse piste à ne pas refaire, une ligne", e.notes, LIMITES.note);
@@ -324,6 +351,9 @@ function rendre(b: Brouillon): string {
   );
 }
 
+/** Le manifeste pour rendre les libellés des signaux ; null si illisible (le rendu montre alors l'identifiant). */
+let manifestePourRendu: Manifeste | null = null;
+
 /** Le brouillon en clair, pour la reprise. */
 function rendreComplet(b: Brouillon): string {
   const puces = (l: string[]) => (l.length ? l.map((x) => `- ${x}`).join("\n") : "_(rien)_");
@@ -337,7 +367,7 @@ function rendreComplet(b: Brouillon): string {
     "\n" +
     bloc("symptome-initial", "Symptôme initial, tel qu'exprimé", b.symptome_initial || "_(rien)_") +
     "\n" +
-    bloc("signaux", "Signaux vérifiés", puces(b.signaux)) +
+    bloc("signaux", "Signaux cochés", puces(b.signaux.map((s) => rendreSignal(manifestePourRendu, s)))) +
     "\n" +
     bloc("verifications", "Crans et vérifications faites, avec leurs résultats", puces(b.verifications)) +
     "\n" +
@@ -447,11 +477,21 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   if (domainesValides) b.domaines_valides = domainesValides;
   if (texte(e.prochaine_etape ?? "")) b.prochaine_etape = texte(e.prochaine_etape!);
   if (texte(e.plan_action ?? "")) b.plan_action = texte(e.plan_action!);
-  b.signaux = ajouter(b.signaux, e.signaux, (x) => x.trim());
+  b.signaux = ajouter(b.signaux, e.signaux, (x) => x.id || x.preuve);
   b.verifications = ajouter(b.verifications, e.verifications, (x) => x.trim());
   b.actions = ajouter(b.actions, e.actions, (x) => x.trim());
   b.notes = ajouter(b.notes, e.notes, (x) => x.trim());
   b.questions = ajouter(b.questions, e.questions, (q) => q.question.trim());
+  // Décision 2, point 7 : un domaine proposé sans signal coché est refusé (incidents ; une demande n'a pas de signaux).
+  if (domainesProposes && (b.nature ?? "incident") === "incident") {
+    const coches = new Set(b.signaux.map((x) => x.id).filter(Boolean));
+    const sansSignal = domainesProposes.filter((d) => !trouverDomaineSignaux(r, d).some((id) => coches.has(id)));
+    if (sansSignal.length && coches.size) {
+      throw new ErreurEnCours(
+        `domaines_proposes : ${sansSignal.join(", ")} sans aucun signal coché. Le triage propose les domaines que les signaux désignent ; cocher d'abord le signal (signaux: [{ id, preuve }]), ou retirer le domaine. Classement actuel : ${rendreClassement(r, b)}`,
+      );
+    }
+  }
   if (session) {
     // Un brouillon neuf hérite des skills et sections servis avant sa création
     // (le triage, un domaine chargé trop tôt), pas d'une recherche ou d'un cas
@@ -469,7 +509,19 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   b.etape = calculerEtape(b);
 
   const fichier = ecrire(r, b);
-  return { id: b.id, fichier, cree, lie, passation, etape: b.etape };
+  return { id: b.id, fichier, cree, lie, passation, etape: b.etape, classement: rendreClassement(r, b) };
+}
+
+function trouverDomaineSignaux(r: Racines, domaine: string): string[] {
+  return (lireManifeste(r).domaines.find((d) => d.id === domaine)?.signaux ?? []).map((s) => s.id);
+}
+
+/** Le classement des domaines depuis les signaux cochés du brouillon, pour la réponse de save_progress. */
+export function rendreClassement(r: Racines, b: Brouillon): string {
+  const ids = b.signaux.map((s) => s.id).filter(Boolean);
+  if (!ids.length) return "aucun signal coché";
+  const cl = classerDomaines(lireManifeste(r), ids);
+  return cl.length ? cl.map((x) => `${x.domaine} (${x.n} : ${x.signaux.join(", ")})`).join(" > ") : "aucun domaine";
 }
 
 export function etatBrouillon(b: Brouillon): EtatBrouillon {
@@ -493,7 +545,8 @@ export function ageJours(b: Brouillon): number {
 }
 
 /** Rendu pour resume_ticket : l'état, puis le brouillon, puis les avertissements. */
-export function rendreReprise(b: Brouillon): string {
+export function rendreReprise(b: Brouillon, m?: Manifeste): string {
+  manifestePourRendu = m ?? null;
   const moi = utilisateur();
   const avert: string[] = [];
   if (b.technicien !== moi) {

@@ -96,6 +96,7 @@ export function valider(r: Racines): Constat[] {
   const dossiers = fs.existsSync(c.domaines)
     ? fs.readdirSync(c.domaines, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_")).map((d) => d.name)
     : [];
+  const signauxVus = new Map<string, string>();
   for (const d of manifeste.domaines) {
     if (!/^[a-z0-9-]+$/.test(d.id)) err(rel(c.manifeste), `identifiant de domaine invalide : ${d.id}`);
     if (d.statut === "beta") {
@@ -103,6 +104,14 @@ export function valider(r: Racines): Constat[] {
         if (!fs.existsSync(path.join(c.domaines, d.id, f))) err(`domaines/${d.id}/${f}`, `domaine en bêta sans ${f}`);
       }
       if (d.signaux.length === 0) avert(rel(c.manifeste), `domaine ${d.id} sans signaux discriminants`);
+      // Décision 2 : identifiants kebab-case, uniques dans tout le manifeste, au plus max_signaux par domaine.
+      if (d.signaux.length > manifeste.max_signaux) err(rel(c.manifeste), `domaine ${d.id} : ${d.signaux.length} signaux, au plus ${manifeste.max_signaux} — un signal discrimine, il ne catalogue pas`);
+      for (const sg of d.signaux) {
+        if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(sg.id)) err(rel(c.manifeste), `signal « ${sg.id} » (${d.id}) : identifiant kebab-case attendu`);
+        if (!sg.libelle.trim()) err(rel(c.manifeste), `signal « ${sg.id} » (${d.id}) : libellé vide`);
+        if (signauxVus.has(sg.id)) err(rel(c.manifeste), `signal « ${sg.id} » en double : déjà dans ${signauxVus.get(sg.id)}`);
+        signauxVus.set(sg.id, d.id);
+      }
     } else if (dossiers.includes(d.id)) {
       avert(rel(c.manifeste), `domaine ${d.id} déclaré « décrit » mais un dossier existe : passer en bêta ou retirer le dossier`);
     }

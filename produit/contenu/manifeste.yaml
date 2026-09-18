@@ -3,6 +3,8 @@
 # contenu/domaines/<id>/ et installation/contexte/<id>.md ; le contexte transverse
 # est contenu/general/contexte.exemple.md (id « general »).
 # Écrit à la main, validé par « node dist/cli.js valider » contre les dossiers.
+# Chaque signal a un identifiant kebab-case, unique dans tout le manifeste : le
+# modèle coche des identifiants, il ne rédige pas (décision 2 du 2026-09-17).
 version: 1
 
 natures:
@@ -10,6 +12,9 @@ natures:
   demande: "« je veux que » — un état cible, rien n'est cassé"
 
 max_domaines: 2
+# Un signal sert à choisir entre deux domaines ; au-delà de six par domaine,
+# ce n'est plus un signal mais un catalogue de symptômes (décision 2).
+max_signaux: 6
 
 questions_rattrapage:
   - "Qui est touché ? Une personne, un groupe corrélé à un lieu ou un lien, ou tout le monde ?"
@@ -22,10 +27,14 @@ domaines:
     statut: beta
     suit: le chemin d'accès (lien, site, VPN, wifi)
     signaux:
-      - dépend du lieu ou du lien (marche au bureau, pas en VPN ; site A oui, site B non ; filaire oui, wifi non)
-      - tous les services touchés en même temps
-      - population corrélée à un lieu ou un lien (un étage, un site, les télétravailleurs)
-      - symptômes de transport (timeout, coupures intermittentes, lenteur sur tout)
+      - id: depend-du-lieu
+        libelle: dépend du lieu ou du lien (marche au bureau, pas en VPN ; site A oui, site B non ; filaire oui, wifi non)
+      - id: tous-services-touches
+        libelle: tous les services touchés en même temps
+      - id: population-lieu-lien
+        libelle: population corrélée à un lieu ou un lien (un étage, un site, les télétravailleurs)
+      - id: symptomes-transport
+        libelle: symptômes de transport (timeout, coupures intermittentes, lenteur sur tout)
     tags: [vpn, dns, proxy-internet, wifi, ouverture-flux, creation-vlan]
 
   - id: systeme
@@ -33,10 +42,14 @@ domaines:
     statut: beta
     suit: un service partagé, quel que soit le chemin
     signaux:
-      - un service précis touché, les autres vont bien
-      - indépendant du chemin d'accès (mêmes symptômes en VPN, sur site, depuis tout poste)
-      - population = tous les utilisateurs du service, où qu'ils soient
-      - symptômes côté serveur (disque plein, service arrêté, certificat expiré, sauvegarde en échec)
+      - id: un-service-touche
+        libelle: un service précis touché, les autres vont bien
+      - id: independant-du-chemin
+        libelle: indépendant du chemin d'accès (mêmes symptômes en VPN, sur site, depuis tout poste)
+      - id: tous-utilisateurs-du-service
+        libelle: population = tous les utilisateurs du service, où qu'ils soient
+      - id: symptomes-serveur
+        libelle: symptômes côté serveur (disque plein, service arrêté, certificat expiré, sauvegarde en échec)
     tags: [virtualisation, stockage, sauvegarde, messagerie, certificat, tache-planifiee, creation-partage, restauration-fichier]
 
   - id: poste-de-travail
@@ -44,9 +57,12 @@ domaines:
     statut: beta
     suit: la machine d'un utilisateur, côté logiciel
     signaux:
-      - suit la machine (même utilisateur sur un autre poste, pas de problème)
-      - un seul poste touché, services et réseau sains pour les autres
-      - le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
+      - id: suit-la-machine
+        libelle: suit la machine (même utilisateur sur un autre poste, pas de problème)
+      - id: un-seul-poste
+        libelle: un seul poste touché, services et réseau sains pour les autres
+      - id: os-repond
+        libelle: le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
     tags: [application, profil, securite, impression, mise-a-jour, installation-logiciel, preparation-poste]
 
   - id: materiel
@@ -54,9 +70,12 @@ domaines:
     statut: beta
     suit: un objet physique
     signaux:
-      - symptômes physiques (rien ne s'allume, bruit, surchauffe, écran noir ou fissuré)
-      - persiste hors logiciel (avant l'OS, ou sur un environnement sain)
-      - l'échange de l'objet fait disparaître le problème
+      - id: symptomes-physiques
+        libelle: symptômes physiques (rien ne s'allume, bruit, surchauffe, écran noir ou fissuré)
+      - id: persiste-hors-logiciel
+        libelle: persiste hors logiciel (avant l'OS, ou sur un environnement sain)
+      - id: echange-objet-resout
+        libelle: l'échange de l'objet fait disparaître le problème
     tags: [sav, stock, peripherique, salle-technique, garantie, remplacement-materiel, commande-materiel]
 
   - id: identite
@@ -64,9 +83,12 @@ domaines:
     statut: beta
     suit: le compte d'une personne, quel que soit le poste
     signaux:
-      - suit la personne (mêmes symptômes quel que soit le poste)
-      - le service répond mais refuse (mot de passe rejeté, accès refusé, compte verrouillé)
-      - corrélé à un événement de compte (changement de mot de passe, de service, retour de congés)
+      - id: suit-la-personne
+        libelle: suit la personne (mêmes symptômes quel que soit le poste)
+      - id: service-repond-mais-refuse
+        libelle: le service répond mais refuse (mot de passe rejeté, accès refusé, compte verrouillé)
+      - id: correle-evenement-compte
+        libelle: corrélé à un événement de compte (changement de mot de passe, de service, retour de congés)
     tags: [synchronisation, droits-acces, compte-service, verrouillage, mfa, creation-compte, depart-collaborateur, attribution-droits]
 
   - id: applicatif
@@ -74,7 +96,10 @@ domaines:
     statut: beta
     suit: une fonction d'une application qui reste accessible
     signaux:
-      - l'accès fonctionne, c'est dedans que ça se passe mal
-      - lié à une action ou une donnée précise (tel écran, tel enregistrement)
-      - reproductible depuis tout poste et tout compte aux mêmes droits
+      - id: acces-ok-dedans-ko
+        libelle: l'accès fonctionne, c'est dedans que ça se passe mal
+      - id: lie-action-ou-donnee
+        libelle: lié à une action ou une donnée précise (tel écran, tel enregistrement)
+      - id: reproductible-partout
+        libelle: reproductible depuis tout poste et tout compte aux mêmes droits
     tags: [editeur, integration, environnement, acces-applicatif, parametrage, habilitation-applicative, mise-a-jour-applicative]

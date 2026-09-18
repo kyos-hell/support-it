@@ -20,7 +20,9 @@ seulement pour celui-là.
 - Les **domaines** validés par le technicien. Les domaines proposés et la
   chaîne d'escalade viennent du brouillon et des skills chargés : le
   serveur les a, ne pas les reconstituer de mémoire.
-- Les **signaux** retenus : ceux qui ont été vérifiés, pas ceux supposés.
+- Les **signaux** : ceux cochés au triage sont déjà dans le brouillon ; n'en
+  ajouter (`{ id, preuve }`) que si un signal du manifeste s'est révélé en
+  cours de route. Le serveur écrit la section par libellé.
 - La **conclusion** : la cause retenue et comment elle a été établie.
 - Le **plan d'action** validé, tel que proposé (la séquence numérotée,
   une commande par étape) — obligatoire pour un ticket résolu.

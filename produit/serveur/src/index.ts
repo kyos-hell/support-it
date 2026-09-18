@@ -8,6 +8,7 @@ import { lireVersion, racines } from "./config.js";
 import { ErreurContexte, ecrireSection, obtenirSections, rendreSections } from "./contexte.js";
 import { ErreurEnCours, LIMITES, etatBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
 import { ErreurKb, lireCas, publier, rechercher, rendreCas, rendreRecherche } from "./kb.js";
+import { identifiantsSignaux, lireManifeste } from "./manifeste.js";
 import { casInstruit, noterCas, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
 import { ErreurSkill, chargerSkills } from "./skills.js";
 import { enregistrerTicket } from "./tickets.js";
@@ -22,6 +23,19 @@ const version = lireVersion(r);
  * reconstruit par resume_ticket. Sans brouillon courant, aucun refus.
  */
 const session = nouvelleSession();
+
+/**
+ * Les enums construits depuis le manifeste au démarrage (décision 2) : une
+ * chaîne libre est rejetée par le schéma avant notre code. Un manifeste
+ * modifié est vu au redémarrage — une session = un ticket, c'est acceptable.
+ */
+const manifeste = lireManifeste(r);
+const enumOuChaine = (valeurs: string[]) => (valeurs.length ? z.enum(valeurs as [string, ...string[]]) : z.string().min(1));
+const DOMAINE = enumOuChaine(manifeste.domaines.map((d) => d.id));
+const SIGNAL = z.object({
+  id: enumOuChaine(identifiantsSignaux(manifeste)).describe("Identifiant du signal, tel qu'écrit au manifeste"),
+  preuve: z.string().max(LIMITES.signal).describe(`L'extrait du ticket qui montre le signal (≤ ${LIMITES.signal} car.), libre`),
+});
 
 const server = new McpServer({ name: "support-it", version });
 
@@ -147,9 +161,9 @@ server.registerTool(
     inputSchema: {
       symptome_initial: z.string().min(1).describe("Le symptôme tel qu'exprimé au départ, sans reformulation"),
       nature: z.enum(["incident", "demande"]),
-      domaines_proposes: z.array(z.string()).describe("Domaines proposés par le triage, dans l'ordre"),
-      domaines_valides: z.array(z.string()).describe("Domaines retenus après validation du technicien"),
-      signaux: z.array(z.string()).optional().describe("Signaux discriminants retenus, vérifiés"),
+      domaines_proposes: z.array(DOMAINE).describe("Domaines proposés par le triage, dans l'ordre — ceux du brouillon sont pris s'il existe"),
+      domaines_valides: z.array(DOMAINE).describe("Domaines retenus après validation du technicien"),
+      signaux: z.array(SIGNAL).optional().describe("Signaux cochés { id, preuve } qui manquent au brouillon ; le serveur écrit la section « Signaux retenus » par libellé"),
       conclusion: z.string().min(1).describe("Diagnostic posé ou étude de la demande, et cause retenue"),
       conclusion_humaine: z.string().optional().describe("Baseline : conclusion du technicien avant l'outil"),
       resolu_par: z.enum(["outil", "humain", "les-deux"]).optional().describe("Seulement si le technicien l'a dit ; omis = null, jamais une valeur supposée"),
@@ -227,11 +241,11 @@ server.registerTool(
       pause: z.boolean().optional().describe("Vrai sur « je mets en pause » du technicien — le seul mot d'étape que le serveur ne voit pas ; levé au prochain appel"),
       symptome_initial: z.string().optional().describe("Tel qu'exprimé par le technicien — obligatoire à la création"),
       nature: z.enum(["incident", "demande"]).optional(),
-      domaines_proposes: z.array(z.string()).optional(),
-      domaines_valides: z.array(z.string()).optional(),
+      domaines_proposes: z.array(DOMAINE).optional().describe("Les domaines que les signaux cochés désignent, dans l'ordre ; refusé si l'un d'eux n'a aucun signal coché (incident)"),
+      domaines_valides: z.array(DOMAINE).optional().describe("Ceux que le technicien a validés"),
       prochaine_etape: z.string().optional().describe(`Une ligne (≤ ${LIMITES.prochaine_etape} car.) : ce qu'on fait en premier à la reprise`),
-      signaux: z.array(z.string()).optional().describe(`Un fait observé qui a servi au triage, une ligne (≤ ${LIMITES.signal} car.), sans le raisonnement ni « → domaine » — ajoutés`),
-      verifications: z.array(z.string()).optional().describe(`Un ACQUIS par entrée : « cran N : commande → résultat », une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
+      signaux: z.array(SIGNAL).optional().describe("Les signaux du manifeste COCHÉS au triage, avec pour chacun l'extrait du ticket qui le montre. Un constat de diagnostic n'est pas un signal : il va dans verifications — ajoutés, dédoublonnés sur l'id"),
+      verifications: z.array(z.string()).optional().describe(`Un constat vérifié par entrée — « cran N : commande → résultat », ou la lecture d'un portail ou d'un journal — une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
       questions: z.array(z.object({ question: z.string(), reponse: z.string(), section: z.string().optional() })).optional().describe(`Une DÉCISION du technicien : question et réponse courtes (≤ ${LIMITES.question} car. chacune). La référence du ticket a son champ, elle n'est pas une question — ajoutées`),
       plan_action: z.string().optional().describe("Le plan TEL QUE PROPOSÉ au technicien, sinon vide. Seul champ long. Les éléments déjà arrêtés avant le plan sont des verifications — remplace"),
       actions: z.array(z.string()).optional().describe(`Ce que le technicien a exécuté et le résultat, une ligne (≤ ${LIMITES.action} car.) — ajoutées`),
@@ -249,6 +263,7 @@ server.registerTool(
       session.brouillonCourant = p.id;
       const lignes = [
         `${p.cree ? "Brouillon créé" : p.lie === "reference" ? "Brouillon rattaché par la référence et mis à jour" : p.lie === "symptome" ? "Brouillon rattaché par le symptôme (même ticket, id oublié) et mis à jour" : "Brouillon mis à jour"} : ${p.id} · étape ${p.etape}`,
+        `- domaines classés par les signaux cochés : ${p.classement}`,
         `- fichier : ${p.fichier}`,
         p.passation ? `- passation enregistrée : de ${p.passation.de} à ${p.passation.a}` : "",
         `Continuer les points d'étape avec id: "${p.id}". À la clôture : save_ticket(id: "${p.id}", …).`,
@@ -279,7 +294,7 @@ server.registerTool(
       return erreur(new Error(`aucun ticket en cours pour « ${ticket} ». ${rendreListe(listerBrouillons(r))}`));
     }
     reconstruire(session, b.id, etatBrouillon(b));
-    return texte(rendreReprise(b));
+    return texte(rendreReprise(b, manifeste));
   },
 );
 

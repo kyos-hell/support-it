@@ -5,8 +5,9 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
-import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type QuestionPosee } from "./encours.js";
+import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, lireSignaux, rendreSignal, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type QuestionPosee, type SignalCoche } from "./encours.js";
 import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
+import { lireManifeste } from "./manifeste.js";
 import { lireDocument, sections } from "./markdown.js";
 import { escaladesDerivees, fusionnerEtat, skillCharge, type Session } from "./session.js";
 
@@ -28,7 +29,8 @@ export interface EntreeTicket {
   /** Jamais fournis par le modèle : dérivés des skills chargés et des cas lus (brouillon ∪ session). */
   escalades?: string[];
   cas_lus?: string[];
-  signaux?: string[];
+  /** Cochés : { id, preuve }. Le serveur écrit la section « Signaux retenus » par libellé. */
+  signaux?: SignalCoche[];
   conclusion: string;
   conclusion_humaine?: string;
   resolu_par?: ResoluPar;
@@ -69,8 +71,9 @@ function bloc(titre: string, id: string, contenu: string | undefined): string {
   return `## ${id} — ${titre}\n\n${(contenu ?? "").trim() || "_(rien)_"}\n`;
 }
 
-export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
+export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racines): string {
   const { iso } = horodatage(date);
+  const m = r ? lireManifeste(r) : null;
   const entete = {
     id,
     date: iso,
@@ -101,7 +104,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date): string {
     `# Ticket ${id}${e.reference?.trim() ? ` — ${e.reference.trim()}` : ""}\n\n` +
     bloc("Symptôme initial, tel qu'exprimé", "symptome-initial", e.symptome_initial) +
     "\n" +
-    bloc("Signaux retenus", "signaux", (e.signaux ?? []).map((s) => `- ${s}`).join("\n")) +
+    bloc("Signaux retenus", "signaux", (e.signaux ?? []).map((s) => `- ${rendreSignal(m, s)}`).join("\n")) +
     "\n" +
     bloc("Conclusion", "conclusion", e.conclusion) +
     "\n" +
@@ -181,7 +184,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       symptome_initial: brouillon.symptome_initial || e.symptome_initial,
       domaines_proposes: brouillon.domaines_proposes.length ? brouillon.domaines_proposes : e.domaines_proposes,
       plan_action: brouillon.plan_action || e.plan_action,
-      signaux: fusion(brouillon.signaux, e.signaux ?? [], (x) => x),
+      signaux: fusion(brouillon.signaux, lireSignaux(e.signaux), (x) => x.id || x.preuve),
       questions: fusion(brouillon.questions, e.questions ?? [], (q) => q.question),
       // Ce que la session a vu depuis le dernier save_progress compte aussi.
       escalades: session ? escaladesDerivees(fusionnerEtat(etatBrouillon(brouillon), session).skills_charges) : escaladesBrouillon(brouillon),
@@ -203,7 +206,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
   if (e.statut === "resolu" && !(e.plan_action ?? "").trim()) {
     throw new ErreurTicket("un ticket résolu a un plan d'action : celui qui a été validé et exécuté (plan_action), tel que proposé.");
   }
-  fs.writeFileSync(fichier, rendreTicket(id, e, date), { encoding: "utf8", flag: "wx" });
+  fs.writeFileSync(fichier, rendreTicket(id, { ...e, signaux: lireSignaux(e.signaux) }, date, r), { encoding: "utf8", flag: "wx" });
   const brouillon_retire = brouillon ? retirerBrouillon(r, brouillon.id) : false;
 
   const journal = ecrireJournal(r, id, e, date);
