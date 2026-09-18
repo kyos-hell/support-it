@@ -5,7 +5,7 @@ import path from "node:path";
 import { chemins, type Racines } from "./config.js";
 import { etatRemplissage, obtenirSections, rendreEtat, rendreSections } from "./contexte.js";
 import { BROUILLONS_LISTES_MAX, listerBrouillons, rendreListe } from "./encours.js";
-import { lireManifeste, rendreManifeste, trouverDomaine, type Manifeste } from "./manifeste.js";
+import { lireManifeste, rendreManifeste, tagsCandidats, trouverDomaine, type Bibliotheque, type Manifeste } from "./manifeste.js";
 import { lireDocument, sansCommentaires } from "./markdown.js";
 
 export type Nature = "incident" | "demande";
@@ -48,7 +48,26 @@ function listeDomaines(m: Manifeste): string {
 export type Reserve = "triage" | "cloture" | "remplissage";
 const RESERVES: Reserve[] = ["triage", "cloture", "remplissage"];
 
-function chargerReserve(r: Racines, nom: Reserve, m: Manifeste): string {
+export interface OptionsChargement {
+  biblio?: Bibliotheque;
+  /** Les domaines validés (et escalades) du brouillon courant ; null sans brouillon → toute la bibliothèque. */
+  domainesValides?: string[] | null;
+}
+
+/** Décision 1 : la liste des tags cochables, servie avec `cloture` — filtrée sur les domaines validés quand le serveur les connaît. */
+function rendreTagsCandidats(o: OptionsChargement): string {
+  if (!o.biblio) return "";
+  const domaines = o.domainesValides ?? [];
+  const candidats = tagsCandidats(o.biblio, domaines);
+  const titre = domaines.length ? `# Tags cochables pour ce ticket (domaines ${domaines.join(", ")} + transverses)` : "# Tags cochables (toute la bibliothèque — aucun brouillon courant)";
+  return (
+    `\n\n---\n\n${titre}\n\n` +
+    (candidats.length ? candidats.map((t) => `\`${t}\``).join(" · ") : "_(aucun)_") +
+    "\n\nAu plus cinq, ceux qui distinguent ce cas ; un tag hors liste est refusé. Nature, domaines, escalades et référence sont ajoutés automatiquement."
+  );
+}
+
+function chargerReserve(r: Racines, nom: Reserve, m: Manifeste, o: OptionsChargement = {}): string {
   const c = chemins(r);
   const fichier = nom === "triage" ? c.triage : nom === "cloture" ? c.cloture : c.remplissage;
   if (!fs.existsSync(fichier)) throw new ErreurSkill(`fichier produit manquant : ${path.basename(fichier)}`);
@@ -62,6 +81,7 @@ function chargerReserve(r: Racines, nom: Reserve, m: Manifeste): string {
   if (nom === "remplissage") {
     return `${corps}\n\n---\n\n# État de remplissage du contexte (calculé à l'instant)\n\n${rendreEtat(etatRemplissage(r))}`;
   }
+  if (nom === "cloture") return corps + rendreTagsCandidats(o);
   return corps;
 }
 
@@ -117,13 +137,13 @@ function chargerDomaine(r: Racines, m: Manifeste, id: string, nature: Nature): {
   return { texte: out.join("\n"), sections: requis.filter((s) => s.etat !== "inconnue").map((s) => s.id) };
 }
 
-export function chargerSkills(r: Racines, domaines: string[], nature?: Nature): SkillRendu {
+export function chargerSkills(r: Racines, domaines: string[], nature?: Nature, o: OptionsChargement = {}): SkillRendu {
   const m = lireManifeste(r);
   if (domaines.length === 0) throw new ErreurSkill("aucun domaine demandé");
   const reserves = domaines.filter((d): d is Reserve => (RESERVES as string[]).includes(d));
   if (reserves.length > 0) {
     if (domaines.length !== 1) throw new ErreurSkill("`triage`, `cloture` et `remplissage` se chargent seuls, sans autre domaine");
-    return { texte: chargerReserve(r, reserves[0], m), domaines: [reserves[0]], sectionsServies: [] };
+    return { texte: chargerReserve(r, reserves[0], m, o), domaines: [reserves[0]], sectionsServies: [] };
   }
   if (!nature) throw new ErreurSkill("`nature` est obligatoire pour charger un domaine : incident ou demande");
   // E1 : dédoublonner avant de compter — ["reseau","systeme","reseau"] fait deux domaines.

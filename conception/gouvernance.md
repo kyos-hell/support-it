@@ -45,8 +45,8 @@ fraîcheur : il relit `historique/` et corrige. Invariant repris de
 | --- | --- | --- |
 | Technicien | Chaque utilisateur de `/support` | Valide le triage ambigu, le plan, la publication ; exécute. Tient les points d'étape (`save_progress`) ; met en pause avec la prochaine étape notée. |
 | Repreneur | Le technicien qui reprend un ticket en cours d'un collègue | Lit le brouillon (`resume_ticket`), vérifie que le collègue n'y est plus si le dernier point est récent, continue ; la passation est enregistrée dans le brouillon puis dans le ticket final. |
-| Référent de domaine | Nommé dans `general/referents` | Applique les mises à jour de contexte, parcourt le journal, garde la fraîcheur. |
-| Rédacteur du produit | L'équipe projet | Écrit skills et gabarits, lance `valider` et `npm test` avant livraison, fait monter les tags libres au manifeste. |
+| Référent de domaine | Nommé dans `general/referents` | Applique les mises à jour de contexte, parcourt le journal, garde la fraîcheur. **Tient `installation/tags.yaml`** (décision 1) : ajoute un tag d'entreprise quand l'équipe constate qu'il manque, retire un tag qui n'a jamais servi ; le modèle ne propose jamais de tag. Lance l'audit (`/support audit` ou `node dist/cli.js audit`) et donne le oui sur ce qu'il propose. |
+| Rédacteur du produit | L'équipe projet | Écrit skills et gabarits, lance `valider` et `npm test` avant livraison, fait monter au manifeste un tag client devenu générique — un jugement à la version suivante, pas un compteur. |
 
 ## 4. Format du plan d'action
 

@@ -97,7 +97,14 @@ export function valider(r: Racines): Constat[] {
     ? fs.readdirSync(c.domaines, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith("_")).map((d) => d.name)
     : [];
   const signauxVus = new Map<string, string>();
+  const tagsVus = new Map<string, string>();
   for (const d of manifeste.domaines) {
+    // Décision 1 : la bibliothèque produit — kebab-case, un tag dans un seul domaine.
+    for (const t of d.tags) {
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(t)) err(rel(c.manifeste), `tag « ${t} » (${d.id}) : kebab-case attendu`);
+      if (tagsVus.has(t)) err(rel(c.manifeste), `tag « ${t} » en double : déjà dans ${tagsVus.get(t)}`);
+      tagsVus.set(t, d.id);
+    }
     if (!/^[a-z0-9-]+$/.test(d.id)) err(rel(c.manifeste), `identifiant de domaine invalide : ${d.id}`);
     if (d.statut === "beta") {
       for (const f of ["skill.md", "demandes.md", "contexte.exemple.md"]) {

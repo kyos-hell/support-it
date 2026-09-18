@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { assurerInstallation, chemins, lireVersion, racines } from "./config.js";
 import { etatRemplissage, gabaritsLivres } from "./contexte.js";
 import { ageJours, JOURS_BROUILLON_ANCIEN, lireEnCours } from "./encours.js";
+import { bibliotheque, lireManifeste } from "./manifeste.js";
 import { rendreConstats, valider } from "./validation.js";
 
 const r = racines();
@@ -31,6 +32,20 @@ Usage : node dist/cli.js <commande>
 
 Variables : SUPPORT_IT_PRODUIT, SUPPORT_IT_INSTALLATION (défauts : le dossier produit/ du serveur, et installation/ à côté).`);
 }
+
+/** Le tags.yaml livré vide : la consigne en commentaire, une rubrique par domaine. */
+const TAGS_YAML_VIDE = `# Tags propres à l'entreprise (décision 1 du 2026-09-14) : application maison,
+# site, outil interne, plateforme. Même forme que le manifeste du produit : une
+# liste par domaine, plus « general » pour les tags transverses (plateformes,
+# outils) acceptés quel que soit le domaine. kebab-case ASCII. Un tag déjà
+# présent dans le produit est ignoré ici. Cette liste ne grandit que par la
+# main du référent : le modèle coche dedans, il ne propose rien.
+#
+# general: [m365, azure]
+# reseau: [vpn-site-a-site]
+# applicatif: [app-compta]
+general: []
+`;
 
 /** installation/VERSION : la version du produit qui a initialisé ou mis à jour cette installation. */
 function versionInstallation(): string | null {
@@ -58,6 +73,12 @@ function init(): void {
     copies.push(cible);
   }
   fs.writeFileSync(path.join(r.installation, "VERSION"), `${version}\n`, "utf8");
+  // L'étage client des tags : créé vide avec sa consigne, jamais écrasé.
+  let tagsCrees = false;
+  if (!fs.existsSync(c.tagsClient)) {
+    fs.writeFileSync(c.tagsClient, TAGS_YAML_VIDE, "utf8");
+    tagsCrees = true;
+  }
   console.log(`installation : ${r.installation}`);
   if (avant === null) console.log(`  mode : ${gardes.length ? "REJOINDRE" : "INITIALISER"} — produit ${version}`);
   else if (avant !== version) console.log(`  mode : MISE À JOUR ${avant} → ${version}`);
@@ -65,6 +86,7 @@ function init(): void {
   for (const f of copies) console.log(`  copié   ${f}`);
   for (const f of gardes) console.log(`  gardé   ${f} (existant, non touché)`);
   if (!copies.length) console.log("  aucun nouveau gabarit à copier");
+  console.log(`  ${tagsCrees ? "créé    " : "gardé   "}${c.tagsClient}${tagsCrees ? " (étage client des tags, vide)" : " (existant, non touché)"}`);
   console.log(`  dossiers : contexte/, en-cours/, tickets/, kb/, journal/`);
 }
 
@@ -95,6 +117,11 @@ function etat(): number {
     if (e.volumineuses.length) console.log(`             VOLUMINEUSES (> 40 lignes ou > 2 500 car., inventaire à élaguer ?) : ${e.volumineuses.join(", ")}`);
     vides += e.vides.length;
   }
+  // L'étage client des tags : lisible, sans doublon avec le produit.
+  const b = bibliotheque(r, lireManifeste(r));
+  const nClient = b.generaux.length + [...b.parDomaine.entries()].reduce((n, [d, l]) => n + l.length - (lireManifeste(r).domaines.find((x) => x.id === d)?.tags.length ?? 0), 0);
+  console.log(`Tags : ${b.tous.length} cochables, dont ${nClient} de l'entreprise (${fs.existsSync(c.tagsClient) ? "tags.yaml" : "tags.yaml ABSENT — lancer « init »"})`);
+  for (const a of b.avertissements) console.log(`  AVERTISSEMENT ${a}`);
   const enCours = lireEnCours(r);
   console.log(`Tickets en cours : ${enCours.actifs.length}`);
   for (const b of enCours.actifs) {

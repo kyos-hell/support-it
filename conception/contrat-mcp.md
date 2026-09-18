@@ -140,7 +140,7 @@ est un choix du modèle sur la mécanique.
 
 | | |
 | --- | --- |
-| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides` (enum des domaines du manifeste), `conclusion`, `statut`. Optionnels : `signaux[{id, preuve}]` (id : enum des signaux du manifeste), `conclusion_humaine`, `resolu_par`, `plan_action` (obligatoire si `resolu`), `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags`, `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise), `id` (identifiant du brouillon — facultatif, voir §5 ter). **Disparu le 2026-09-18** : `escalades`, dérivées des skills chargés. |
+| Entrée | Champs obligatoires : `symptome_initial`, `nature`, `domaines_proposes`, `domaines_valides` (enum des domaines du manifeste), `conclusion`, `statut`. Optionnels : `signaux[{id, preuve}]` (id : enum des signaux du manifeste), `conclusion_humaine`, `resolu_par`, `plan_action` (obligatoire si `resolu`), `questions[{question, reponse, section?}]`, `mises_a_jour_contexte[{section, contenu}]`, `tags` (enum de la bibliothèque, ≤ 5, des domaines validés ou transverses — décision 1), `duree_minutes`, `reference` (numéro du ticket dans l'outil de ticketing de l'entreprise), `id` (identifiant du brouillon — facultatif, voir §5 ter). **Disparu le 2026-09-18** : `escalades`, dérivées des skills chargés. |
 | Lit | Rien. |
 | Écrit | `installation/tickets/<id>.md` et, s'il y a eu des questions, **un** journal `installation/journal/<id>.md` (une section par question, sections candidates en en-tête — un fichier par ticket depuis le 2026-09-11, un par question avant). |
 
@@ -163,7 +163,7 @@ question dont la réponse est une information d'entreprise porte sa
 
 | | |
 | --- | --- |
-| Entrée | `ticket_id` renvoyé par `save_ticket` ; `tags` supplémentaires validés. |
+| Entrée | `ticket_id` renvoyé par `save_ticket` ; `tags` supplémentaires : enum de la bibliothèque, ≤ 5, des domaines validés du ticket ou transverses (décision 1). Refusé si le ticket n'est pas `resolu` ; la réponse cite le symptôme publié. |
 | Lit | `installation/tickets/<id>.md`. |
 | Écrit | `installation/kb/<id>.md`. |
 
@@ -337,6 +337,21 @@ brouillon zombie est retiré au passage (A8).
   `SUPPORT_IT_INSTALLATION` change (H1).
 - Une erreur d'usage renvoie un texte avec `isError` ; une erreur de
   livraison (fichier produit manquant) aussi, mais en nommant le fichier.
+- **Les tags sont une bibliothèque fermée à deux étages** (décision 1,
+  2026-09-18) : le produit (les `tags:` par domaine du manifeste) et le
+  client (`installation/tags.yaml`, même forme, plus `general` pour les
+  transverses — plateformes, outils). Produit ∪ client est un enum du schéma
+  de `save_ticket` et `publish_kb`, plafonné à cinq tags cochés ; un tag
+  d'un domaine hors des domaines validés (et escalades) du ticket est refusé
+  par le serveur avec la liste filtrée. `load_skill(["cloture"])` sert la
+  liste filtrée quand un brouillon est courant, toute la bibliothèque sinon.
+  `search_kb` signale un tag inconnu avec les tags proches. Les dérivés
+  (nature, domaines validés, escalades, référence) restent automatiques et
+  hors plafond. `tags.yaml` illisible, un tag en doublon avec le produit ou
+  un domaine inconnu : averti sur stderr au démarrage et dans `etat`,
+  l'entrée est ignorée, le serveur démarre. La liste ne grandit que par la
+  main du référent ; les entrées de base antérieures (tags libres) ne sont
+  pas migrées.
 - **Les signaux et les domaines sont des enums** construits depuis le
   manifeste au démarrage du serveur (décision 2, 2026-09-18) : le modèle
   coche, il ne rédige pas. Le serveur rend l'identifiant avec le libellé

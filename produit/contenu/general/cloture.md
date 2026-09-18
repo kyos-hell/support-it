@@ -41,9 +41,11 @@ seulement pour celui-là.
   ticket, `search_kb` le retrouvera. Test : *un autre technicien, sur un
   autre ticket dans six mois, aurait-il besoin de ce fait avant sa première
   question ?* Rien n'est écrit sans le oui du technicien (section suivante).
-- Les **tags** libres : les clés selon-cas rencontrées (vpn, dns, stockage,
-  certificat…) et deux ou trois mots-clés du symptôme. Le domaine et la
-  nature sont ajoutés automatiquement.
+- Les **tags** : **cocher au plus cinq** dans la liste servie à la fin de
+  ce document — ceux qui distinguent ce cas (la cause, pas le domaine). Un
+  tag hors liste ou d'un autre domaine est refusé ; on n'en invente pas, le
+  référent enrichit `tags.yaml`. Nature, domaines, escalades et référence
+  sont ajoutés automatiquement.
 - La **référence** du ticket dans l'outil de ticketing, telle que donnée
   par le technicien (au début, ou en cours de route). Si elle n'a jamais été
   donnée, la demander une fois ici ; « pas de référence » suffit. Elle est

@@ -40,7 +40,7 @@ domaines:
 | --- | --- | --- |
 | Écrit à la main ou généré ? | À la main, validé par script. | Il contient ce qu'aucun dossier ne porte : les domaines décrits mais non implémentés, et leurs signaux. Petit (six entrées), il ne mérite pas un générateur. |
 | Les signaux vivent-ils ici ou dans la taxonomie ? | Ici, en copie **livrée** ; la taxonomie (`conception/`) reste la référence de travail avec ses tableaux de symptômes ambigus. | `conception/` n'est pas livré (2.1). Le triage a besoin des signaux à l'usage. Le script de validation ne compare pas les deux : c'est une discipline de rédaction, à revoir si elle dérive. |
-| Les tags du manifeste et ceux de la base sont-ils le même vocabulaire ? | **Oui, par extension.** Niveau 1 : identifiants de domaine. Niveau 2 : tags déclarés ici — clés `selon-cas` des skills et noms des demandes. Niveau 3 : tags libres posés à la clôture. La base utilise les trois ; le manifeste déclare les deux premiers. | Un vocabulaire unique rend lisible pourquoi un cas a matché (F). Les tags libres absorbent ce que la taxonomie ne prévoit pas encore ; ceux qui reviennent montent au niveau 2 lors d'une livraison. Question ouverte de `plan.md` section 4, tranchée. |
+| Les tags du manifeste et ceux de la base sont-ils le même vocabulaire ? | **Oui, et il est fermé** (révisé le 2026-09-18, décision 1 de `plan-after-beta.md`). Niveau 1 : identifiants de domaine, nature, escalades, référence — dérivés par le serveur. Niveau 2 : tags déclarés ici, par domaine — clés `selon-cas` des skills et noms des demandes. Niveau 2 bis : tags de l'entreprise dans `installation/tags.yaml`, même forme, plus `general` pour les transverses. Plus de niveau 3 : aucun tag libre n'entre en base. | 74 tags distincts sur trois entrées réelles, des coquilles, des tags qui matchent tout : un tag libre est un choix du modèle sur la mécanique. La liste ne grandit que par la main du référent (`tags.yaml`), et un tag client générique monte ici à la version suivante — un jugement, pas un compteur. |
 | Chemins ? | Jamais. `id` → `produit/contenu/domaines/<id>/` et `installation/contexte/<id>.md` par convention, résolue par le serveur avec ses deux racines. | Le manifeste reste remplaçable en bloc avec `produit/` (H). |
 
 ## 4. Validation (script `valider`)
@@ -50,3 +50,6 @@ domaines:
   `_template`) est déclaré ; un domaine `decrit` n'a pas de dossier.
 - Toute clé `selon-cas` d'un `skill.md` figure dans les `tags` de son domaine
   (avertissement sinon) — c'est ce qui tient le vocabulaire des tags.
+- Les tags sont en kebab-case et un tag n'est que dans un domaine (erreur
+  sinon) ; les signaux ont un identifiant kebab-case unique dans tout le
+  manifeste, au plus `max_signaux` par domaine (2026-09-18).

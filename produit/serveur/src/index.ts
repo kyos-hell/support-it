@@ -6,9 +6,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { lireVersion, racines } from "./config.js";
 import { ErreurContexte, ecrireSection, obtenirSections, rendreSections } from "./contexte.js";
-import { ErreurEnCours, LIMITES, etatBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
+import { ErreurEnCours, LIMITES, escaladesBrouillon, etatBrouillon, lireBrouillon, listerBrouillons, rendreListe, rendreReprise, sauverProgression, trouverBrouillon } from "./encours.js";
 import { ErreurKb, lireCas, publier, rechercher, rendreCas, rendreRecherche } from "./kb.js";
-import { identifiantsSignaux, lireManifeste } from "./manifeste.js";
+import { bibliotheque, identifiantsSignaux, lireManifeste } from "./manifeste.js";
 import { casInstruit, noterCas, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
 import { ErreurSkill, chargerSkills } from "./skills.js";
 import { enregistrerTicket } from "./tickets.js";
@@ -32,6 +32,11 @@ const session = nouvelleSession();
 const manifeste = lireManifeste(r);
 const enumOuChaine = (valeurs: string[]) => (valeurs.length ? z.enum(valeurs as [string, ...string[]]) : z.string().min(1));
 const DOMAINE = enumOuChaine(manifeste.domaines.map((d) => d.id));
+/** La bibliothèque de tags (décision 1) : produit ∪ client, un enum ; tags.yaml illisible ou en doublon → averti sur stderr, étage client ignoré. */
+const biblio = bibliotheque(r, manifeste);
+for (const a of biblio.avertissements) console.error(`support-it : ${a}`);
+const TAGS_MAX = 5;
+const TAGS = z.array(enumOuChaine(biblio.tous)).max(TAGS_MAX);
 const SIGNAL = z.object({
   id: enumOuChaine(identifiantsSignaux(manifeste)).describe("Identifiant du signal, tel qu'écrit au manifeste"),
   preuve: z.string().max(LIMITES.signal).describe(`L'extrait du ticket qui montre le signal (≤ ${LIMITES.signal} car.), libre`),
@@ -61,7 +66,9 @@ server.registerTool(
   },
   async ({ domaines, nature }) => {
     try {
-      const rendu = chargerSkills(r, domaines, nature);
+      // Pour `cloture` : les tags candidats sont filtrés sur les domaines validés du brouillon courant.
+      const courant = session.brouillonCourant ? lireBrouillon(r, session.brouillonCourant) : null;
+      const rendu = chargerSkills(r, domaines, nature, { biblio, domainesValides: courant ? [...courant.domaines_valides, ...escaladesBrouillon(courant)] : null });
       // Noté après un chargement réussi seulement : un refus ne compte pas.
       noterSkill(session, rendu.domaines);
       for (const s of rendu.sectionsServies) noterSection(session, s);
@@ -117,7 +124,7 @@ server.registerTool(
     }
     const res = rechercher(r, tags);
     session.rechercheFaite = true;
-    return texte(rendreRecherche(tags, res));
+    return texte(rendreRecherche(tags, res, biblio));
   },
 );
 
@@ -183,7 +190,7 @@ server.registerTool(
         .optional()
         .describe("Contenu candidat pour les sections de contexte, à destination du référent"),
       statut: z.enum(["resolu", "non-resolu", "hors-domaines-couverts", "escalade-externe"]),
-      tags: z.array(z.string()).optional().describe("Tags libres en plus du domaine et de la nature, ajoutés automatiquement"),
+      tags: TAGS.optional().describe(`Au plus ${TAGS_MAX} tags COCHÉS dans la liste servie par load_skill(["cloture"]) — ceux qui distinguent ce cas. Un tag d'un autre domaine que ceux validés est refusé (les transverses passent). Nature, domaines, escalades et référence sont ajoutés automatiquement, hors plafond`),
       duree_minutes: z.number().int().min(0).optional().describe("Durée du traitement, pour la mesure — calculée par le serveur (création du brouillon → clôture) dès qu'un brouillon existe ; ne sert qu'à un ticket de baseline sans brouillon"),
       reference: z.string().optional().describe("Référence du ticket dans l'outil de ticketing de l'entreprise (ex. INC-12345), telle que donnée par le technicien ; ajoutée aux tags. Jamais inventée : sans référence, omettre"),
       id: z.string().optional().describe("Identifiant du brouillon en cours (renvoyé par save_progress) : le ticket final reprend cet id et le brouillon est retiré. Sans id, le serveur relie par la référence, sinon par le symptôme initial."),
@@ -191,7 +198,7 @@ server.registerTool(
   },
   async (entree) => {
     try {
-      const t = enregistrerTicket(r, entree, session);
+      const t = enregistrerTicket(r, entree, session, biblio);
       vider(session);
       return texte(
         `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n\n` +
@@ -212,12 +219,12 @@ server.registerTool(
       "Les tags du ticket sont repris, complétés par ceux fournis.",
     inputSchema: {
       ticket_id: z.string().min(1).describe("Identifiant renvoyé par save_ticket"),
-      tags: z.array(z.string()).optional().describe("Tags supplémentaires validés"),
+      tags: TAGS.optional().describe(`Au plus ${TAGS_MAX} tags supplémentaires, cochés dans la bibliothèque, des domaines validés du ticket ou transverses`),
     },
   },
   async ({ ticket_id, tags }) => {
     try {
-      const p = publier(r, ticket_id, tags ?? []);
+      const p = publier(r, ticket_id, tags ?? [], biblio);
       return texte(`Publié : ${p.id}\n- symptôme : ${p.symptome}\n- fichier : ${p.fichier}\n- tags : ${p.tags.join(", ")}`);
     } catch (e) {
       if (e instanceof ErreurKb) return erreur(e);

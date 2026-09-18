@@ -47,6 +47,8 @@ export function chemins(r: Racines) {
     enCours: path.join(r.installation, "en-cours"),
     kb: path.join(r.installation, "kb"),
     journal: path.join(r.installation, "journal"),
+    /** L'étage client de la bibliothèque de tags (décision 1) : créé vide par init, édité par le référent. */
+    tagsClient: path.join(r.installation, "tags.yaml"),
   };
 }
 

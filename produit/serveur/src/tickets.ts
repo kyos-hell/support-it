@@ -7,7 +7,7 @@ import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
 import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, lireSignaux, rendreSignal, retirerBrouillon, trouverBrouillon, trouverParSymptome, verifierDomaines, verifierReference, type Brouillon, type QuestionPosee, type SignalCoche } from "./encours.js";
 import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
-import { lireManifeste } from "./manifeste.js";
+import { domaineDuTag, lireManifeste, tagsCandidats, type Bibliotheque } from "./manifeste.js";
 import { lireDocument, sections } from "./markdown.js";
 import { escaladesDerivees, fusionnerEtat, skillCharge, type Session } from "./session.js";
 
@@ -124,7 +124,24 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
  * refuse si `cloture` n'a pas été chargé dans la session. Les escalades
  * sont dérivées des skills chargés, jamais fournies par le modèle.
  */
-export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session): TicketEcrit {
+/**
+ * Décision 1 : un tag coché doit être d'un domaine validé du ticket (ou d'une
+ * escalade), ou transverse. Le refus renvoie la liste filtrée — c'est là que
+ * le modèle la voit s'il ne l'a pas lue dans `cloture`.
+ */
+export function verifierTags(b: Bibliotheque, tags: string[] | undefined, domaines: string[]): void {
+  if (!tags?.length) return;
+  const permis = tagsCandidats(b, domaines);
+  const horsDomaine = tags.filter((t) => !permis.includes(t));
+  if (horsDomaine.length) {
+    const ou = horsDomaine.map((t) => `${t} (${domaineDuTag(b, t) ?? "inconnu"})`).join(", ");
+    throw new ErreurTicket(
+      `tags hors des domaines validés (${domaines.join(", ") || "aucun"}) : ${ou}. Cocher parmi : ${permis.join(", ") || "(aucun tag pour ces domaines)"}.`,
+    );
+  }
+}
+
+export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session, biblio?: Bibliotheque): TicketEcrit {
   assurerInstallation(r);
   const c = chemins(r);
   const date = new Date();
@@ -203,6 +220,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       fichier = path.join(c.tickets, `${id}.md`);
     }
   }
+  if (biblio) verifierTags(biblio, e.tags, [...e.domaines_valides, ...(e.escalades ?? [])]);
   if (e.statut === "resolu" && !(e.plan_action ?? "").trim()) {
     throw new ErreurTicket("un ticket résolu a un plan d'action : celui qui a été validé et exécuté (plan_action), tel que proposé.");
   }

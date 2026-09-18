@@ -5,7 +5,8 @@ import path from "node:path";
 import YAML from "yaml";
 import { assurerInstallation, chemins, type Racines } from "./config.js";
 import { lireDocument, sections } from "./markdown.js";
-import { idValide, lireTicket } from "./tickets.js";
+import { tagsProches, type Bibliotheque } from "./manifeste.js";
+import { idValide, lireTicket, verifierTags, ErreurTicket } from "./tickets.js";
 
 export interface ResultatKb {
   id: string;
@@ -79,7 +80,19 @@ export function rechercher(r: Racines, tags: string[]): { total: number; corresp
 }
 
 /** Rendu compact (~300 caractères par cas) : de quoi choisir, pas de quoi s'en servir — read_kb pour ça. */
-export function rendreRecherche(tags: string[], res: { total: number; correspondants: number; resultats: ResultatKb[] }): string {
+export function rendreRecherche(tags: string[], res: { total: number; correspondants: number; resultats: ResultatKb[] }, biblio?: Bibliotheque): string {
+  // Décision 1 : un tag inconnu de la bibliothèque est signalé avec les tags proches, pas ignoré en silence.
+  const inconnus = biblio ? normaliser(tags).filter((t) => !biblio.tous.includes(t)) : [];
+  const avert = inconnus.length
+    ? inconnus.map((t) => {
+        const proches = biblio ? tagsProches(biblio, t) : [];
+        return `Tag inconnu de la bibliothèque : « ${t} »${proches.length ? ` — proche de : ${proches.join(", ")}` : ""}.`;
+      }).join("\n") + "\n\n"
+    : "";
+  return avert + rendreRecherche0(tags, res);
+}
+
+function rendreRecherche0(tags: string[], res: { total: number; correspondants: number; resultats: ResultatKb[] }): string {
   if (res.total === 0) {
     return "Base de connaissances vide : aucun cas publié pour l'instant. C'est le cas nominal au démarrage — poursuivre avec le plan d'action.";
   }
@@ -173,7 +186,7 @@ export function rendreCas(x: CasLu): string {
 
 export class ErreurKb extends Error {}
 
-export function publier(r: Racines, ticketId: string, tagsSupp: string[] = []): { id: string; fichier: string; tags: string[]; symptome: string } {
+export function publier(r: Racines, ticketId: string, tagsSupp: string[] = [], biblio?: Bibliotheque): { id: string; fichier: string; tags: string[]; symptome: string } {
   assurerInstallation(r);
   const c = chemins(r);
   if (!idValide(ticketId)) throw new ErreurKb(`identifiant de ticket invalide : ${ticketId}`);
@@ -189,6 +202,14 @@ export function publier(r: Racines, ticketId: string, tagsSupp: string[] = []): 
     throw new ErreurKb(`ticket ${ticketId} : statut « ${statut || "inconnu"} », seul un ticket résolu se publie en base de connaissances.`);
   }
   const doc = lireDocument(t.texte);
+  if (biblio) {
+    try {
+      verifierTags(biblio, tagsSupp, [...(((doc.entete.domaines_valides as string[]) ?? []).map(String)), ...(((doc.entete.escalades as string[]) ?? []).map(String))]);
+    } catch (e) {
+      if (e instanceof ErreurTicket) throw new ErreurKb(e.message);
+      throw e;
+    }
+  }
   const tags = normaliser([...(((doc.entete.tags as string[]) ?? []).map(String)), ...tagsSupp]);
   const entete = { ...doc.entete, tags, publie: new Date().toISOString() };
   fs.writeFileSync(cible, `---\n${YAML.stringify(entete).trimEnd()}\n---\n\n${doc.corps}`, { encoding: "utf8", flag: "wx" });

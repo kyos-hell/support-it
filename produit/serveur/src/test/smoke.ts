@@ -71,6 +71,8 @@ async function refusSchema(p: Promise<unknown>, motif: RegExp, message: string):
 async function main() {
   // Contexte : gabarits copiés, puis une section remplie pour tester l'état « ok ».
   fs.mkdirSync(path.join(installation, "contexte"), { recursive: true });
+  // L'étage client des tags (décision 1) : un transverse, un tag réseau, un tag applicatif, un doublon avec le produit (ignoré).
+  fs.writeFileSync(path.join(installation, "tags.yaml"), "general: [m365]\nreseau: [vpn-site-a-site]\napplicatif: [app-compta]\nsysteme: [sauvegarde]\n", "utf8");
   const contenu = path.join(produit, "contenu");
   fs.copyFileSync(path.join(contenu, "general", "contexte.exemple.md"), path.join(installation, "contexte", "general.md"));
   fs.copyFileSync(path.join(contenu, "domaines", "reseau", "contexte.exemple.md"), path.join(installation, "contexte", "reseau.md"));
@@ -379,6 +381,16 @@ async function main() {
   assert.ok(estErreur(autreId) && /un autre ticket est en cours/.test(texte(autreId)), texte(autreId));
   const cloture = await clientB.callTool({ name: "load_skill", arguments: { domaines: ["cloture"] } });
   assert.ok(!estErreur(cloture) && /save_ticket/.test(texte(cloture)));
+  // Décision 1 : cloture sert les tags cochables, filtrés sur les domaines validés (+ escalade) et les transverses.
+  assert.match(texte(cloture), /Tags cochables pour ce ticket \(domaines systeme, identite \+ transverses\)/, texte(cloture).slice(-600));
+  assert.match(texte(cloture), /`sauvegarde`[\s\S]*`verrouillage`[\s\S]*`m365`/, "tags produit des deux domaines puis le transverse client");
+  assert.doesNotMatch(texte(cloture), /`vpn`/, "un tag d'un autre domaine n'est pas proposé");
+  // Tag inconnu et sixième tag : refus du schéma ; tag d'un autre domaine : refus du serveur avec la liste.
+  await refusSchema(clientB.callTool({ name: "save_ticket", arguments: { symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu", tags: ["ecm-interne"] } }), /ecm-interne/, "tag hors bibliothèque");
+  await refusSchema(clientB.callTool({ name: "save_ticket", arguments: { symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu", tags: ["sauvegarde", "stockage", "messagerie", "certificat", "virtualisation", "m365"] } }), /5|maximum|Too big|at most/i, "six tags");
+  const horsDomaine = await clientB.callTool({ name: "save_ticket", arguments: { symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu", tags: ["sauvegarde", "vpn"] } });
+  assert.ok(estErreur(horsDomaine) && /vpn \(reseau\)/.test(texte(horsDomaine)) && /Cocher parmi : [^\n]*sauvegarde/.test(texte(horsDomaine)), texte(horsDomaine));
+  assert.ok(fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)), "un refus de tags ne clôture rien");
   const clotRef = await clientB.callTool({ name: "save_ticket", arguments: { reference: "INC-AUTRE", symptome_initial: "x", nature: "incident", domaines_proposes: [], domaines_valides: ["systeme"], conclusion: "x", plan_action: "x", statut: "resolu" } });
   assert.ok(estErreur(clotRef) && /mauvais id/.test(texte(clotRef)), texte(clotRef));
   assert.ok(fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)), "un refus ne retire pas le brouillon");
@@ -437,7 +449,7 @@ async function main() {
       questions: [{ question: "Quelle est la passerelle du site ?", reponse: "TEST", section: "reseau/topologie" }],
       mises_a_jour_contexte: [{ section: "reseau/acces-distant", contenu: "TEST" }],
       statut: "resolu",
-      tags: ["VPN", "lenteur"],
+      tags: ["vpn", "vpn-site-a-site", "m365"],
       duree_minutes: 3,
       reference: "INC-TEST-42",
     },
@@ -453,6 +465,8 @@ async function main() {
   assert.match(ticket, /lenteur uniquement via VPN/);
   assert.match(ticket, /- incident\n/);
   assert.match(ticket, /- vpn\n/);
+  assert.match(ticket, /- vpn-site-a-site\n/, "tag client du domaine validé");
+  assert.match(ticket, /- m365\n/, "tag transverse client");
   assert.match(ticket, /^escalades: \[\]$/m, "sans brouillon ni skill de domaine dans la session : aucune escalade");
   assert.match(ticket, /^duree_minutes: 3$/m, "sans brouillon, la durée donnée sert (baseline)");
   assert.match(ticket, /^reference: INC-TEST-42$/m, "référence dans l'en-tête");
@@ -462,15 +476,18 @@ async function main() {
   // 7. Non publié : invisible en recherche. Publication, puis visible. Seul un ticket résolu se publie.
   const avant = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpn"] } });
   assert.match(texte(avant), /Base de connaissances vide/);
-  const pub = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: id, tags: ["concentrateur"] } });
+  const pubHors = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: id, tags: ["sauvegarde"] } });
+  assert.ok(estErreur(pubHors) && /sauvegarde \(systeme\)/.test(texte(pubHors)), texte(pubHors));
+  const pub = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: id, tags: ["proxy-internet"] } });
   assert.ok(!estErreur(pub), texte(pub));
   assert.match(texte(pub), /symptôme : Test de fumée : lenteur uniquement via VPN/, "la réponse de publish_kb cite ce qui a été publié");
   const rePub = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: id } });
   assert.ok(estErreur(rePub) && /déjà publié/.test(texte(rePub)));
-  const apres = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpn", "dns", "concentrateur"] } });
+  const apres = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpn", "dns", "proxy-internet"] } });
   assert.match(texte(apres), /1 cas sur 1 en base, par rareté/);
   assert.match(texte(apres), /score 2/, "D2 : deux tags communs portés par une seule entrée = 1 + 1");
-  assert.match(texte(apres), /tags communs : vpn, concentrateur \(et \d+ autre\(s\)\)/, "rendu compact : tags communs seulement");
+  assert.match(texte(apres), /tags communs : vpn, proxy-internet \(et \d+ autre\(s\)\)/, "rendu compact : tags communs seulement");
+  assert.doesNotMatch(texte(apres), /Tag inconnu/, "tous les tags cherchés sont de la bibliothèque");
   assert.doesNotMatch(texte(apres), /- tags : /, "la liste complète des tags n'est plus rendue");
   assert.match(texte(apres), /read_kb\(ticket_id\)/);
   const parRef = await clientB.callTool({ name: "search_kb", arguments: { tags: ["inc-test-42"] } });
@@ -488,7 +505,10 @@ async function main() {
   const luInconnu = await clientB.callTool({ name: "read_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
   assert.ok(estErreur(luInconnu) && /aucun cas publié/.test(texte(luInconnu)), texte(luInconnu));
   const rien = await clientB.callTool({ name: "search_kb", arguments: { tags: ["imprimante"] } });
+  assert.match(texte(rien), /Tag inconnu de la bibliothèque : « imprimante »/, "un tag inconnu est signalé, pas ignoré en silence");
   assert.match(texte(rien), /Aucun cas ne partage/);
+  const proche = await clientB.callTool({ name: "search_kb", arguments: { tags: ["vpnn"] } });
+  assert.match(texte(proche), /« vpnn » — proche de : vpn/, "tags proches proposés");
   const inexistant = await clientB.callTool({ name: "publish_kb", arguments: { ticket_id: "20200101-000000-x-y" } });
   assert.ok(estErreur(inexistant) && /introuvable/.test(texte(inexistant)));
   const nonResolu = await clientB.callTool({
@@ -562,7 +582,7 @@ async function main() {
 
   // 9. Rien d'écrit hors de installation/.
   const ecrits = fs.readdirSync(installation);
-  assert.deepEqual(ecrits.sort(), ["contexte", "en-cours", "journal", "kb", "tickets"]);
+  assert.deepEqual(ecrits.sort(), ["contexte", "en-cours", "journal", "kb", "tags.yaml", "tickets"]);
 
   fs.rmSync(installation, { recursive: true, force: true });
   console.log("smoke : OK — neuf appels, six domaines, un domaine décrit synthétique, trois sessions ; ticket", id);
