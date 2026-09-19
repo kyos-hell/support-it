@@ -153,11 +153,21 @@ pas tester l'hôte : test manuel T-H5 (`validation.md` §2.5).
 | Question | Décision | Raison |
 | --- | --- | --- |
 | Dépôt Git, archive ou paquet ? | **Archive du dossier `produit/`** (zip) par version, pour les clients. Le dépôt Git reste l'outil de l'équipe et des collègues de la bêta, qui font `git pull` puis `install.*`. | Un client n'a pas à installer Git pour recevoir des fichiers. L'archive est exactement ce que H4 remplace en bloc. |
-| `dist/` et `node_modules/` livrés ? | Non : le script les construit (`npm install`, `npm run build`), donc accès npm requis à l'installation. Pour un poste sans accès, livrer une archive « construite » (avec `dist/` et `node_modules/`) et passer `-SansBuild`. | Le prérequis Node.js est déjà là (Claude Code) ; npm aussi. L'archive construite est le plan B, prévu par l'option, pas par un second script. |
+| `dist/` et `node_modules/` livrés ? | Non : le script les construit (`npm install`, `npm run build`), donc accès npm requis à l'installation. Pour un poste sans accès, livrer une archive « construite » (avec `dist/` et `node_modules/`) et passer `-SansBuild`. | Le prérequis Node.js est proposé à l'installation par l'étape 1 du script (oui explicite) ; npm vient avec. L'archive construite est le plan B, prévu par l'option, pas par un second script. |
 
 ## 5. Prérequis du poste
 
-- Claude Code installé (c'est lui qui apporte Node.js ≥ 18 et npm).
+- Node.js ≥ 18 et npm. **Claude Code ne les apporte pas** : l'app desktop
+  embarque son propre runtime sans rien mettre sur le PATH (constaté le
+  2026-09-19 sur un poste neuf). Si l'un des deux manque, l'étape 1 du script
+  affiche la commande du gestionnaire de paquets du poste (`winget` sous
+  Windows et Git Bash, `brew` sous macOS, `apt-get` ou `dnf` sous Linux),
+  demande un `o` explicite, installe, recharge le PATH de la console et
+  revérifie. Sans gestionnaire reconnu, ou en entrée non interactive, le
+  script s'arrête avec la commande et l'URL nodejs.org : jamais d'installation
+  silencieuse, jamais de `curl | bash`.
+- Claude Code installé (app desktop ou CLI ; son absence du PATH n'empêche
+  rien, l'enregistrement écrit `~/.claude.json` directement).
 - Accès en lecture au dossier `produit/`, en écriture à `installation/`
   (local ou partage ; l'authentification est celle du partage).
 - Mode de permission de Claude Code : par défaut, confirmation avant chaque

@@ -227,7 +227,13 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
 
 - `install.ps1` et `install.sh` : mêmes six étapes, mêmes messages. Tout le
   travail est dans `dist/cli.js` (`outillage.md`) : ajouter une commande au
-  CLI, pas de logique dans les scripts.
+  CLI, pas de logique dans les scripts. **Une seule exception, l'étape 1**
+  (prérequis) : tant que Node.js n'est pas là, aucun CLI ne peut tourner,
+  donc la détection de node/npm, la proposition d'installation par le
+  gestionnaire du poste (oui explicite, jamais silencieux) et le
+  rechargement du PATH vivent dans les deux scripts, en double. Ne pas la
+  « nettoyer » vers le CLI ; garder les deux versions alignées message pour
+  message.
 - `install.ps1` en **UTF-8 avec BOM** (PowerShell 5.1) ; `install.sh` en
   **LF** sans CR et exécutable dans l'index Git ; les deux tenus par
   `.gitattributes` et vérifiés par `valider`. Les écrire avec un outil qui

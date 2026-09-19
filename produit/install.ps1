@@ -3,7 +3,7 @@
   Installe ou met à jour la boîte à outils IA pour le support IT sur ce poste (Windows).
 .DESCRIPTION
   Mêmes étapes, dans le même ordre, que install.sh :
-    1. prérequis (Node.js >= 18, npm ; Claude Code signalé)
+    1. prérequis (Node.js >= 18, npm : proposés à l'installation si absents, après un oui explicite ; Claude Code signalé)
     2. construction du serveur MCP
     3. validation du produit livré, puis test de fumée du serveur construit
     4. installation/ : initialiser (premier poste), rejoindre (existant) ou mettre à jour (nouvelle version)
@@ -54,15 +54,50 @@ Write-Host "== support-it $Version — installation =="
 Write-Host "produit      : $Produit"
 Write-Host "installation : $Installation"
 
+# L'étape 1 est la seule logique qui vit dans les scripts et non dans dist/cli.js :
+# tant que Node.js n'est pas là, aucun CLI ne peut tourner (etat-d-avancement.md §4.7).
+function Demander($question) {
+  # Réponse « o » explicite ; tout le reste (dont une entrée non interactive) vaut non.
+  if ([Console]::IsInputRedirected) { Write-Host "  (entrée non interactive : réponse non)"; return $false }
+  $r = Read-Host "$question [o/N]"
+  return ($r -match '^[oO]$')
+}
+function VersionNode() {
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return $null }
+  return (& node --version).TrimStart("v")
+}
+function NodeOk($v) { if (-not $v) { return $false }; return ([int]($v.Split(".")[0]) -ge 18) }
+function RechargerPath() {
+  # winget écrit le PATH dans le registre, pas dans cette console : on le relit.
+  $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+
 Etape 1 "Prérequis"
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-if (-not $nodeCmd) { Echec "Node.js introuvable. Claude Code l'installe normalement ; sinon https://nodejs.org (LTS)." }
-$nodeVersion = (& node --version).TrimStart("v")
-$major = [int]($nodeVersion.Split(".")[0])
-if ($major -lt 18) { Echec "Node.js $nodeVersion trop ancien : 18 minimum." }
-Write-Host "  node $nodeVersion"
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Echec "npm introuvable (livré avec Node.js)." }
-Write-Host "  npm $(& npm --version)"
+$nodeVersion = VersionNode
+$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+$winget = Get-Command winget -ErrorAction SilentlyContinue
+if ($nodeVersion) { Write-Host "  node $nodeVersion" } else { Write-Host "  node : absent" }
+if ($npmCmd) { Write-Host "  npm $(& npm --version)" } else { Write-Host "  npm  : absent" }
+if (-not (NodeOk $nodeVersion) -or -not $npmCmd) {
+  if (-not $nodeVersion) { $manque = "Node.js absent" }
+  elseif (-not (NodeOk $nodeVersion)) { $manque = "Node.js $nodeVersion trop ancien (18 minimum)" }
+  else { $manque = "npm absent (livré avec Node.js)" }
+  $commande = "winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements"
+  if (-not $winget) { Echec "$manque. Aucun gestionnaire de paquets reconnu : installer Node.js LTS depuis https://nodejs.org puis relancer ce script." }
+  Write-Host "  $manque. Ce script peut l'installer avec le gestionnaire du poste :" -ForegroundColor Yellow
+  Write-Host "    $commande"
+  if (-not (Demander "  Installer maintenant ?")) { Echec "$manque. Lancer la commande ci-dessus (ou https://nodejs.org, LTS) puis relancer ce script." }
+  & winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
+  if ($LASTEXITCODE -ne 0) { Echec "l'installation a échoué (winget, code $LASTEXITCODE) : installer Node.js LTS depuis https://nodejs.org puis relancer ce script." }
+  RechargerPath
+  $nodeVersion = VersionNode
+  $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  if (-not (NodeOk $nodeVersion) -or -not $npmCmd) {
+    if ($nodeVersion) { $vu = "node $nodeVersion" } else { $vu = "node absent" }
+    Echec "Node.js installé mais introuvable ou trop ancien dans cette console ($vu) : ouvrir une nouvelle console, ou https://nodejs.org (LTS), puis relancer ce script."
+  }
+  Write-Host "  node $nodeVersion, npm $(& npm --version) : installés"
+}
 $claude = Get-Command claude -ErrorAction SilentlyContinue
 if ($claude) { Write-Host "  claude CLI présent : $($claude.Source)" } else { Write-Host "  claude CLI absent du PATH : l'enregistrement écrira directement ~/.claude.json" }
 
