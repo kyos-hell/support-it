@@ -66,9 +66,9 @@ utilisateur, un `install` lancé depuis un autre dossier (un test, un second
 clone) réécrivait l'entrée et détournait l'installation en place sans
 prévenir — constaté pendant la campagne (T-H1). En portée projet, deux
 installations coexistent sur un poste, et le serveur suit le dossier de
-lancement comme `.claude/settings.json`. Contreparties : Claude Code demande
-une approbation du `.mcp.json` au premier lancement dans ce dossier (à dire
-au technicien) ; une ancienne entrée utilisateur est retirée par
+lancement comme `.claude/settings.json`. Contreparties : Claude Code peut demander
+une approbation du `.mcp.json` au premier lancement dans ce dossier (le CLI
+la demande ; l'app desktop l'a chargé sans rien demander le 2026-09-20) ; une ancienne entrée utilisateur est retirée par
 `enregistrer` si elle pointe sur ce produit, signalée sinon. La vérification
 robuste après installation n'est pas `/mcp` (peu lisible dans l'app desktop,
 qui mêle ses propres serveurs et ouvre parfois le catalogue des connecteurs)

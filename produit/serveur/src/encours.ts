@@ -512,7 +512,12 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
     b.symptome_initial = sans;
   }
   if (e.nature) b.nature = e.nature;
-  if (domainesProposes) b.domaines_proposes = domainesProposes;
+  if (domainesProposes) {
+    // Même règle pour les proposés : après le premier skill de domaine, l'escalade
+    // s'ajoute à la proposition du triage, elle ne l'efface pas (jeu de test du triage).
+    const instruits = domainesInstruits(session ? session.skillsCharges : b.skills_charges);
+    b.domaines_proposes = instruits.length && b.domaines_proposes.length ? [...b.domaines_proposes, ...domainesProposes.filter((d) => !b!.domaines_proposes.includes(d))] : domainesProposes;
+  }
   if (domainesValides) {
     // E5 (campagne 0.3.0-beta) : après le premier skill de domaine, un domaine
     // validé ne se retire plus — l'escalade passe par load_skill et s'ajoute.
