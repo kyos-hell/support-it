@@ -439,3 +439,22 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
 | 2026-09-11 | T-H1 | vert | `install.ps1` (via `-ExecutionPolicy Bypass`) et `install.sh` sur un dossier temporaire : six étapes, `tester` vert à l'étape 3, sept gabarits + `VERSION` créés, code 0 |
 | 2026-09-11 | T-D3 | vert | journal : un fichier par ticket, en-tête `questions` et `sections_candidates`, section `q01`, deux tickets → deux fichiers ; message de `save_ticket` avec le chemin |
 | 2026-09-11 | T-H2 | vert | rejoindre : « déjà en 0.2.0-beta », sept « gardé », aucun copié ; mise à jour simulée depuis 0.1.0-beta : « MISE À JOUR 0.1.0-beta → 0.2.0-beta », seul `identite.md` copié |
+| 2026-09-19 | §3.2 étapes 1–12 | vert, sauf étape 9 rouge | mise en place sur `test-support-it` ; étape 9 : anomalie 7 (`casse.md`) absente de l'audit car jamais générée (E6) ; `/mcp` peu fiable dans l'app desktop (O6) |
+| 2026-09-19 | T1 | vert | 13 tours, séquence complète, `cas_lus` EX-1001, `actions_par_appel` tous à 1 ; E2, E3, O1, O2 |
+| 2026-09-19 | T2 | vert | triage ambigu → une question ; `contradictions` ; `read_kb` sur le cas retenu ; section complète recomposée ; O3, O4, E4 |
+| 2026-09-19 | T3 | vert flux / rouge données | escalade poste de travail → identité jouée, mais `domaines_valides` écrasé (E5) ; refus d'hôte accidentel bien géré ; E6, E7 |
+| 2026-09-19 | T4 | vert | demande, une commande à la fois (T-B8), l'erreur arrête le plan, tri du contexte ; E8, O5 |
+| 2026-09-19 | T5 | vert | pause, **reprise après redémarrage complet de Claude Code**, clôture non-résolu ; E9, O6 |
+| 2026-09-19 | T6 | rouge puis vert | routage forcé vers réseau (E10) ; après correction, `hors-domaines-couverts` propre |
+| 2026-09-19 | T7 | vert avec rouges ponctuels | `search_kb` par rareté, `read_kb` ; adresse fabriquée (E12), « À confirmer » ignoré (E13), proposition d'éditer `kb/` (E14) puis hôte tenu (B14/B16) |
+| 2026-09-20 | T8 | vert | reprise après perte de session ; contradictions sur 3 sections reprises par le serveur ; confirmation à l'identique re-datée sans copie (C4) ; O7, O8 |
+| 2026-09-20 | T9 | vert clôture / rouge flux | baseline : `resolu_par: humain`, durée calculée ; mais flux court-circuité, accepté par le serveur (E15) ; O9 |
+| 2026-09-20 | T10 | vert avec réserves | référence fabriquée refusée, référence après coup acceptée, deux domaines discriminés ; symptôme reformulé (E16) ; tags reportés sur EX-2111 |
+| 2026-09-20 | B1–B13, B19, B20, A6, tags ×4 | vert | joués par le QA contre le MCP : 19 refus, messages lisibles ; `tags.yaml` enrichi accepté après redémarrage |
+| 2026-09-20 | B14, B15, B16 | vert | refus d'emblée du modèle, aucun contournement ; hôte prouvé sur `kb/` (T7) |
+| 2026-09-20 | B17, B18 | vert | une commande puis attente ; jamais deux questions par tour (questions composées, E9) |
+| 2026-09-20 | C1–C7 | vert | audit écrit, un par un, 1 clôture, 1 publication, 3 sections entières écrites, rien sur non ; O10, O11, E17 |
+| 2026-09-20 | C8, C9 | vert | corrections à la main puis `audit` rc 0, 0 constat C3 |
+| 2026-09-20 | C10, C11 | vert | remplissage sans triage ; liste vide ; référence inconnue → triage en une question |
+| 2026-09-20 | D (npm test, valider, etat, install.ps1 REJOINDRE, install.sh temp) | vert | `settings.json` fusionné sans doublon ; **E18** : `install.sh` ailleurs réécrit `~/.claude.json` (réparé) |
+| 2026-09-20 | T-H5 | vert | `settings.json` : Bash/PowerShell refusés dans l'onglet de test, `Read`/`Edit` sur `installation/` refusés ; détail dans `campagne-test-0.3.0-beta.md` |
