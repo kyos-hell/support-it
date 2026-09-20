@@ -203,7 +203,7 @@ server.registerTool(
       const t = enregistrerTicket(r, entree, session, biblio);
       vider(session);
       return texte(
-        `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n\n` +
+        `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n- durée : ${t.duree.minutes === null ? "non renseignée" : `${t.duree.minutes} min`}${t.duree.calculee ? ` (calculée du brouillon à la clôture${t.duree.fournie_ignoree ? " ; la valeur fournie a été ignorée" : ""})` : ""}\n\n` +
           `La publication en base de connaissances est une étape distincte, après validation du technicien : publish_kb(ticket_id="${t.id}").`,
       );
     } catch (e) {
@@ -250,8 +250,8 @@ server.registerTool(
       pause: z.boolean().optional().describe("Vrai sur « je mets en pause » du technicien — le seul mot d'étape que le serveur ne voit pas ; levé au prochain appel"),
       symptome_initial: z.string().optional().describe("Tel qu'exprimé par le technicien — obligatoire à la création"),
       nature: z.enum(["incident", "demande"]).optional(),
-      domaines_proposes: z.array(DOMAINE).optional().describe("Les domaines que les signaux cochés désignent, dans l'ordre ; refusé si l'un d'eux n'a aucun signal coché (incident)"),
-      domaines_valides: z.array(DOMAINE).optional().describe("Ceux que le technicien a validés"),
+      domaines_proposes: z.array(DOMAINE).optional().describe("Les domaines que les signaux cochés désignent, dans l'ordre ; refusé si l'un d'eux n'a aucun signal coché (incident comme demande)"),
+      domaines_valides: z.array(DOMAINE).optional().describe("Ceux que le technicien a validés. Une fois un skill de domaine chargé, ils ne se retirent plus : l'escalade s'ajoute par load_skill, pas ici"),
       prochaine_etape: z.string().optional().describe(`Une ligne (≤ ${LIMITES.prochaine_etape} car.) : ce qu'on fait en premier à la reprise`),
       signaux: z.array(SIGNAL).optional().describe("Les signaux du manifeste COCHÉS au triage, avec pour chacun l'extrait du ticket qui le montre. Un constat de diagnostic n'est pas un signal : il va dans verifications — ajoutés, dédoublonnés sur l'id"),
       verifications: z.array(z.string()).optional().describe(`Un constat vérifié par entrée — « cran N : commande → résultat », ou la lecture d'un portail ou d'un journal — une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
@@ -279,6 +279,7 @@ server.registerTool(
         `- domaines classés par les signaux cochés : ${p.classement}`,
         `- fichier : ${p.fichier}`,
         p.passation ? `- passation enregistrée : de ${p.passation.de} à ${p.passation.a}` : "",
+        ...p.avertissements.map((a) => `- ATTENTION ${a}`),
         `Continuer les points d'étape avec id: "${p.id}". À la clôture : save_ticket(id: "${p.id}", …).`,
       ].filter(Boolean);
       return texte(lignes.join("\n"));

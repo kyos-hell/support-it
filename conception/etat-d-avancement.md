@@ -52,16 +52,27 @@ zéro erreur (six avertissements de longueur acceptés, tous ≤ 110 lignes),
 serveur (catalogue, séquence complète avec les refus, reprise après
 redémarrage).
 
-**Ce qui reste à faire**, dans l'ordre (`plan-after-beta.md` §2.11 et §3) :
+**Campagne de test 0.3.0-beta jouée les 2026-09-19/20** (journal :
+`campagne-test-0.3.0-beta.md` ; report dans `validation.md` §7 et
+`retours-beta.md`) : onze tickets, vingt refus, C1–C11, D. Critère de
+sortie atteint ; dix-huit écarts et onze observations. **Corrections faites
+le 2026-09-20** (`fin-de-projet.md` §11, décisions 42–44) : union des
+domaines validés (E5), signal requis pour toute nature + domaine
+`hors-perimetre` décrit + signaux de demande `objet-…` (E10), enregistrement
+MCP en portée projet `.mcp.json` (E18), résolu refusé sans skill de domaine
+(E15), règle « une commande » réécrite (E3/E4), référence retirée du symptôme
+(E11), annotation de péremption en tête (E13), tags structurels connus et
+dédoublonnage en base (E2/E7), audit enrichi (O10/O11), générateur corrigé
+(E6/E17). Restent à trancher : O1, O2, O3, O7, O8 (voir le journal §1).
 
-1. `outils/jeu-de-test.mjs` + `.yaml` : le générateur du jeu de données
-   (43 sections, 13 tickets, 19 anomalies), piloté par le client MCP.
-2. Réinstallation propre par le testeur (§3.2), puis les dix tickets, les
-   vingt refus provoqués, l'audit, T-H5 (§3.3) — une ligne par écart dans
-   `retours-beta.md`, une ligne par scénario dans `validation.md` §7.
-3. **Après** les dix tickets seulement : la passe sur le manifeste
-   (identifiants et libellés des signaux, à partir des écarts du jeu de
-   test), puis `0.3.0` sans `-beta`.
+**Ce qui reste à faire**, dans l'ordre :
+
+1. Trancher les observations O1–O3, O7, O8 du journal de campagne.
+2. **Un ticket par domaine retouché** (le manifeste a changé : signaux
+   `objet-…`, `hors-perimetre`), puis `0.3.0` sans `-beta`. Le testeur
+   rejoue en particulier T6 (attendu : signaux `hors-perimetre` cochés →
+   clôture `hors-domaines-couverts`), T4 (signal `objet-poste`), T3
+   (`domaines_valides: [poste-de-travail, identite]`), T9 (refus sans skill).
 4. Pendant les tests, observer le cycle de vie du processus serveur dans
    Claude Code (`/clear`, `--resume`, reconnexion) : si l'état de session
    est perdu plus souvent que « une session = un ticket », la
@@ -106,18 +117,18 @@ il est fragile et il faut le savoir.
 | Le serveur ne raisonne jamais ; l'intelligence est dans `contenu/`, le déterminisme dans `serveur/`. | Architecture : aucun appel ne prend une décision qu'un skill pourrait prendre. |
 | Le modèle ne fabrique jamais un chemin, un identifiant, une date. | Contrat : aucun appel n'a de paramètre de chemin ; le serveur fabrique tout (`ids.ts`). Une référence fabriquée est refusée (A6). |
 | **Le modèle n'a pas de choix sur la mécanique** (principe du 2026-09-14) : domaines, signaux, tags, sections sont des enums ; le symptôme, les domaines proposés, le plan, les questions viennent du brouillon ; l'étape, les escalades, les cas lus, la durée sont dérivés ; l'ordre du flux est tenu par l'état de session. | **Code** : schémas construits au démarrage (`index.ts`), `session.ts`, `encours.ts`, `tickets.ts`. Il reste au modèle : net ou ambigu, la question, la conclusion, le plan, les preuves des signaux, le constat d'une contradiction. |
-| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5). |
+| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5) ; prompt : règle explicite dans triage et clôture depuis E14. Exception assumée : `install` écrit `.mcp.json` et `.claude/settings.json` dans le dossier de lancement (décision 44). |
 | Aucune donnée d'entreprise dans `produit/contenu/`, même en exemple. | `valider` (regex IP, UNC, mail, domaine interne, nom d'hôte plausible). Placeholders `<...>` uniquement. |
 | Un ticket clôturé, un journal, une entrée de base : écrits une fois, jamais modifiés. | Code (`flag: "wx"`). |
 | Seules deux matières sont mutables : le contexte (`update_context`, avec copie dans `contexte/historique/`) et les brouillons (`save_progress`, fusion). La seule suppression est le brouillon à la clôture. | Code. Concurrence non protégée en mono-poste ; empreinte prévue à la porte 2. |
 | Le contexte n'est jamais écrit sans un oui explicite du technicien. | **Prompt seulement** (`remplissage.md`, `cloture.md`, `audit.md`, description de l'outil). Irréductible : il faut un humain. |
-| Trois points de validation humaine : triage ambigu, plan d'action, publication. Pas de quatrième. | Prompt (`triage.md`, `cloture.md`) + contrat (`publish_kb` distinct de `save_ticket`). |
+| Trois points de validation humaine : triage ambigu, plan d'action, publication. Pas de quatrième. | Prompt (`triage.md`, `cloture.md`) + contrat (`publish_kb` distinct de `save_ticket`). `resolu_par` est une **question** à la clôture, pas un quatrième point (E8, prompt seul). |
 | L'IA n'exécute rien : le technicien exécute et rapporte. | Prompt + **l'hôte** : `Bash` et `PowerShell` retirés du contexte du modèle par `.claude/settings.json` (décision 5). Aucun appel MCP n'exécute quoi que ce soit. |
 | Une question, puis j'attends la réponse. | Prompt seulement (`format-skill.md` §6, mot pour mot dans chaque skill ; `valider` contrôle la présence, pas le respect). |
-| Une commande, puis j'attends la sortie — le plan s'applique une étape à la fois, un résultat inattendu l'arrête. | **Prompt seulement** (décision 10 du 2026-09-18). Les actions se passent hors de tout appel : aucun garde-fou serveur possible. L'audit signale un `save_progress` à plusieurs `actions` (indice). Test de référence : T-B8. |
+| Une commande, puis j'attends la sortie — le plan s'applique une étape à la fois, un résultat inattendu l'arrête. | **Prompt seulement** (décision 10 du 2026-09-18 ; règle réécrite le 2026-09-20 après E3 : « une étape du plan par tour, commande, manipulation ou question », le pipe `\|` est une invocation). Les actions se passent hors de tout appel : aucun garde-fou serveur possible. L'audit signale un `save_progress` à plusieurs `actions` (indice). Test de référence : T-B8 ; la campagne a compté 7 écarts sur 11 tickets avant la réécriture. |
 | Un skill fait ~100 lignes (110 max), pas de persona au-delà d'une ligne, chaque ligne passe le test de valeur. | `valider` (longueur) + relecture (T-B1). |
 | Les identifiants de sections (`domaine/section`) sont le contrat entre skills, gabarits et serveur ; renommer un `id` est interdit sans note de version. | `valider` (contrat B/C dans les deux sens). |
-| Le symptôme initial est conservé tel qu'exprimé. | Code : le brouillon est la source, la clôture ne le remplace pas (A1). Irréductible : la première copie, au premier `save_progress`, est celle du modèle. |
+| Le symptôme initial est conservé tel qu'exprimé. | Code : le brouillon est la source, la clôture ne le remplace pas (A1) ; le préfixe « référence : » est retiré par le serveur (E11). Irréductible : la première copie, au premier `save_progress`, est celle du modèle — T10 l'a enrichie des réponses suivantes (E16), tenu par le prompt seul. |
 | Un ticket clôturé, un journal, une entrée de base ne sont jamais corrigés par l'outil, même à l'audit. | Prompt (`audit.md`) + code (l'audit n'a aucune écriture hors `audits/`). |
 | Le contexte reçoit la structure et les pivots, jamais les instances d'un ticket. | Prompt (`remplissage.md`, `cloture.md`) + signal « volumineuse » de `etat`. |
 
@@ -225,7 +236,11 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
 
 ### 4.7 Les scripts d'installation
 
-- `install.ps1` et `install.sh` : mêmes six étapes, mêmes messages. Tout le
+- `install.ps1` et `install.sh` : mêmes six étapes, mêmes messages. Depuis
+  le 2026-09-20, `enregistrer` écrit `.mcp.json` dans le dossier de
+  lancement (portée projet, décision 44) et retire une entrée utilisateur
+  qui pointait sur ce produit ; un test sur un dossier temporaire ne touche
+  donc plus la machine. Ne jamais revenir à `~/.claude.json`. Tout le
   travail est dans `dist/cli.js` (`outillage.md`) : ajouter une commande au
   CLI, pas de logique dans les scripts. **Une seule exception, l'étape 1**
   (prérequis) : tant que Node.js n'est pas là, aucun CLI ne peut tourner,

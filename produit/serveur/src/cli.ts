@@ -29,7 +29,7 @@ Usage : node dist/cli.js <commande>
   etat         État de remplissage du contexte, par fichier et par section.
   audit        Le rapport d'audit (tickets, base, brouillons, contexte) : affiché et écrit dans installation/audits/ ;
                code 1 si un constat de santé des fichiers (C3) est trouvé. Le même rapport que /support audit.
-  enregistrer  Enregistre le serveur MCP dans ~/.claude.json (portée utilisateur), avec sauvegarde.
+  enregistrer  Enregistre le serveur MCP dans <dossier de lancement>/.mcp.json (portée projet), avec sauvegarde ; retire l'ancienne entrée utilisateur si elle pointait ici.
   entree       Installe le point d'entrée /support dans ~/.claude/skills/support/.
   hote         Dépose .claude/settings.json dans le dossier de lancement (permissions refusées au modèle), en fusionnant.
 
@@ -152,32 +152,69 @@ function audit(): number {
   return sante > 0 ? 1 : 0;
 }
 
+/**
+ * E18 (campagne 0.3.0-beta, 2026-09-20) : le serveur s'enregistre en portée
+ * PROJET — `<dossier de lancement>/.mcp.json`, à côté de `.claude/settings.json`
+ * — et plus dans `~/.claude.json`. Deux installations coexistent sur un poste,
+ * et un `install` lancé ailleurs (test, second clone) ne détourne plus celle
+ * en place. Une entrée utilisateur laissée par une version antérieure est
+ * retirée si elle pointe sur ce produit ; sinon elle est signalée, jamais touchée.
+ */
 function enregistrer(): number {
-  const fichier = path.join(os.homedir(), ".claude.json");
+  const lancement = path.resolve(r.produit, "..");
+  const fichier = path.join(lancement, ".mcp.json");
+  const dist = path.dirname(fileURLToPath(import.meta.url));
+  const commande = path.join(dist, "index.js");
   let config: Record<string, unknown> = {};
+  let existant = false;
   if (fs.existsSync(fichier)) {
-    fs.copyFileSync(fichier, `${fichier}.support-it.bak`);
+    existant = true;
     try {
       config = JSON.parse(fs.readFileSync(fichier, "utf8")) as Record<string, unknown>;
     } catch {
-      console.error(`~/.claude.json illisible : enregistrement refusé, rien n'a été modifié (sauvegarde : ${fichier}.support-it.bak)`);
+      console.error(`${fichier} illisible : enregistrement refusé, rien n'a été modifié. Corriger le JSON, puis relancer « enregistrer ».`);
       return 1;
     }
+    fs.copyFileSync(fichier, `${fichier}.support-it.bak`);
   }
   const serveurs = (config.mcpServers ?? {}) as Record<string, unknown>;
-  const dist = path.dirname(fileURLToPath(import.meta.url));
   serveurs["support-it"] = {
     type: "stdio",
     command: "node",
-    args: [path.join(dist, "index.js")],
+    args: [commande],
     env: { SUPPORT_IT_PRODUIT: r.produit, SUPPORT_IT_INSTALLATION: r.installation },
   };
   config.mcpServers = serveurs;
   fs.writeFileSync(fichier, JSON.stringify(config, null, 2) + "\n", "utf8");
-  console.log(`serveur MCP « support-it » enregistré dans ${fichier} (portée utilisateur)`);
-  console.log(`  commande : node ${path.join(dist, "index.js")}`);
+  console.log(`serveur MCP « support-it » enregistré dans ${fichier} (portée projet${existant ? ", fusionné, sauvegarde .support-it.bak" : ""})`);
+  console.log(`  commande : node ${commande}`);
   console.log(`  produit  : ${r.produit}`);
   console.log(`  install. : ${r.installation}`);
+  console.log(`  dossier de lancement : ${lancement} — lancer Claude Code depuis là ; au premier lancement, accepter le serveur du projet quand Claude Code le demande.`);
+
+  // L'ancienne portée utilisateur (≤ 0.3.0-beta) : retirée si c'est ce produit, signalée sinon.
+  const utilisateur = path.join(os.homedir(), ".claude.json");
+  if (fs.existsSync(utilisateur)) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(utilisateur, "utf8")) as Record<string, unknown>;
+      const srv = (cfg.mcpServers ?? {}) as Record<string, { args?: string[] }>;
+      const ancien = srv["support-it"];
+      if (ancien) {
+        const cible = String(ancien.args?.[0] ?? "");
+        if (path.resolve(cible) === path.resolve(commande)) {
+          fs.copyFileSync(utilisateur, `${utilisateur}.support-it.bak`);
+          delete srv["support-it"];
+          cfg.mcpServers = srv;
+          fs.writeFileSync(utilisateur, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+          console.log(`  entrée « support-it » de portée utilisateur retirée de ${utilisateur} (elle pointait sur ce produit ; sauvegarde .support-it.bak)`);
+        } else {
+          console.log(`  ATTENTION : ${utilisateur} enregistre déjà « support-it » en portée utilisateur vers ${cible || "?"} — une autre installation. Elle n'est pas touchée ; la retirer à la main si elle ne sert plus.`);
+        }
+      }
+    } catch {
+      console.log(`  ${utilisateur} illisible : non touché`);
+    }
+  }
   console.log("Redémarrer Claude Code pour qu'il voie le serveur.");
   return 0;
 }

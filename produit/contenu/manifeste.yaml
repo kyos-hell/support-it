@@ -5,6 +5,10 @@
 # Écrit à la main, validé par « node dist/cli.js valider » contre les dossiers.
 # Chaque signal a un identifiant kebab-case, unique dans tout le manifeste : le
 # modèle coche des identifiants, il ne rédige pas (décision 2 du 2026-09-17).
+# Depuis la campagne 0.3.0-beta (E10, O5, 2026-09-20) : chaque domaine porte
+# un signal de DEMANDE (« objet-… » : sur quoi porte l'état cible), et le
+# domaine hors-perimetre, décrit sans dossier, donne ses signaux à ce qui
+# n'est pas du support IT — le serveur exige un signal pour toute nature.
 version: 1
 
 natures:
@@ -35,6 +39,8 @@ domaines:
         libelle: population corrélée à un lieu ou un lien (un étage, un site, les télétravailleurs)
       - id: symptomes-transport
         libelle: symptômes de transport (timeout, coupures intermittentes, lenteur sur tout)
+      - id: objet-chemin
+        libelle: (demande) l'état cible porte sur un lien, un flux, un VLAN, le wifi ou le VPN
     tags: [vpn, dns, proxy-internet, wifi, ouverture-flux, creation-vlan]
 
   - id: systeme
@@ -50,6 +56,8 @@ domaines:
         libelle: population = tous les utilisateurs du service, où qu'ils soient
       - id: symptomes-serveur
         libelle: symptômes côté serveur (disque plein, service arrêté, certificat expiré, sauvegarde en échec)
+      - id: objet-service
+        libelle: (demande) l'état cible porte sur un serveur, un partage, une sauvegarde, un certificat, une tâche
     tags: [virtualisation, stockage, sauvegarde, messagerie, certificat, tache-planifiee, creation-partage, restauration-fichier]
 
   - id: poste-de-travail
@@ -63,6 +71,8 @@ domaines:
         libelle: un seul poste touché, services et réseau sains pour les autres
       - id: os-repond
         libelle: le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
+      - id: objet-poste
+        libelle: (demande) l'état cible porte sur la machine d'un utilisateur, côté logiciel (installer, préparer, configurer)
     tags: [application, profil, securite, impression, mise-a-jour, installation-logiciel, preparation-poste]
 
   - id: materiel
@@ -76,6 +86,8 @@ domaines:
         libelle: persiste hors logiciel (avant l'OS, ou sur un environnement sain)
       - id: echange-objet-resout
         libelle: l'échange de l'objet fait disparaître le problème
+      - id: objet-physique
+        libelle: (demande) l'état cible porte sur un objet à commander, remplacer, réparer ou prêter
     tags: [sav, stock, peripherique, salle-technique, garantie, remplacement-materiel, commande-materiel]
 
   - id: identite
@@ -89,6 +101,8 @@ domaines:
         libelle: le service répond mais refuse (mot de passe rejeté, accès refusé, compte verrouillé)
       - id: correle-evenement-compte
         libelle: corrélé à un événement de compte (changement de mot de passe, de service, retour de congés)
+      - id: objet-compte
+        libelle: (demande) l'état cible porte sur un compte, un groupe, un droit d'accès
     tags: [synchronisation, droits-acces, compte-service, verrouillage, mfa, creation-compte, depart-collaborateur, attribution-droits]
 
   - id: applicatif
@@ -102,4 +116,21 @@ domaines:
         libelle: lié à une action ou une donnée précise (tel écran, tel enregistrement)
       - id: reproductible-partout
         libelle: reproductible depuis tout poste et tout compte aux mêmes droits
+      - id: objet-fonction-applicative
+        libelle: (demande) l'état cible porte sur un paramétrage, une habilitation, une intégration d'une application
     tags: [editeur, integration, environnement, acces-applicatif, parametrage, habilitation-applicative, mise-a-jour-applicative]
+
+  # Décrit, sans dossier : le serveur refuse de le charger, le triage répond
+  # « hors des domaines couverts » et propose la clôture hors-domaines-couverts.
+  - id: hors-perimetre
+    libelle: Hors du support IT
+    statut: decrit
+    suit: rien que le support exploite — travaux, achat, prestation, bâtiment, organisation
+    signaux:
+      - id: travaux-batiment
+        libelle: travaux ou aménagement (câblage, prise à poser, cloison, déménagement)
+      - id: achat-ou-devis
+        libelle: un devis, une commande ou un contrat à passer avec un tiers, sans objet du parc en cause
+      - id: hors-informatique
+        libelle: le sujet n'est ni un service, ni un compte, ni un poste, ni un objet du parc, ni le réseau
+    tags: []

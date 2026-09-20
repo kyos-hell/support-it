@@ -106,7 +106,7 @@ fi
 if command -v claude >/dev/null 2>&1; then
   echo "  claude CLI présent : $(command -v claude)"
 else
-  echo "  claude CLI absent du PATH : l'enregistrement écrira directement ~/.claude.json"
+  echo "  claude CLI absent du PATH : le serveur s'enregistre dans .mcp.json (portée projet), sans lui"
 fi
 
 etape 2 "Construction du serveur MCP"

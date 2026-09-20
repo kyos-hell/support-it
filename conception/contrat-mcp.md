@@ -230,6 +230,16 @@ pour le dire, écrit au fil de l'eau et retiré à la clôture.
 | Lit | Le brouillon existant, par `id`, sinon par `reference`, sinon par symptôme initial identique (A5). |
 | Écrit | `installation/en-cours/<id>.md`, écriture atomique ; y recopie l'état de session (`skills_charges`, `sections_servies`, `cas_lus`, `recherche_faite`). |
 
+**Depuis le 2026-09-20 (campagne 0.3.0-beta).** Un domaine proposé sans
+signal coché est refusé **quelle que soit la nature**, même si aucun signal
+n'est coché (E10 ; les demandes ont leur signal `objet-…` au manifeste).
+Après le premier skill de domaine chargé, `domaines_valides` ne peut que
+s'étendre : le serveur fait l'union et signale « ATTENTION … conservé(s) »
+quand l'appel voulait en retirer un (E5, décision 42). Si `symptome_initial`
+commence par la référence du brouillon (« EX-2107 : … »), le préfixe est
+retiré et signalé (E11). Ces avertissements sont des lignes « ATTENTION »
+de la réponse, jamais des refus.
+
 **Comportement.** Sans `id`, sans brouillon de même référence ni de même
 symptôme : création, identifiant fabriqué par le serveur (même forme que
 les tickets), technicien et poste relevés ; le brouillon devient le
@@ -310,11 +320,15 @@ clôture est refusée. Sans brouillon courant (processus neuf, clôture d'un
 ticket jamais brouillonné), le serveur relie par `id`, sinon par référence,
 sinon par symptôme identique. Le ticket final **reprend l'identifiant du
 brouillon** et le brouillon est **la source** : symptôme initial (A1),
-référence, domaines proposés, plan d'action, questions, signaux — ce que
-la clôture fournit ne sert que là où le brouillon n'a rien, les listes
-s'ajoutent. La durée est calculée (création → clôture), `resolu_par` vaut
-`null` s'il n'est pas dit, `plan_action` est obligatoire pour un ticket
-résolu. Les **escalades sont dérivées** des skills chargés (brouillon ∪
+référence, domaines proposés, **domaines validés** (union avec ceux de la
+clôture, jamais de retrait — sauf `hors-domaines-couverts`, où la clôture
+peut n'en valider aucun ; E5, 2026-09-20), plan d'action, questions,
+signaux — ce que la clôture fournit ne sert que là où le brouillon n'a rien,
+les listes s'ajoutent. La durée est calculée (création → clôture) et la
+réponse la dit, avec « la valeur fournie a été ignorée » le cas échéant
+(O9) ; `resolu_par` vaut `null` s'il n'est pas dit ; `plan_action` est
+obligatoire pour un ticket résolu ; **un `resolu` sans aucun skill de
+domaine chargé est refusé** (E15 : une baseline suit le même flux). Les **escalades sont dérivées** des skills chargés (brouillon ∪
 session) : tout domaine chargé après le premier appel de domaine. Puis le
 brouillon est **retiré** et la session vidée. C'est la seule suppression
 que le serveur fasse, et elle ne perd rien : le ticket final contient tout

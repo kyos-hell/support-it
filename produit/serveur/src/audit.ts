@@ -102,7 +102,8 @@ export function rendreCandidats(m: Map<string, Candidat[]>): string {
   const out = ["| Section | Source | Ticket | Contenu candidat |", "| --- | --- | --- | --- |"];
   for (const [section, liste] of m) {
     for (const x of liste) {
-      out.push(`| \`${section}\` | ${x.source} | ${x.ticket} (${x.date.slice(0, 10)}) | ${x.contenu.replace(/\|/g, "\\|").replace(/\n/g, " ").slice(0, 200)} |`);
+      // O11 (campagne 0.3.0-beta) : jamais tronqué — le skill doit pouvoir montrer le candidat en entier.
+      out.push(`| \`${section}\` | ${x.source} | ${x.ticket} (${x.date.slice(0, 10)}) | ${x.contenu.replace(/\|/g, "\\|").replace(/\n/g, "<br>")} |`);
     }
   }
   out.push("", "Proposer un par un, la section la plus demandée en tête ; montrer le contenu en entier ; écrire sur oui seulement.");
@@ -127,6 +128,7 @@ export interface TicketAudit {
   signaux: string[];
   cas_lus: string[];
   actions_par_appel: number[];
+  conclusion: string;
   publie: boolean;
   /** En-tête YAML illisible ou vide. */
   illisible: boolean;
@@ -150,13 +152,15 @@ export interface Audit {
   installation: string;
   tickets: TicketAudit[];
   triage: LigneTriage[];
-  brouillonsAnciens: { id: string; reference: string; age: number; etape: string }[];
+  brouillonsAnciens: { id: string; reference: string; age: number; etape: string; prochaine_etape: string }[];
   zombies: string[];
   orphelins: string[];
   resolusNonPublies: TicketAudit[];
   tagsHorsBibliotheque: { entree: string; tags: string[] }[];
   domainesInconnus: { ticket: string; domaines: string[] }[];
   kbIllisibles: string[];
+  /** E7 (campagne 0.3.0-beta) : un fichier dont le nom n'est pas l'id de son en-tête (copie à la main) — doublon en base. */
+  nomsDiscordants: string[];
   ticketsIllisibles: string[];
   casLus: { ticket: string; cas: string[]; statut: string }[];
   actionsMultiples: { ticket: string; appels: number[] }[];
@@ -191,6 +195,9 @@ function lireTicketAudit(f: string, publies: Set<string>): TicketAudit {
     signaux: lireSignaux(e.signaux).map((s) => s.id).filter(Boolean),
     cas_lus: liste(e.cas_lus),
     actions_par_appel: Array.isArray(e.actions_par_appel) ? (e.actions_par_appel as unknown[]).map(Number) : [],
+    // O10 (campagne 0.3.0-beta) : la conclusion, une ligne, pour qu'un résolu non
+    // publié puisse être proposé sans être lu (read_kb refuse un non publié).
+    conclusion: (sections(doc.corps).find((x) => x.id === "conclusion")?.contenu ?? "").split("\n").map((l) => l.trim()).find(Boolean) ?? "",
     publie: publies.has(id),
     illisible: Object.keys(e).length === 0,
   };
@@ -224,17 +231,20 @@ export function calculerAudit(r: Racines): Audit {
   const enCours = lireEnCours(r);
   const brouillonsAnciens = enCours.actifs
     .filter((b: Brouillon) => ageJours(b) >= JOURS_BROUILLON_ANCIEN)
-    .map((b: Brouillon) => ({ id: b.id, reference: b.reference ?? "—", age: ageJours(b), etape: b.etape }));
+    .map((b: Brouillon) => ({ id: b.id, reference: b.reference ?? "—", age: ageJours(b), etape: b.etape, prochaine_etape: b.prochaine_etape || "—" }));
   const resolusNonPublies = lisibles.filter((t) => t.statut === "resolu" && !t.publie);
   const tagsHorsBibliotheque: Audit["tagsHorsBibliotheque"] = [];
   const kbIllisibles: string[] = [];
+  const nomsDiscordants: string[] = [];
   const derives = new Set<string>([...domaines, "incident", "demande"]);
+  for (const t of lisibles) if (path.basename(t.fichier, ".md") !== t.id) nomsDiscordants.push(`tickets/${path.basename(t.fichier)} (id ${t.id})`);
   for (const f of kbFichiers) {
     const doc = lireDocument(fs.readFileSync(f, "utf8"));
     if (Object.keys(doc.entete).length === 0) {
       kbIllisibles.push(path.basename(f));
       continue;
     }
+    if (doc.entete.id && String(doc.entete.id) !== path.basename(f, ".md")) nomsDiscordants.push(`kb/${path.basename(f)} (id ${String(doc.entete.id)})`);
     const ref = doc.entete.reference ? String(doc.entete.reference).toLowerCase() : "";
     const tags = Array.isArray(doc.entete.tags) ? doc.entete.tags.map(String) : [];
     const hors = tags.filter((t) => !biblio.tous.includes(t) && !derives.has(t) && t !== ref);
@@ -294,6 +304,7 @@ export function calculerAudit(r: Racines): Audit {
     tagsHorsBibliotheque,
     domainesInconnus,
     kbIllisibles,
+    nomsDiscordants,
     ticketsIllisibles: tickets.filter((t) => t.illisible).map((t) => path.basename(t.fichier)),
     casLus,
     actionsMultiples,
@@ -309,7 +320,7 @@ export function calculerAudit(r: Racines): Audit {
 
 /** Les constats de santé des fichiers (C3) : ce qui fait échouer la commande CLI. */
 export function constatsSante(a: Audit): number {
-  return a.orphelins.length + a.kbIllisibles.length + a.ticketsIllisibles.length + a.domainesInconnus.length + a.titresMalFormes.length + a.sectionsEnDouble.length + a.tagsHorsBibliotheque.length;
+  return a.orphelins.length + a.kbIllisibles.length + a.nomsDiscordants.length + a.ticketsIllisibles.length + a.domainesInconnus.length + a.titresMalFormes.length + a.sectionsEnDouble.length + a.tagsHorsBibliotheque.length;
 }
 
 /** Le nombre de constats, tous volets — ce que le rapport annonce en tête. */
@@ -323,6 +334,7 @@ export function nombreConstats(a: Audit): number {
     a.tagsHorsBibliotheque.length +
     a.domainesInconnus.length +
     a.kbIllisibles.length +
+    a.nomsDiscordants.length +
     a.ticketsIllisibles.length +
     a.casLus.length +
     a.actionsMultiples.length +
@@ -355,11 +367,11 @@ export function rendreAudit(a: Audit): string {
     out.push("", `${a.triage.filter((l) => l.ecart).length} écart(s). Un écart désigne un signal du manifeste à revoir — à lire par le référent, jamais corrigé en cours de ticket. Les tickets sans signaux cochés sont antérieurs aux identifiants : à lire à la main.`);
   }
   out.push("", "### Brouillons anciens — à clôturer en `non-resolu` sur oui, un par un (`save_ticket`)", "");
-  out.push(puce(a.brouillonsAnciens.map((b) => `\`${b.id}\` (${b.reference}) : ${b.age} j, étape ${b.etape}`)));
+  out.push(puce(a.brouillonsAnciens.map((b) => `\`${b.id}\` (${b.reference}) : ${b.age} j, étape ${b.etape}, prochaine étape : ${b.prochaine_etape}`)));
   out.push("", "### Brouillons zombies et orphelins — à supprimer à la main", "");
   out.push(puce([...a.zombies.map((z) => `zombie \`${z}\` : le ticket est déjà clôturé`), ...a.orphelins.map((o) => `orphelin \`${o}\` : pas d'en-tête lisible`)]));
   out.push("", "### Tickets résolus jamais publiés — candidats à `publish_kb`, un par un, sur oui", "");
-  out.push(puce(a.resolusNonPublies.map((t) => `\`${t.id}\`${t.reference ? ` (${t.reference})` : ""} · ${t.nature} · ${t.domaines_valides.join(", ")} · ${t.date.slice(0, 10)}`)));
+  out.push(puce(a.resolusNonPublies.map((t) => `\`${t.id}\`${t.reference ? ` (${t.reference})` : ""} · ${t.nature} · ${t.domaines_valides.join(", ")} · ${t.date.slice(0, 10)}${t.conclusion ? ` — ${t.conclusion}` : ""}`)));
   out.push("", "### Tags hors bibliothèque dans la base — correction manuelle", "");
   out.push(puce(a.tagsHorsBibliotheque.map((x) => `\`${x.entree}\` : ${x.tags.join(", ")}`)));
   out.push("", "### Cas lus par `read_kb` et suite donnée", "");
@@ -371,6 +383,7 @@ export function rendreAudit(a: Audit): string {
     puce([
       ...a.ticketsIllisibles.map((f) => `ticket illisible : \`tickets/${f}\` (YAML cassé)`),
       ...a.kbIllisibles.map((f) => `entrée de base illisible : \`kb/${f}\` (YAML cassé, invisible à la recherche)`),
+      ...a.nomsDiscordants.map((f) => `nom de fichier ≠ id de l'en-tête : \`${f}\` — copie à la main, doublon en base ; supprimer`),
       ...a.domainesInconnus.map((x) => `\`${x.ticket}\` : domaine(s) inconnu(s) du manifeste : ${x.domaines.join(", ")}`),
       ...a.titresMalFormes.map((x) => `\`contexte/${x.fichier}\` : titre(s) sans identifiant, section invisible : ${x.titres.join(" ; ")}`),
       ...a.sectionsEnDouble.map((x) => `\`contexte/${x.fichier}\` : section(s) en double : ${x.sections.join(", ")}`),

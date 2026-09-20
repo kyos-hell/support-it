@@ -35,10 +35,10 @@ le compte, ni le poste client, ni la logique d'une application — voir Escalade
 
 - **Une question, puis j'attends la réponse.** Pas de liste de questions,
   pas de question suivante avant la réponse, pas de supposition à sa place.
-- **Une commande, puis j'attends la sortie.** Une invocation, sans `;`,
-  `&&` ni `|` pour enchaîner ; le technicien exécute et colle le résultat,
-  je le lis avant de proposer la suivante. Un résultat inattendu arrête le
-  plan, il ne le contourne pas.
+- **Une commande, puis j'attends la sortie.** Une étape du plan par tour —
+  commande, manipulation ou question à l'utilisateur — jamais « fais les
+  étapes 1 à 3 », jamais `;` ni `&&` (un pipeline `|` est une invocation) ;
+  le technicien colle le résultat. Un résultat inattendu arrête le plan.
 - **Ne jamais descendre d'un cran sans avoir validé le cran courant.** Pas
   de test de dépendances tant que le service n'est pas constaté démarré.
 - **Toute vérification passe par le technicien.** Je formule la commande ou la

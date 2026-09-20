@@ -94,7 +94,7 @@ contexte:
     | EXEMPLE-INVITES | invités | portail captif, code du jour | VLAN 90, internet seulement |
   reseau/flux-existants: |
     | Source | Destination | Port / protocole | Motif | Depuis |
-    | --- | --- | --- | --- |
+    | --- | --- | --- | --- | --- |
     | VLAN 10 Siège | srv-app-01 | TCP 8443 | app-compta client lourd | 2024-03 |
     | Agence Nord VLAN 10 | srv-fs-01 | TCP 445 | partages | 2023-01 |
     | srv-app-01 | ERP hébergé | TCP 443 sortant | interface CSV nocturne | 2025-06 |
@@ -327,6 +327,8 @@ tickets:
     nature: demande
     domaines: [reseau]
     symptome: "Il faut ouvrir l'accès à app-compta depuis l'Agence Nord"
+    signaux:
+      - { id: objet-chemin, preuve: "ouvrir l'accès à app-compta depuis l'Agence Nord" }
     selon_cas: reseau/flux-existants
     questions:
       - { question: "Qui demande, et pour combien de postes ?", reponse: "La responsable comptabilité, pour 2 postes de l'Agence Nord", section: applicatif/responsables }
@@ -383,6 +385,8 @@ tickets:
     nature: demande
     domaines: [systeme]
     symptome: "Créer un partage Projets sur srv-fs-01 pour l'équipe études"
+    signaux:
+      - { id: objet-service, preuve: "créer un partage Projets sur srv-fs-01" }
     selon_cas: systeme/partages
     questions:
       - { question: "Qui doit pouvoir modifier, qui doit pouvoir lire ?", reponse: "Modification : les 6 personnes des études ; lecture : la direction", section: systeme/partages }
@@ -443,6 +447,8 @@ tickets:
     nature: demande
     domaines: [poste-de-travail]
     symptome: "Installer le client lourd app-compta sur trois postes de la compta"
+    signaux:
+      - { id: objet-poste, preuve: "installer le client lourd app-compta sur trois postes" }
     selon_cas: poste-de-travail/applications-standard
     questions:
       - { question: "Quels postes exactement ?", reponse: "PC-0412, PC-0415, PC-0418", section: poste-de-travail/parc }
@@ -493,6 +499,8 @@ tickets:
     nature: demande
     domaines: [materiel]
     symptome: "Commander un second écran pour le nouveau poste de l'accueil"
+    signaux:
+      - { id: objet-physique, preuve: "commander un second écran" }
     selon_cas: materiel/stock
     questions:
       - { question: "Le stock a-t-il un écran 24 pouces ?", reponse: "Non, quantité 0", section: materiel/stock }
@@ -544,6 +552,8 @@ tickets:
     nature: demande
     domaines: [identite]
     symptome: "Créer le compte de la nouvelle alternante compta, arrivée lundi"
+    signaux:
+      - { id: objet-compte, preuve: "créer le compte de la nouvelle alternante" }
     selon_cas: identite/cycle-de-vie
     questions:
       - { question: "La demande vient-elle des RH ?", reponse: "Oui, mail des RH reçu jeudi", section: identite/cycle-de-vie }
@@ -597,6 +607,8 @@ tickets:
     nature: demande
     domaines: [applicatif]
     symptome: "Donner à la nouvelle alternante l'accès au module Factures de app-compta"
+    signaux:
+      - { id: objet-fonction-applicative, preuve: "l'accès au module Factures de app-compta" }
     selon_cas: applicatif/acces-applicatifs
     questions:
       - { question: "Le responsable comptabilité a-t-il donné son accord ?", reponse: "Oui, par mail ce matin", section: applicatif/acces-applicatifs }

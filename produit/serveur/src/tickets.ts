@@ -9,7 +9,7 @@ import { ErreurEnCours, escaladesBrouillon, etatBrouillon, lireBrouillon, lireSi
 import { fabriquerId, horodatage, idValide, normaliserCle, poste, utilisateur } from "./ids.js";
 import { domaineDuTag, lireManifeste, tagsCandidats, type Bibliotheque } from "./manifeste.js";
 import { lireDocument, sections } from "./markdown.js";
-import { escaladesDerivees, fusionnerEtat, skillCharge, type Session } from "./session.js";
+import { casInstruit, escaladesDerivees, fusionnerEtat, skillCharge, type Session } from "./session.js";
 
 export { idValide, fabriquerId, type QuestionPosee };
 
@@ -53,6 +53,8 @@ export interface EntreeTicket {
 export interface TicketEcrit {
   id: string;
   fichier: string;
+  /** O9 (campagne 0.3.0-beta) : la durée retenue, et si la valeur fournie a été ignorée. */
+  duree: { minutes: number | null; calculee: boolean; fournie_ignoree: boolean };
   /** Le journal du ticket : un seul fichier, absent s'il n'y a eu aucune question. */
   journal: { fichier: string | null; questions: number };
   brouillon_retire: boolean;
@@ -178,6 +180,15 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
     if (!skillCharge(session!.skillsCharges, "cloture")) {
       throw new ErreurTicket('charger `cloture` d\'abord : load_skill(["cloture"]) — ses consignes n\'ont pas été lues dans cette session.');
     }
+    // E15 (campagne 0.3.0-beta) : une baseline se déroule comme un ticket normal ;
+    // « résolu » sans aucun skill de domaine chargé est un flux court-circuité.
+    const brouillonCourant = lireBrouillon(r, courant);
+    const instruits = brouillonCourant ? fusionnerEtat(etatBrouillon(brouillonCourant), session!).skills_charges : session!.skillsCharges;
+    if (e.statut === "resolu" && !casInstruit(instruits)) {
+      throw new ErreurTicket(
+        "un ticket résolu s'instruit : charger le skill du domaine (load_skill) avant de clôturer, baseline comprise — la différence d'une baseline est à la clôture (conclusion_humaine, resolu_par), pas dans le flux.",
+      );
+    }
   }
   // Lien avec un brouillon en cours : le courant de la session, sinon par id,
   // sinon par référence, sinon par le symptôme (A5). Le ticket final reprend
@@ -186,6 +197,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
   if (e.id && !brouillon) throw new ErreurTicket(`brouillon inconnu : ${e.id}. Omettre id pour clôturer sans brouillon.`);
   if (!brouillon && !e.id) brouillon = trouverParSymptome(r, e.symptome_initial);
   let id: string;
+  let fournie: number | undefined;
   let fichier: string;
   if (brouillon) {
     id = brouillon.id;
@@ -201,6 +213,7 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
         `le brouillon ${id} porte la référence « ${brouillon.reference} », la clôture donne « ${ref} » : mauvais id ? Un ticket = une référence.`,
       );
     }
+    fournie = e.duree_minutes;
     // A1 et complément : le brouillon est la source. Le symptôme, les domaines
     // proposés, le plan et les questions viennent de lui ; ceux de la clôture
     // ne servent que là où le brouillon n'a rien. Les listes s'ajoutent.
@@ -209,6 +222,13 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       reference: brouillon.reference ?? e.reference,
       symptome_initial: brouillon.symptome_initial || e.symptome_initial,
       domaines_proposes: brouillon.domaines_proposes.length ? brouillon.domaines_proposes : e.domaines_proposes,
+      // E5 (campagne 0.3.0-beta) : les domaines validés aussi viennent du brouillon
+      // (union avec ceux de la clôture, jamais de retrait) — sauf un statut
+      // hors-domaines-couverts, où la clôture peut n'en valider aucun.
+      domaines_valides:
+        e.statut === "hors-domaines-couverts"
+          ? e.domaines_valides
+          : [...brouillon.domaines_valides, ...e.domaines_valides.filter((d) => !brouillon.domaines_valides.includes(d))],
       plan_action: brouillon.plan_action || e.plan_action,
       signaux: fusion(brouillon.signaux, lireSignaux(e.signaux), (x) => x.id || x.preuve),
       questions: fusion(brouillon.questions, e.questions ?? [], (q) => q.question),
@@ -247,7 +267,12 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
   const brouillon_retire = brouillon ? retirerBrouillon(r, brouillon.id) : false;
 
   const journal = ecrireJournal(r, id, e, date);
-  return { id, fichier, journal, brouillon_retire };
+  const duree = {
+    minutes: e.duree_minutes ?? null,
+    calculee: Boolean(brouillon),
+    fournie_ignoree: Boolean(brouillon) && fournie !== undefined && fournie !== e.duree_minutes,
+  };
+  return { id, fichier, journal, brouillon_retire, duree };
 }
 
 /**

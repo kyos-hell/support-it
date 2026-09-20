@@ -32,7 +32,8 @@ seulement pour celui-là.
   serveur en fait le journal du ticket (un fichier par ticket) : c'est
   ainsi que les gabarits se complètent.
 - Les **mises à jour de contexte** : quand le terrain a complété le
-  contexte, formuler le contenu **prêt à coller** dans la section visée.
+  contexte, formuler la **section entière prête à coller** (le tableau
+  complet, pas la ligne qui change : `update_context` remplace tout).
   Les **contradictions** notées en cours de ticket (`contradictions` de
   `save_progress`) sont déjà reprises par le serveur : ne pas les redire.
   **Trier avant de proposer** : le contexte reçoit ce que l'entreprise
@@ -52,10 +53,13 @@ seulement pour celui-là.
   par le technicien (au début, ou en cours de route). Si elle n'a jamais été
   donnée, la demander une fois ici ; « pas de référence » suffit. Elle est
   ajoutée aux tags : un cas publié se retrouve par sa référence.
-- La **durée** si le technicien peut la donner, et pour un ticket de
-  baseline, `conclusion_humaine` et `resolu_par`.
+- **Qui a résolu** (`resolu_par` : outil, humain, les deux) : **une question
+  au technicien**, jamais une valeur supposée — c'est une mesure. Pour une
+  baseline, `conclusion_humaine` en plus. La durée est calculée par le serveur.
 
 Le serveur fabrique l'identifiant et le chemin : ne jamais en proposer.
+Rien ne s'écrit dans `installation/` hors des appels — un ticket, une entrée
+de base ne se corrigent pas, même sur demande : le signaler au référent.
 **Le brouillon en cours est rattaché par le serveur** : `save_ticket` sans
 `id` suffit, le ticket final reprend l'id du brouillon, ce qu'il a
 accumulé (symptôme, questions, signaux, plan, durée) est la source, et il

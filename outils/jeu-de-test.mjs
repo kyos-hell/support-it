@@ -219,7 +219,11 @@ async function main() {
   // 7 : entrée kb illisible — copie de EX-1010 sans le second ---.
   {
     const s = lire(path.join(kb, `${ids.get("EX-1010")}.md`));
-    ecrire(path.join(kb, "casse.md"), s.replace(/\n---\n\n# Ticket/, "\n\n# Ticket"));
+    // E6 (campagne 0.3.0-beta) : l'entrée publiée a deux lignes vides après le
+    // second --- ; l'ancienne regex ne matchait pas et casse.md restait lisible.
+    const casse = s.replace(/\n---\n+# Ticket/, "\n\n# Ticket");
+    if (casse === s) throw new Error("anomalie 7 : le second --- n'a pas été trouvé, casse.md serait lisible");
+    ecrire(path.join(kb, "casse.md"), casse);
     log("anomalie 7 : kb/casse.md (YAML cassé)");
   }
   // 8 : reseau/acces-distant datée de 120 jours (topologie n'a pas de ligne de date dans le gabarit).

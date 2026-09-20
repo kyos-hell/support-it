@@ -209,15 +209,17 @@ export function rendreSections(res: ResultatSection[]): string {
   const out: string[] = [];
   for (const s of res) {
     const titre = s.titre ? ` — ${s.titre}` : "";
-    out.push(`### ${s.id}${titre} · ${s.etat}`);
+    out.push(`### ${s.id}${titre} · ${s.etat}${s.perimee ? " · **PÉRIMÉE, À CONFIRMER**" : ""}`);
     if (s.etat === "ok") {
-      out.push(s.contenu ?? "");
-      if (s.derniereMiseAJour) out.push(`_Dernière mise à jour : ${s.derniereMiseAJour}_`);
       if (s.perimee) {
+        // E13 (campagne 0.3.0-beta) : en tête, pas en pied — le modèle lisait le
+        // contenu et ignorait la note. Une consigne, pas une information.
         out.push(
-          `_**À confirmer** : datée du ${s.derniereMiseAJour}, plus de ${JOURS_PEREMPTION} jours. Avant de s'en servir, faire confirmer au technicien que c'est toujours vrai — oui : update_context avec le contenu identique (le serveur re-date seulement) ; non : update_context avec le nouveau contenu._`,
+          `_**Datée du ${s.derniereMiseAJour}, plus de ${JOURS_PEREMPTION} jours : ne pas s'en servir avant d'avoir dit au technicien qu'elle est périmée et obtenu sa réponse** — « toujours vrai ? » oui : update_context avec le contenu identique (le serveur re-date seulement) ; non : update_context avec le nouveau contenu._`,
         );
       }
+      out.push(s.contenu ?? "");
+      if (s.derniereMiseAJour) out.push(`_Dernière mise à jour : ${s.derniereMiseAJour}_`);
       if (s.note) out.push(`_${s.note}_`);
     } else {
       if (s.note) out.push(`_${s.note}_`);

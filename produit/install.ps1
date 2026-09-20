@@ -99,7 +99,7 @@ if (-not (NodeOk $nodeVersion) -or -not $npmCmd) {
   Write-Host "  node $nodeVersion, npm $(& npm --version) : installés"
 }
 $claude = Get-Command claude -ErrorAction SilentlyContinue
-if ($claude) { Write-Host "  claude CLI présent : $($claude.Source)" } else { Write-Host "  claude CLI absent du PATH : l'enregistrement écrira directement ~/.claude.json" }
+if ($claude) { Write-Host "  claude CLI présent : $($claude.Source)" } else { Write-Host "  claude CLI absent du PATH : le serveur s'enregistre dans .mcp.json (portée projet), sans lui" }
 
 Etape 2 "Construction du serveur MCP"
 if ($SansBuild) {

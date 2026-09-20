@@ -131,6 +131,9 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 39 | **L'audit** : `audit.ts` calcule (jeu de test du triage, brouillons anciens/zombies/orphelins, résolus non publiés, tags hors bibliothèque, cas lus, actions multiples, santé C3, T-P7 ; périmées, candidats, volumineuses, placeholders, historique), rapport daté dans `audits/`, commande CLI et skill `audit` qui propose un par un sur oui et n'écrit jamais de lui-même — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 8 et §2.9, audit.md, outillage.md | Le projet produisait des données sans outil pour se regarder ; T-P7 était vide depuis le premier jour. `verifier` (C3) et `mesures` absorbées. |
 | 40 | **Validité du contexte** : péremption 90 jours annotée « à confirmer » à l'usage, confirmation = `update_context` à contenu identique (re-date sans historique), `contradictions` de `save_progress` reprises à la clôture, file des candidats servie par `remplissage` et l'audit — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 9 et §2.8, format-contexte §5, contrat-mcp §5 bis | La boucle de fraîcheur de `validation.md` §6, différée depuis le 2026-09-11 ; pas d'appel `confirm_context`, pas de seuil par section. |
 | 41 | **Une question, une commande, attendre** : deux règles mot pour mot dans les douze skills (`valider` les exige), plan en séquence numérotée, T-B8 ; les règles « à confirmer » et « contradiction » voyagent avec la donnée plutôt que d'être répétées — décidé avec toi le 2026-09-18, implémenté le même jour | déc. 10 et §2.2, format-skill §6, gouvernance §4 | Le ticket RBAC Azure : le modèle livrait les étapes 0 à 2 d'un coup ; « une commande à la fois » n'était écrit nulle part. Tenu par le prompt seul, c'est dit comme tel. |
+| 42 | **Domaines validés : union, jamais de retrait** après le premier skill de domaine ; `save_ticket` les prend du brouillon — décidé avec toi le 2026-09-20 (E5) | §11, contrat-mcp §5 ter | T3 : le ticket final disait `domaines_valides = escalades = [identite]`, poste-de-travail perdu, jeu de test du triage faussé. |
+| 43 | **Un signal par domaine proposé, demandes comprises**, signal `objet-…` par domaine et domaine `hors-perimetre` décrit au manifeste — décidé avec toi le 2026-09-20 (E10) | §11, manifeste, triage | T6 : devis de câblage routé en réseau ; « hors des domaines couverts » n'était tenu par rien pour une demande, et aucun domaine non couvert n'existait. |
+| 44 | **Enregistrement MCP en portée projet** (`.mcp.json` dans le dossier de lancement) — décidé avec toi le 2026-09-20 (E18) | §11, deploiement §3 | D5 : `install.sh` sur un dossier temporaire a réécrit `~/.claude.json` et détourné l'installation de test. Une machine = plusieurs installations possibles ; approbation du `.mcp.json` au premier lancement à documenter. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -286,3 +289,34 @@ passe côté serveur ou côté hôte.
 de base existants se lisent tels quels (signaux et tags libres acceptés en
 lecture) ; rien n'est migré. Les tickets antérieurs sortent dans le jeu de
 test du triage sans signaux cochés : à lire à la main.
+
+## 11. Campagne de test 0.3.0-beta — 2026-09-19/20, et ses corrections
+
+**Ce qui a été joué** (`campagne-test-0.3.0-beta.md`) : la mise en place
+§3.2, onze tickets (T1–T10 + EX-2111), vingt refus (dix-neuf tirés par le
+QA contre le serveur, B14–B18 dans l'onglet de test), C1–C11, D. Verdict au
+critère de sortie §3.4 : atteint — aucun refus injustifié, l'hôte tient, C9
+propre, D vert — mais dix-huit écarts et onze observations, dont trois
+hauts, corrigés le 2026-09-20 avant de retoucher le manifeste.
+
+| Écart | Correction (2026-09-20) | Tenu par |
+| --- | --- | --- |
+| E5 — à l'escalade, `domaines_valides` écrasé par le modèle ; `save_ticket` le prenait de l'argument | Après le premier skill de domaine, `save_progress` fait l'**union** (retrait signalé « ATTENTION », jamais appliqué) ; `save_ticket` prend les validés du brouillon (union), sauf `hors-domaines-couverts` | code (`encours.ts`, `tickets.ts`), smoke |
+| E10 — hors-domaines non tenable : demande sans signal acceptée, aucun domaine non couvert au manifeste, skills demande contradictoires | Un signal par domaine proposé, **incident comme demande**, même sans aucun signal coché ; le manifeste porte un signal de demande `objet-…` par domaine et un domaine `hors-perimetre` **décrit** (travaux, achat, prestation, bâtiment) ; triage et skills de demande alignés | code, manifeste, contenu, smoke |
+| E18 — enregistrement MCP en portée utilisateur : un `install` ailleurs détourne l'installation | `enregistrer` écrit `<dossier de lancement>/.mcp.json` (portée projet) et retire l'entrée utilisateur si elle pointait ici, la signale sinon | CLI, scripts, deploiement §3 |
+| E15 — baseline court-circuitée, résolu accepté sans skill de domaine | `save_ticket` refuse `resolu` sans skill de domaine chargé ; triage §6 « le même flux » | code, contenu |
+| E3, E4 — deux étapes par tour (7 fois), règle `\|` mal calibrée | Règle « une commande » réécrite mot pour mot dans les treize fichiers : une étape du plan par tour, jamais « fais les étapes 1 à 3 », le pipe est une invocation ; triage point 8 | prompt seul (consigné §3) |
+| E8 — `resolu_par` décidé par le modèle (×3) | `cloture.md` : une question au technicien, jamais supposé | prompt seul |
+| E11, E16 — symptôme préfixé par la référence, puis enrichi | Le serveur retire le préfixe `<référence> :` et le dit ; triage point 2 : « le premier message, moins la référence, jamais complété » | code + prompt |
+| E12, E13 — adresse fabriquée dans une commande ; section « À confirmer » ignorée | Skill réseau cran 5 : charger `dns-dhcp` avant toute commande DNS ; triage point 4 ; annotation de péremption en **tête** de section, impérative | prompt ; rendu serveur |
+| E14 — proposition d'éditer `kb/` | Règle « rien ne s'écrit dans `installation/` hors des appels » dans triage et clôture ; l'hôte reste le filet | prompt + hôte |
+| E2, E7 — « tag inconnu : reseau » ; doublon d'id en base | Natures, domaines et références connus par construction dans `search_kb` ; dédoublonnage par id ; constat C3 « nom de fichier ≠ id » | code |
+| E6, E17 — anomalie 7 jamais générée ; séparateur à 4 colonnes | Regex corrigée et vérifiée par le générateur ; YAML corrigé ; demandes du jeu avec leur signal ; étape 9 rejouée : 19 anomalies, `casse.md` compris | outils |
+| O4, O9, O10, O11 | Clôture : la section **entière** dans `mises_a_jour_contexte` ; `save_ticket` annonce la durée retenue ; l'audit donne la prochaine étape des brouillons anciens et la conclusion des résolus non publiés ; candidats non tronqués | prompt ; code |
+
+**Non corrigé, à trancher** (`campagne-test-0.3.0-beta.md` §1) : O1
+(`get_context` non borné aux sections du skill), O2 (section en double à
+l'écriture), O3 (la proposition ambiguë du triage n'est jamais
+enregistrée), O5 (signaux et demandes — traité en partie par `objet-…`),
+O6 (`/mcp` dans l'app), O7 (état écrit au point suivant), O8 (durée
+calendaire), E9 (questions composées, à observer).

@@ -42,12 +42,20 @@ function extrait(texte: string): string {
  * une seule vaut 1. La nature, les domaines et la référence ne sont pas
  * comptés : ils sont sur tous les tickets d'une famille.
  */
-export function rechercher(r: Racines, tags: string[]): { total: number; correspondants: number; resultats: ResultatKb[] } {
+export function rechercher(r: Racines, tags: string[]): { total: number; correspondants: number; resultats: ResultatKb[]; structurels: Set<string> } {
   const c = chemins(r);
-  if (!fs.existsSync(c.kb)) return { total: 0, correspondants: 0, resultats: [] };
+  if (!fs.existsSync(c.kb)) return { total: 0, correspondants: 0, resultats: [], structurels: new Set() };
   const voulus = normaliser(tags);
   const fichiers = fs.readdirSync(c.kb).filter((f) => f.endsWith(".md"));
-  const entrees = fichiers.map((f) => lireTicket(path.join(c.kb, f))).filter((t) => t.entete && Object.keys(t.entete).length > 0);
+  // E7 (campagne 0.3.0-beta) : deux fichiers portant le même id (copie à la
+  // main) ne comptent qu'une fois — celui dont le nom est l'id, sinon le premier.
+  const lus = fichiers.map((f) => ({ f, t: lireTicket(path.join(c.kb, f)) })).filter((x) => x.t.entete && Object.keys(x.t.entete).length > 0);
+  const parId = new Map<string, (typeof lus)[number]>();
+  for (const x of lus) {
+    const deja = parId.get(x.t.id);
+    if (!deja || path.basename(x.f, ".md") === x.t.id) parId.set(x.t.id, x);
+  }
+  const entrees = [...parId.values()].map((x) => x.t);
   const frequence = new Map<string, number>();
   const nonComptes = new Set<string>();
   for (const t of entrees) {
@@ -76,13 +84,16 @@ export function rechercher(r: Racines, tags: string[]): { total: number; corresp
     });
   }
   resultats.sort((a, b) => b.score - a.score || b.communs.length - a.communs.length || b.date.localeCompare(a.date));
-  return { total: entrees.length, correspondants: resultats.length, resultats: resultats.slice(0, RESULTATS_MAX) };
+  return { total: entrees.length, correspondants: resultats.length, resultats: resultats.slice(0, RESULTATS_MAX), structurels: nonComptes };
 }
 
 /** Rendu compact (~300 caractères par cas) : de quoi choisir, pas de quoi s'en servir — read_kb pour ça. */
-export function rendreRecherche(tags: string[], res: { total: number; correspondants: number; resultats: ResultatKb[] }, biblio?: Bibliotheque): string {
+export function rendreRecherche(tags: string[], res: { total: number; correspondants: number; resultats: ResultatKb[]; structurels?: Set<string> }, biblio?: Bibliotheque): string {
   // Décision 1 : un tag inconnu de la bibliothèque est signalé avec les tags proches, pas ignoré en silence.
-  const inconnus = biblio ? normaliser(tags).filter((t) => !biblio.tous.includes(t)) : [];
+  // E2 (campagne 0.3.0-beta) : les tags que le serveur ajoute lui-même (nature,
+  // domaines, références des cas en base) sont connus par construction.
+  const structurels = res.structurels ?? new Set<string>();
+  const inconnus = biblio ? normaliser(tags).filter((t) => !biblio.tous.includes(t) && !structurels.has(t)) : [];
   const avert = inconnus.length
     ? inconnus.map((t) => {
         const proches = biblio ? tagsProches(biblio, t) : [];

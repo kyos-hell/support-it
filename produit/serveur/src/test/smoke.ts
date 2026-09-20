@@ -105,7 +105,10 @@ async function main() {
   assert.match(texte(triage), /Manifeste des domaines/);
   assert.match(texte(triage), /`reseau`/);
   for (const d of DOMAINES) assert.match(texte(triage), new RegExp("`" + d + "` — [^|]+\\| \\*\\*couvert\\*\\*"), `${d} couvert au manifeste`);
-  assert.doesNotMatch(texte(triage), /hors bêta/, "plus aucun domaine décrit hors bêta dans le produit livré");
+  // E10 (campagne 0.3.0-beta) : hors-perimetre est décrit sans dossier, avec ses signaux.
+  assert.match(texte(triage), /`hors-perimetre` — [^|]+\| décrit, hors bêta \|[^|]+\| `travaux-batiment`/, "hors-perimetre décrit au manifeste");
+  const horsPerimetre = await client.callTool({ name: "load_skill", arguments: { domaines: ["hors-perimetre"], nature: "demande" } });
+  assert.ok(estErreur(horsPerimetre) && /hors des domaines couverts/.test(texte(horsPerimetre)), texte(horsPerimetre));
   assert.match(texte(triage), /Tickets en cours[\s\S]*Aucun ticket en cours/);
 
   // 2. Domaine inconnu, domaine hors bêta, nature manquante, trois domaines.
@@ -209,7 +212,7 @@ async function main() {
   assert.match(hist[0], /^reseau-\d{8}-\d{6}\.md$/);
   const relu = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/plan-adressage"] } });
   assert.match(texte(relu), /plan-adressage[^\n]*· ok[\s\S]*VLAN-TEST/);
-  assert.doesNotMatch(texte(relu), /À confirmer/, "datée d'aujourd'hui : pas périmée");
+  assert.doesNotMatch(texte(relu), /À CONFIRMER/, "datée d'aujourd'hui : pas périmée");
   // Décision 9 : le même contenu = « toujours vrai » — re-datée, pas de copie dans historique/.
   const confirmee = await client.callTool({
     name: "update_context",
@@ -221,7 +224,8 @@ async function main() {
   const reseauMdDate = fs.readFileSync(path.join(installation, "contexte", "reseau.md"), "utf8");
   fs.writeFileSync(path.join(installation, "contexte", "reseau.md"), reseauMdDate.replace(/Dernière mise à jour : \d{4}-\d{2}-\d{2}/, "Dernière mise à jour : 2020-01-01"), "utf8");
   const perimee = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/plan-adressage"] } });
-  assert.match(texte(perimee), /plan-adressage[^\n]*· ok[\s\S]*\*\*À confirmer\*\* : datée du 2020-01-01, plus de 90 jours/, texte(perimee));
+  // E13 (campagne 0.3.0-beta) : la consigne est en tête de section, avant le contenu.
+  assert.match(texte(perimee), /plan-adressage[^\n]*· ok · \*\*PÉRIMÉE, À CONFIRMER\*\*\n_\*\*Datée du 2020-01-01, plus de 90 jours : ne pas s'en servir[\s\S]*\| 10 \| VLAN-TEST/, texte(perimee));
   assert.match(texte(perimee), /update_context avec le contenu identique/);
 
   const maj2 = await client.callTool({
@@ -316,6 +320,26 @@ async function main() {
   assert.match(texte(p1b), /domaines classés par les signaux cochés : systeme \(2 : un-service-touche, independant-du-chemin\) > reseau \(1 : population-lieu-lien\)/, "classement calculé par le serveur");
   const p1 = p1b;
   const pid = texte(p1).match(/Brouillon créé : (\S+) ·/)?.[1];
+  // E10 (campagne 0.3.0-beta) : une demande aussi exige un signal par domaine proposé.
+  const demandeSansSignal = await clientB.callTool({
+    name: "save_progress",
+    arguments: { reference: "DEM-TEST-1", symptome_initial: "Test : créer un partage pour l'équipe", nature: "demande", domaines_proposes: ["systeme"] },
+  });
+  assert.ok(estErreur(demandeSansSignal) && /systeme sans aucun signal coché/.test(texte(demandeSansSignal)), texte(demandeSansSignal));
+  // E11 : la référence en tête du symptôme est retirée, et dite.
+  const prefixe = await clientB.callTool({
+    name: "save_progress",
+    arguments: { reference: "DEM-TEST-1", symptome_initial: "DEM-TEST-1 : créer un partage pour l'équipe", nature: "demande", signaux: [{ id: "objet-service", preuve: "créer un partage" }], domaines_proposes: ["systeme"], prochaine_etape: "x" },
+  });
+  assert.ok(!estErreur(prefixe), texte(prefixe));
+  assert.match(texte(prefixe), /ATTENTION symptome_initial : la référence « DEM-TEST-1 » en tête a été retirée/, texte(prefixe));
+  const pidDem = texte(prefixe).match(/Brouillon créé : (\S+) ·/)?.[1];
+  assert.ok(pidDem);
+  assert.match(fs.readFileSync(path.join(installation, "en-cours", `${pidDem}.md`), "utf8"), /symptome_initial: créer un partage pour l'équipe/);
+  fs.rmSync(path.join(installation, "en-cours", `${pidDem}.md`));
+  // Retour au brouillon de la séquence.
+  const retour = await clientB.callTool({ name: "resume_ticket", arguments: { ticket: pid } });
+  assert.ok(!estErreur(retour), texte(retour));
   assert.ok(pid, "id du brouillon");
   assert.ok(fs.existsSync(path.join(installation, "en-cours", `${pid}.md`)));
   // Refus hors séquence, brouillon courant : chercher avant d'instruire, clôturer sans cloture.
@@ -333,6 +357,11 @@ async function main() {
   // Instruction : le skill, ses requis, un point d'étape.
   const sk = await clientB.callTool({ name: "load_skill", arguments: { domaines: ["systeme"], nature: "incident" } });
   assert.ok(!estErreur(sk), texte(sk));
+  // E5 (campagne 0.3.0-beta) : après le premier skill de domaine, domaines_valides ne se retire plus — union, dite.
+  const retrait = await clientB.callTool({ name: "save_progress", arguments: { id: pid, domaines_valides: ["materiel"], prochaine_etape: "x" } });
+  assert.ok(!estErreur(retrait), texte(retrait));
+  assert.match(texte(retrait), /ATTENTION domaines_valides : systeme conservé\(s\)[^\n]*validés : systeme, materiel/, texte(retrait));
+  assert.match(fs.readFileSync(path.join(installation, "en-cours", `${pid}.md`), "utf8"), /domaines_valides:\n  - systeme\n  - materiel/);
   await refusSchema(clientB.callTool({ name: "save_progress", arguments: { id: pid, contradictions: [{ section: "reseau/inexistante", constat: "x" }] } }), /inexistante/, "section inconnue des gabarits");
   await refusSchema(clientB.callTool({ name: "save_progress", arguments: { id: pid, questions: [{ question: "q", reponse: "r", section: "systeme/nexiste-pas" }] } }), /nexiste-pas/, "section candidate inconnue");
   const p2 = await clientB.callTool({
@@ -398,7 +427,7 @@ async function main() {
   const cloture = await clientB.callTool({ name: "load_skill", arguments: { domaines: ["cloture"] } });
   assert.ok(!estErreur(cloture) && /save_ticket/.test(texte(cloture)));
   // Décision 1 : cloture sert les tags cochables, filtrés sur les domaines validés (+ escalade) et les transverses.
-  assert.match(texte(cloture), /Tags cochables pour ce ticket \(domaines systeme, identite \+ transverses\)/, texte(cloture).slice(-600));
+  assert.match(texte(cloture), /Tags cochables pour ce ticket \(domaines systeme, materiel, identite \+ transverses\)/, texte(cloture).slice(-600));
   assert.match(texte(cloture), /`sauvegarde`[\s\S]*`verrouillage`[\s\S]*`m365`/, "tags produit des deux domaines puis le transverse client");
   assert.doesNotMatch(texte(cloture), /`vpn`/, "un tag d'un autre domaine n'est pas proposé");
   // Tag inconnu et sixième tag : refus du schéma ; tag d'un autre domaine : refus du serveur avec la liste.
@@ -602,7 +631,7 @@ async function main() {
   assert.match(depuis("Santé des fichiers"), /contexte\/general\.md[^\n]*titre\(s\) sans identifiant[^\n]*## Sites/, "titre mal formé signalé");
   assert.ok(depuis("plusieurs actions").includes(`\`${pid}\` : 2 action`), "save_progress à deux actions signalé (décision 10) — " + depuis("plusieurs actions").slice(0, 300));
   assert.ok(depuis("Cas lus").includes(`\`${pid2}\` a lu \`${id}\``), "cas lu et suite donnée");
-  assert.match(depuis("Jeu de test du triage"), /un-service-touche, independant-du-chemin, population-lieu-lien \| systeme > reseau \| systeme, reseau \| systeme \| identite \| \*\*oui\*\*/, "signaux cochés → calculés → validés, écart désigné");
+  assert.match(depuis("Jeu de test du triage"), /un-service-touche, independant-du-chemin, population-lieu-lien \| systeme > reseau \| systeme, reseau \| systeme, materiel \| identite \| \*\*oui\*\*/, "signaux cochés → calculés → validés, écart désigné");
   assert.match(depuis("Sections périmées"), /`reseau\/plan-adressage` : datée du 2020-01-01/, "section périmée proposée à confirmation");
   assert.match(depuis("Mesures (T-P7)"), /INC-TEST-42[^\n]*\| incident \| reseau \| 1 \| 3 \| — \| resolu/, "T-P7 rempli");
   fs.rmSync(fVieux);

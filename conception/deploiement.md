@@ -54,9 +54,25 @@ rejoindre ou mettre à jour — même commande, idempotente, qui note la
 version dans `installation/VERSION` et annonce le mode), `enregistrer` +
 `entree` + `hote` (Claude Code), `etat`. Le script se termine par trois
 rappels : remplir le contexte (à la main ou par `/support remplis le
-contexte`), redémarrer Claude Code et vérifier `/mcp`, lancer Claude Code
-depuis le dossier parent de `produit/` où `.claude/settings.json` tient la
-règle « l'IA n'exécute rien ».
+contexte`), redémarrer Claude Code et accepter le serveur du projet quand
+il le demande, lancer Claude Code depuis le dossier parent de `produit/` où
+`.claude/settings.json` tient la règle « l'IA n'exécute rien » et `.mcp.json`
+déclare le serveur.
+
+**Portée de l'enregistrement MCP — projet, depuis le 2026-09-20 (E18 de la
+campagne 0.3.0-beta).** `enregistrer` écrit `<dossier de lancement>/.mcp.json`
+(fusionné, sauvegardé), plus `~/.claude.json`. Raison : en portée
+utilisateur, un `install` lancé depuis un autre dossier (un test, un second
+clone) réécrivait l'entrée et détournait l'installation en place sans
+prévenir — constaté pendant la campagne (T-H1). En portée projet, deux
+installations coexistent sur un poste, et le serveur suit le dossier de
+lancement comme `.claude/settings.json`. Contreparties : Claude Code demande
+une approbation du `.mcp.json` au premier lancement dans ce dossier (à dire
+au technicien) ; une ancienne entrée utilisateur est retirée par
+`enregistrer` si elle pointe sur ce produit, signalée sinon. La vérification
+robuste après installation n'est pas `/mcp` (peu lisible dans l'app desktop,
+qui mêle ses propres serveurs et ouvre parfois le catalogue des connecteurs)
+mais le premier appel : `/support` → `load_skill(["triage"])`.
 
 **Encodage et fins de ligne.** `install.ps1` est enregistré en **UTF-8 avec
 BOM** : Windows PowerShell 5.1 lit un `.ps1` sans BOM dans la page de codes
@@ -167,7 +183,7 @@ pas tester l'hôte : test manuel T-H5 (`validation.md` §2.5).
   script s'arrête avec la commande et l'URL nodejs.org : jamais d'installation
   silencieuse, jamais de `curl | bash`.
 - Claude Code installé (app desktop ou CLI ; son absence du PATH n'empêche
-  rien, l'enregistrement écrit `~/.claude.json` directement).
+  rien, l'enregistrement écrit `.mcp.json` dans le dossier de lancement).
 - Accès en lecture au dossier `produit/`, en écriture à `installation/`
   (local ou partage ; l'authentification est celle du partage).
 - Mode de permission de Claude Code : par défaut, confirmation avant chaque

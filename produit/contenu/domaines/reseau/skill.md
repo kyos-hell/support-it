@@ -31,10 +31,10 @@ chemin, ni le poste qui s'y connecte, ni les droits d'accès — voir Escalade.
 
 - **Une question, puis j'attends la réponse.** Pas de liste de questions,
   pas de question suivante avant la réponse, pas de supposition à sa place.
-- **Une commande, puis j'attends la sortie.** Une invocation, sans `;`,
-  `&&` ni `|` pour enchaîner ; le technicien exécute et colle le résultat,
-  je le lis avant de proposer la suivante. Un résultat inattendu arrête le
-  plan, il ne le contourne pas.
+- **Une commande, puis j'attends la sortie.** Une étape du plan par tour —
+  commande, manipulation ou question à l'utilisateur — jamais « fais les
+  étapes 1 à 3 », jamais `;` ni `&&` (un pipeline `|` est une invocation) ;
+  le technicien colle le résultat. Un résultat inattendu arrête le plan.
 - **Ne jamais descendre d'un cran sans avoir validé le cran courant.** Pas de
   test DNS tant que l'IP locale n'est pas confirmée saine.
 - **Toute vérification passe par le technicien.** Je formule la commande ou la
@@ -72,8 +72,9 @@ saine.
    `reseau/acces-distant`. Coupure au même saut pour plusieurs cibles :
    lien d'interconnexion ou opérateur.
 5. **Résolution de noms.** Le nom se résout-il, et vers la bonne adresse ?
-   → `nslookup <cible>`. Échec de résolution seule (le ping par IP passe) :
-   DNS — charger `reseau/dns-dhcp`.
+   → charger `reseau/dns-dhcp` **avant** toute commande vers un serveur DNS
+   (ses adresses y sont — jamais une adresse supposée), puis `nslookup
+   <cible>`. Échec de résolution seule (le ping par IP passe) : DNS.
 6. **Chemin applicatif.** Le port du service répond-il depuis ce segment ?
    → `Test-NetConnection <cible> -Port <port>`. IP joignable mais port fermé
    depuis certains segments seulement : filtrage — charger

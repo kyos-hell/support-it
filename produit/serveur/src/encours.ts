@@ -138,6 +138,8 @@ export interface ProgressionEcrite {
   etape: Etape;
   /** Décision 2, point 7 : les domaines classés depuis les signaux cochés. */
   classement: string;
+  /** Ce que le serveur a corrigé ou ignoré dans l'appel (E5, E11 de la campagne 0.3.0-beta), une ligne chacun. */
+  avertissements: string[];
 }
 
 export class ErreurEnCours extends Error {}
@@ -289,6 +291,12 @@ function ajouter<T>(existants: T[], nouveaux: T[] | undefined, cle: (x: T) => st
 }
 
 const texte = (s: string) => s.trim();
+
+/** « EX-2107 : le wifi coupe » → « le wifi coupe » quand la référence est celle du brouillon (E11). */
+export function sansPrefixeReference(symptome: string, reference: string): string {
+  const ref = reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return symptome.replace(new RegExp(`^\\s*${ref}\\s*[:—–-]\\s*`, "i"), "").trim() || symptome;
+}
 
 /**
  * Taxonomie du brouillon : un champ, une nature, une longueur. Une entrée est
@@ -494,10 +502,30 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   // La référence ne s'écrit que si le brouillon n'en a pas (A4 a déjà refusé
   // un changement) : une variante de casse ne doit pas écraser « INC-123 ».
   if (ref && !b.reference) b.reference = ref;
-  if (!b.symptome_initial && texte(e.symptome_initial ?? "")) b.symptome_initial = texte(e.symptome_initial!);
+  const avertissements: string[] = [];
+  if (!b.symptome_initial && texte(e.symptome_initial ?? "")) {
+    // E11 (campagne 0.3.0-beta) : l'argument de /support commence souvent par
+    // « EX-2107 : … » ; la référence a son champ, elle n'est pas le symptôme.
+    const brut = texte(e.symptome_initial!);
+    const sans = b.reference ? sansPrefixeReference(brut, b.reference) : brut;
+    if (sans !== brut) avertissements.push(`symptome_initial : la référence « ${b.reference} » en tête a été retirée, le symptôme commence à « ${sans.slice(0, 40)}… »`);
+    b.symptome_initial = sans;
+  }
   if (e.nature) b.nature = e.nature;
   if (domainesProposes) b.domaines_proposes = domainesProposes;
-  if (domainesValides) b.domaines_valides = domainesValides;
+  if (domainesValides) {
+    // E5 (campagne 0.3.0-beta) : après le premier skill de domaine, un domaine
+    // validé ne se retire plus — l'escalade passe par load_skill et s'ajoute.
+    const instruits = domainesInstruits(session ? session.skillsCharges : b.skills_charges);
+    if (instruits.length && b.domaines_valides.length) {
+      const union = [...b.domaines_valides, ...domainesValides.filter((d) => !b!.domaines_valides.includes(d))];
+      const retires = b.domaines_valides.filter((d) => !domainesValides.includes(d));
+      if (retires.length) avertissements.push(`domaines_valides : ${retires.join(", ")} conservé(s) — un domaine validé ne se retire plus une fois un skill de domaine chargé ; l'escalade s'ajoute par load_skill (validés : ${union.join(", ")})`);
+      b.domaines_valides = union;
+    } else {
+      b.domaines_valides = domainesValides;
+    }
+  }
   if (texte(e.prochaine_etape ?? "")) b.prochaine_etape = texte(e.prochaine_etape!);
   if (texte(e.plan_action ?? "")) b.plan_action = texte(e.plan_action!);
   b.signaux = ajouter(b.signaux, e.signaux, (x) => x.id || x.preuve);
@@ -508,11 +536,13 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   b.notes = ajouter(b.notes, e.notes, (x) => x.trim());
   b.questions = ajouter(b.questions, e.questions, (q) => q.question.trim());
   b.contradictions = ajouter(b.contradictions, e.contradictions, (x) => `${x.section} ${x.constat}`);
-  // Décision 2, point 7 : un domaine proposé sans signal coché est refusé (incidents ; une demande n'a pas de signaux).
-  if (domainesProposes && (b.nature ?? "incident") === "incident") {
+  // Décision 2, point 7 : un domaine proposé sans signal coché est refusé.
+  // Depuis la campagne 0.3.0-beta (E10) : pour une demande aussi — le manifeste
+  // porte pour chaque domaine un signal « ce sur quoi porte l'état cible ».
+  if (domainesProposes) {
     const coches = new Set(b.signaux.map((x) => x.id).filter(Boolean));
     const sansSignal = domainesProposes.filter((d) => !trouverDomaineSignaux(r, d).some((id) => coches.has(id)));
-    if (sansSignal.length && coches.size) {
+    if (sansSignal.length) {
       throw new ErreurEnCours(
         `domaines_proposes : ${sansSignal.join(", ")} sans aucun signal coché. Le triage propose les domaines que les signaux désignent ; cocher d'abord le signal (signaux: [{ id, preuve }]), ou retirer le domaine. Classement actuel : ${rendreClassement(r, b)}`,
       );
@@ -535,7 +565,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   b.etape = calculerEtape(b);
 
   const fichier = ecrire(r, b);
-  return { id: b.id, fichier, cree, lie, passation, etape: b.etape, classement: rendreClassement(r, b) };
+  return { id: b.id, fichier, cree, lie, passation, etape: b.etape, classement: rendreClassement(r, b), avertissements };
 }
 
 function trouverDomaineSignaux(r: Racines, domaine: string): string[] {
