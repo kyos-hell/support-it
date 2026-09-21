@@ -74,13 +74,14 @@ première installation fonctionne de bout en bout ; sur un contexte vide le
 modèle demande, il n'invente pas. **Corrections faites le 2026-09-21**
 (`fin-de-projet.md` §12, décisions 45–46) : structurels de `search_kb`
 depuis le manifeste (EA1), en-tête de tableau contrôlé par `update_context`
-(EA2), candidat comparé en entier (EA3). Restent à trancher : OA1–OA4.
+(EA2), candidat comparé en entier (EA3) — **rejouées le même jour** sur un
+vrai clone (`C:\Projet-IT\it-support-test\support-it`, `cf7f708`), vertes.
+Restent à trancher : OA1–OA5.
 
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Trancher les observations O1–O3, O7, O8 et OA1–OA4 des journaux de
-   campagne ; rejouer EA1–EA3 sur l'env de test (`support-it-test`, `git
-   pull` + `install.ps1` REJOINDRE).
+1. Trancher les observations O1–O3, O7, O8 et OA1–OA5 des journaux de
+   campagne.
 2. **Un ticket par domaine retouché** (le manifeste a changé : signaux
    `objet-…`, `hors-perimetre`), puis `0.3.0` sans `-beta`. Le testeur
    rejoue en particulier T6 (attendu : signaux `hors-perimetre` cochés →

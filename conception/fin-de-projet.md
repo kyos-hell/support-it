@@ -344,9 +344,18 @@ Trois écarts, tous côté serveur/skills, corrigés le 2026-09-21 :
 | EA2 — mise à jour de contexte au format inventé pour une section jamais servie ; le serveur écrivait tel quel | Décision 45 : `update_context` compare l'en-tête du tableau à celui attendu (gabarit si vide, colonnes en place sinon) et refuse avec les deux en-têtes et le rappel `get_context` ; `cloture.md` : « section jamais servie → `get_context` d'abord » | code (`contexte.ts`) + prompt, smoke |
 | EA3 — file des candidats : comparaison par préfixe de 60 caractères, une mise à jour qui étend une section était perdue | Décision 46 : inclusion du candidat entier normalisé | code (`audit.ts`), smoke |
 
+**Rejeu le 2026-09-21** sur un vrai clone (`cf7f708`, journal §5) :
+R-M1 (INITIALISER vu), R-EA1, R-EA2 (skill et serveur), R-EA3 verts, en
+trois tickets (EX-3101 résolu publié, EX-3102 escalade externe, EX-3103
+demande sur deux domaines).
+
 **Non corrigé, à trancher** (§1 du journal) : OA1 (l'audit ne dit pas que
 le contexte est vide), OA2 (copie `historique/` d'un gabarit vierge,
 message « remplacée »), OA3 (`section:` sur une réponse oui/non — prompt),
 OA4 (conseil « relance le ticket clôturé » — une demande reportée se met
-en pause, prompt). Toujours à observer : E3 (2 occurrences atténuées en 3
-tickets), E9 (5 questions composées), dates calculées par le modèle.
+en pause, prompt ; au rejeu le modèle a proposé la pause de lui-même), OA5
+(déductions du modèle rangées comme réponses du technicien ou candidats :
+convention de nommage, « Active Directory », « interface web » — l'invariant
+« rien d'inventé » tenu par le prompt seul). Toujours à observer : E3 (2
+occurrences atténuées en 3 tickets), E9 (5 questions composées), dates
+calculées par le modèle, une phrase en anglais.
