@@ -136,6 +136,8 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 44 | **Enregistrement MCP en portée projet** (`.mcp.json` dans le dossier de lancement) — décidé avec toi le 2026-09-20 (E18) | §11, deploiement §3 | D5 : `install.sh` sur un dossier temporaire a réécrit `~/.claude.json` et détourné l'installation de test. Une machine = plusieurs installations possibles ; approbation du `.mcp.json` au premier lancement à documenter. |
 | 45 | **Les colonnes d'un tableau de contexte ne se choisissent pas** : `update_context` refuse un en-tête différent de celui attendu (le squelette du gabarit si la section est vide ou absente, les colonnes en place sinon) ; la clôture dit « section jamais servie → `get_context` d'abord » — décidé avec toi le 2026-09-21 (EA2) | §12, contexte.ts, cloture.md | Campagne sans jeu de données, V1 : `systeme/serveurs`, jamais servie dans la session, écrite avec `Serveur \| Rôle \| Adresse \| Site` au lieu des six colonnes du gabarit, et rien ne le détectait. Sur un contexte vide c'est le cas courant. Principe du 2026-09-14 : la forme est dérivable, donc au serveur. Contrepartie : changer les colonnes d'une section se fait à la main par le référent, pas par l'outil. |
 | 46 | **Un candidat au contexte est « déjà appliqué » seulement s'il est contenu en entier** dans la section (normalisé), plus un préfixe de 60 caractères — décidé seul le 2026-09-21 (EA3) | §12, audit.ts | V3 : la mise à jour d'EX-3002 pour `reseau/acces-distant` reprenait la section et y ajoutait une IP et un piège ; même début → écartée, l'ajout perdu pour `remplissage` et `audit`. C'est le fonctionnement normal d'une installation qui grandit ticket après ticket. |
+| 47 | **La durée d'un ticket est la durée active** : somme des écarts entre points d'étape consécutifs (création → clôture), chacun plafonné à 30 min ; la calendaire est écrite à côté (`duree_calendaire_minutes`) ; le brouillon note l'horodatage de chaque `save_progress` (`points_etape`) — décidé avec toi le 2026-09-21 (O8) | §12, encours.ts, tickets.ts | T5 comptait sa pause (18 min), T8 sa nuit de session perdue (1 506 min), EX-3102 47 min pour 8 tours : la mesure T-P7 « durée » était fausse dès qu'un ticket attendait. Un brouillon antérieur, sans points, garde la calendaire. |
+| 48 | **Une section vide se remplit, elle n'est pas remplacée** : `update_context` sur un squelette n'archive rien dans `historique/` et répond « remplie (était vide) » — décidé avec toi le 2026-09-21 (OA2) | §12, contexte.ts | Chaque première écriture archivait le gabarit livré ; l'audit comptait ces copies. Même logique que la confirmation à l'identique (décision 9) : rien à sauver. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -349,13 +351,18 @@ R-M1 (INITIALISER vu), R-EA1, R-EA2 (skill et serveur), R-EA3 verts, en
 trois tickets (EX-3101 résolu publié, EX-3102 escalade externe, EX-3103
 demande sur deux domaines).
 
-**Non corrigé, à trancher** (§1 du journal) : OA1 (l'audit ne dit pas que
-le contexte est vide), OA2 (copie `historique/` d'un gabarit vierge,
-message « remplacée »), OA3 (`section:` sur une réponse oui/non — prompt),
-OA4 (conseil « relance le ticket clôturé » — une demande reportée se met
-en pause, prompt ; au rejeu le modèle a proposé la pause de lui-même), OA5
-(déductions du modèle rangées comme réponses du technicien ou candidats :
-convention de nommage, « Active Directory », « interface web » — l'invariant
-« rien d'inventé » tenu par le prompt seul). Toujours à observer : E3 (2
+**Observations tranchées et corrigées le 2026-09-21** (après le rejeu) :
+
+| Observation | Correction | Tenu par |
+| --- | --- | --- |
+| OA1 — l'audit ne disait pas que le contexte est vide | Une ligne d'information en tête du volet contexte (« N section(s) vide(s) sur 45 — information, pas un constat ») ; rc inchangé | code (`audit.ts`), smoke |
+| OA2 — copie `historique/` d'un gabarit vierge, « remplacée » | Décision 48 : pas de copie quand la section était vide, message « remplie (était vide) » | code (`contexte.ts`, `index.ts`), smoke |
+| OA3, OA5 — `section:` sur un oui/non ; déductions rangées comme réponses | Descriptions des champs `questions` de `save_progress` et `save_ticket` (relues à chaque appel) : « une question réellement posée », « ce qu'il a répondu, tel quel — une déduction va dans `notes` », « `section` seulement si la réponse est une donnée d'entreprise réutilisable » ; `cloture.md` et `triage.md` (point 2) alignés | prompt seul (consigné §3 de l'état d'avancement) |
+| OA4 — demande reportée clôturée, « relance le ticket » | `cloture.md` : une exécution reportée = `pause: true`, un clôturé ne se reprend pas | prompt seul |
+| O6 (hier) — « vérifier `/mcp` » | Rappel final des deux scripts : « taper `/support` : le premier appel prouve que le serveur répond » | scripts |
+| O8 (hier) — durée calendaire | Décision 47 : durée active, calendaire à côté, `points_etape` dans le brouillon, T-P7 « Durée active » | code, smoke |
+
+**Non corrigé, à observer** : O3 (au rejeu, le modèle a enregistré la
+proposition ambiguë de lui-même), O1, O2, O7 (laissés pour 0.3.0), E3 (2
 occurrences atténuées en 3 tickets), E9 (5 questions composées), dates
 calculées par le modèle, une phrase en anglais.

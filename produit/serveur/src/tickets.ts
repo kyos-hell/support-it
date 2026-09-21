@@ -44,6 +44,8 @@ export interface EntreeTicket {
   statut: Statut;
   tags?: string[];
   duree_minutes?: number;
+  /** O8 : création → clôture, en temps calendaire (pauses comprises) — écrite par le serveur à côté de la durée active. */
+  duree_calendaire_minutes?: number;
   /** Identifiant du brouillon en cours (save_progress) : le ticket final reprend cet id et le brouillon est retiré. */
   id?: string;
   /** Référence du ticket dans l'outil de ticketing de l'entreprise (INC-12345…). */
@@ -53,8 +55,8 @@ export interface EntreeTicket {
 export interface TicketEcrit {
   id: string;
   fichier: string;
-  /** O9 (campagne 0.3.0-beta) : la durée retenue, et si la valeur fournie a été ignorée. */
-  duree: { minutes: number | null; calculee: boolean; fournie_ignoree: boolean };
+  /** O9 (campagne 0.3.0-beta) : la durée retenue, et si la valeur fournie a été ignorée. O8 : active (points d'étape) et calendaire. */
+  duree: { minutes: number | null; calculee: boolean; fournie_ignoree: boolean; calendaire: number | null; active: boolean };
   /** Le journal du ticket : un seul fichier, absent s'il n'y a eu aucune question. */
   journal: { fichier: string | null; questions: number };
   brouillon_retire: boolean;
@@ -91,6 +93,7 @@ export function rendreTicket(id: string, e: EntreeTicket, date: Date, r?: Racine
     resolu_par: e.resolu_par ?? null,
     reference: e.reference?.trim() || null,
     duree_minutes: e.duree_minutes ?? null,
+    duree_calendaire_minutes: e.duree_calendaire_minutes ?? null,
     domaines_proposes: e.domaines_proposes,
     domaines_valides: e.domaines_valides,
     escalades: e.escalades ?? [],
@@ -235,8 +238,11 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
       // Ce que la session a vu depuis le dernier save_progress compte aussi.
       escalades: session ? escaladesDerivees(fusionnerEtat(etatBrouillon(brouillon), session).skills_charges) : escaladesBrouillon(brouillon),
       cas_lus: session ? fusionnerEtat(etatBrouillon(brouillon), session).cas_lus : brouillon.cas_lus,
-      // La durée est celle du brouillon (création → clôture), pas une estimation.
-      duree_minutes: dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
+      // La durée est celle du brouillon, pas une estimation. O8 : active
+      // (points d'étape, écarts plafonnés) quand le brouillon en a, sinon
+      // calendaire (création → clôture) ; la calendaire est toujours écrite à côté.
+      duree_minutes: dureeActiveMinutes(brouillon.points_etape, date) ?? dureeMinutes(brouillon.cree, date) ?? e.duree_minutes,
+      duree_calendaire_minutes: dureeMinutes(brouillon.cree, date),
       // Décision 9 : les contradictions notées en cours de ticket sont reprises, et deviennent
       // des mises à jour de contexte proposées — sans compter sur la mémoire du modèle.
       contradictions: brouillon.contradictions,
@@ -271,6 +277,8 @@ export function enregistrerTicket(r: Racines, e: EntreeTicket, session?: Session
     minutes: e.duree_minutes ?? null,
     calculee: Boolean(brouillon),
     fournie_ignoree: Boolean(brouillon) && fournie !== undefined && fournie !== e.duree_minutes,
+    calendaire: e.duree_calendaire_minutes ?? null,
+    active: Boolean(brouillon && brouillon.points_etape.length),
   };
   return { id, fichier, journal, brouillon_retire, duree };
 }
@@ -336,6 +344,26 @@ function dureeMinutes(creeIso: string, cloture: Date): number | undefined {
   const t = Date.parse(creeIso);
   if (Number.isNaN(t)) return undefined;
   return Math.max(0, Math.round((cloture.getTime() - t) / 60000));
+}
+
+/** O8 : au-delà de cet écart entre deux points d'étape, le technicien faisait autre chose (pause, nuit) — l'écart compte pour ce plafond. */
+export const ECART_ACTIF_MAX_MINUTES = 30;
+
+/**
+ * O8 (campagne 0.3.0-beta) : durée **active**, somme des écarts entre points
+ * d'étape consécutifs (création → … → clôture), chacun plafonné à
+ * ECART_ACTIF_MAX_MINUTES. Une pause de 18 min ou une nuit de session perdue
+ * ne comptent plus qu'une demi-heure. `undefined` sans points lisibles
+ * (brouillon antérieur) : la calendaire sert alors.
+ */
+export function dureeActiveMinutes(points: string[], cloture: Date): number | undefined {
+  const t = points.map((p) => Date.parse(p)).filter((x) => !Number.isNaN(x));
+  if (!t.length) return undefined;
+  t.sort((a, b) => a - b);
+  t.push(cloture.getTime());
+  let ms = 0;
+  for (let i = 1; i < t.length; i++) ms += Math.min(Math.max(0, t[i] - t[i - 1]), ECART_ACTIF_MAX_MINUTES * 60000);
+  return Math.round(ms / 60000);
 }
 
 export interface TicketLu {

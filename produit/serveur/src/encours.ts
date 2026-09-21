@@ -97,6 +97,8 @@ export interface Brouillon {
   recherche_faite: boolean;
   /** Décision 10 : nombre d'actions ajoutées par chaque save_progress qui en a ajouté — écrit par le serveur. Plus d'une = un indice. */
   actions_par_appel: number[];
+  /** O8 (campagne 0.3.0-beta) : l'horodatage de chaque point d'étape, création comprise — écrit par le serveur. Sert à la durée active (pauses et nuits exclues). */
+  points_etape: string[];
   passations: Passation[];
   symptome_initial: string;
   prochaine_etape: string;
@@ -216,6 +218,8 @@ function lireFichier(fichier: string): Brouillon | null {
     cas_lus: e.cas_lus ?? [],
     recherche_faite: Boolean(e.recherche_faite),
     actions_par_appel: Array.isArray(e.actions_par_appel) ? (e.actions_par_appel as number[]).map(Number) : [],
+    // Brouillon antérieur à O8 : pas de points ; la clôture retombe sur la durée calendaire.
+    points_etape: Array.isArray(e.points_etape) ? (e.points_etape as unknown[]).map(String) : [],
     passations: e.passations ?? [],
     symptome_initial: String(e.symptome_initial ?? ""),
     prochaine_etape: String(e.prochaine_etape ?? ""),
@@ -476,6 +480,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
       cas_lus: [],
       recherche_faite: false,
       actions_par_appel: [],
+      points_etape: [],
       passations: [],
       symptome_initial: "",
       prochaine_etape: "",
@@ -498,6 +503,7 @@ export function sauverProgression(r: Racines, e: EntreeProgression, session?: Se
   b.technicien = moi;
   b.poste = poste();
   b.derniere_mise_a_jour = maintenant;
+  b.points_etape = [...b.points_etape, maintenant];
   b.pause = Boolean(e.pause);
   // La référence ne s'écrit que si le brouillon n'en a pas (A4 a déjà refusé
   // un changement) : une variante de casse ne doit pas écraser « INC-123 ».

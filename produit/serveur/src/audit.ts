@@ -167,6 +167,8 @@ export interface Audit {
   casLus: { ticket: string; cas: string[]; statut: string }[];
   actionsMultiples: { ticket: string; appels: number[] }[];
   /** Volet contexte. */
+  /** OA1 (campagne sans jeu de données) : le remplissage, en information — pas un constat, l'audit à 0 ticket disait « 0 constat » sur 45 vides. */
+  remplissage: { remplies: number; vides: number };
   perimees: { section: string; date: string; age: number }[];
   candidats: Map<string, Candidat[]>;
   volumineuses: string[];
@@ -264,6 +266,7 @@ export function calculerAudit(r: Racines): Audit {
   const placeholders: string[] = [];
   const titres: Audit["titresMalFormes"] = [];
   const doubles: Audit["sectionsEnDouble"] = [];
+  const remplissage = { remplies: 0, vides: 0 };
   for (const g of gabaritsLivres(r)) {
     const fichier = path.join(c.contexte, `${g.domaine}.md`);
     if (!fs.existsSync(fichier)) continue;
@@ -275,7 +278,11 @@ export function calculerAudit(r: Racines): Audit {
     const dbl = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
     if (dbl.length) doubles.push({ fichier: `${g.domaine}.md`, sections: dbl });
     for (const s of secs) {
-      if (s.vide) continue;
+      if (s.vide) {
+        remplissage.vides++;
+        continue;
+      }
+      remplissage.remplies++;
       const id = `${g.domaine}/${s.id}`;
       const age = ageEnJours(s.derniereMiseAJour);
       if (age !== null && age > JOURS_PEREMPTION) perimees.push({ section: id, date: s.derniereMiseAJour ?? "", age });
@@ -310,6 +317,7 @@ export function calculerAudit(r: Racines): Audit {
     ticketsIllisibles: tickets.filter((t) => t.illisible).map((t) => path.basename(t.fichier)),
     casLus,
     actionsMultiples,
+    remplissage,
     perimees,
     candidats: candidats(r),
     volumineuses,
@@ -392,12 +400,19 @@ export function rendreAudit(a: Audit): string {
     ]),
   );
   out.push("", "### Mesures (T-P7)", "");
-  out.push("| Ticket | Nature | Domaine(s) | Questions | Durée (min) | Résolu par | Statut |", "| --- | --- | --- | --- | --- | --- | --- |");
+  out.push("| Ticket | Nature | Domaine(s) | Questions | Durée active (min) | Résolu par | Statut |", "| --- | --- | --- | --- | --- | --- | --- |");
   for (const t of a.tickets.filter((x) => !x.illisible)) {
     out.push(`| ${t.id}${t.reference ? ` (${t.reference})` : ""} | ${t.nature} | ${t.domaines_valides.join(", ") || "—"} | ${t.questions} | ${t.duree ?? "—"} | ${t.resolu_par} | ${t.statut} |`);
   }
 
   out.push("", "## contexte — Volet contexte", "");
+  const total = a.remplissage.remplies + a.remplissage.vides;
+  out.push(
+    a.remplissage.vides
+      ? `_${a.remplissage.vides} section(s) vide(s) sur ${total} — information, pas un constat : l'outil pose la question au moment utile ; \`etat\` les liste, \`/support remplis le contexte\` les remplit._`
+      : `_${total} section(s), toutes remplies._`,
+    "",
+  );
   out.push(`### Sections périmées (> ${JOURS_PEREMPTION} jours) — « toujours vrai ? » : oui → \`update_context\` identique (re-date), non → nouveau contenu`, "");
   out.push(puce(a.perimees.map((p) => `\`${p.section}\` : datée du ${p.date}, ${p.age} j`)));
   out.push("", "### File des candidats — proposé par les tickets, pas encore dans le contexte", "");

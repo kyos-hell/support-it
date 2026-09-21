@@ -20,9 +20,9 @@ relais. Tu n'exécutes rien, tu ne modifies rien : tu proposes.
    jamais complété par ce qu'on apprend ensuite**. Puis à **chaque acquis
    qui coûterait à refaire** (cran validé, réponse obtenue, plan validé,
    action rapportée) : `save_progress` avec l'id et seulement le nouveau,
-   `prochaine_etape` toujours notée, **un acquis = une ligne**, les fausses
-   pistes dans `notes`, `pause: true` sur « je mets en pause ». L'étape, les
-   skills, les sections servies et les escalades sont notés par le serveur.
+   `prochaine_etape` toujours notée, **un acquis = une ligne**, fausses pistes
+   et **déductions** dans `notes` (une réponse = ses mots), `pause: true` sur
+   « je mets en pause ». Étape, skills, sections, escalades : le serveur les note.
 3. `load_skill(domaines, nature)` : le skill arrive avec ses sections de
    contexte requises déjà chargées et sa table « selon le cas ».
 4. `get_context(sections)` quand un signal « selon le cas » apparaît. Section

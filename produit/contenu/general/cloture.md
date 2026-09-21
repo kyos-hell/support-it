@@ -16,7 +16,10 @@ seulement pour celui-là.
   reformulé avec ce qu'on sait maintenant. C'est ce qui nourrit le jeu de
   test du triage.
 - Le **statut** : `resolu`, `non-resolu`, `hors-domaines-couverts`,
-  `escalade-externe`.
+  `escalade-externe`. Une exécution **reportée** (plan validé, à faire un
+  autre jour) n'est pas une clôture : `pause: true` au dernier
+  `save_progress`, le brouillon reste reprenable — un ticket clôturé ne se
+  reprend pas.
 - Les **domaines** validés par le technicien. Les domaines proposés et la
   chaîne d'escalade viennent du brouillon et des skills chargés : le
   serveur les a, ne pas les reconstituer de mémoire.
@@ -26,11 +29,13 @@ seulement pour celui-là.
 - La **conclusion** : la cause retenue et comment elle a été établie.
 - Le **plan d'action** validé, tel que proposé (la séquence numérotée,
   une commande par étape) — obligatoire pour un ticket résolu.
-- Chaque **question posée** au technicien, avec sa réponse, et — quand la
-  réponse est une information d'entreprise (une passerelle, un serveur, un
-  prestataire) — la **section de contexte** qu'elle pourrait remplir. Le
-  serveur en fait le journal du ticket (un fichier par ticket) : c'est
-  ainsi que les gabarits se complètent.
+- Chaque **question posée** au technicien, avec sa réponse **telle qu'il
+  l'a dite** — une déduction (convention repérée, outil supposé) va dans
+  `notes`, jamais en réponse — et, seulement quand la réponse est une
+  information d'entreprise réutilisable (une passerelle, un serveur, un
+  prestataire ; pas un constat oui/non), la **section de contexte** qu'elle
+  pourrait remplir. Le serveur en fait le journal du ticket : c'est ainsi
+  que les gabarits se complètent.
 - Les **mises à jour de contexte** : quand le terrain a complété le
   contexte, formuler la **section entière prête à coller** (le tableau
   complet, pas la ligne qui change : `update_context` remplace tout).

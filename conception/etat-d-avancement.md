@@ -76,12 +76,19 @@ modèle demande, il n'invente pas. **Corrections faites le 2026-09-21**
 depuis le manifeste (EA1), en-tête de tableau contrôlé par `update_context`
 (EA2), candidat comparé en entier (EA3) — **rejouées le même jour** sur un
 vrai clone (`C:\Projet-IT\it-support-test\support-it`, `cf7f708`), vertes.
-Restent à trancher : OA1–OA5.
+**Second lot le 2026-09-21** (`fin-de-projet.md` §12, décisions 47–48) :
+OA1 (audit : sections vides en information), OA2 (section vide « remplie »,
+sans copie), OA3/OA5 (réponses = les mots du technicien, `section`
+seulement pour une donnée réutilisable — descriptions des champs, clôture,
+triage), OA4 (exécution reportée = pause), O6 (rappel `/support` au lieu de
+`/mcp`), O8 (durée active, `points_etape`, calendaire à côté). Laissés
+pour 0.3.0 : O1, O2, O3, O7.
 
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Trancher les observations O1–O3, O7, O8 et OA1–OA5 des journaux de
-   campagne.
+1. Rejouer le second lot sur l'env de test (un ticket avec pause puis
+   clôture : durée active < calendaire ; une section vide écrite : pas de
+   copie) ; observer OA5 et E9.
 2. **Un ticket par domaine retouché** (le manifeste a changé : signaux
    `objet-…`, `hors-perimetre`), puis `0.3.0` sans `-beta`. Le testeur
    rejoue en particulier T6 (attendu : signaux `hors-perimetre` cochés →
@@ -136,6 +143,7 @@ il est fragile et il faut le savoir.
 | Un ticket clôturé, un journal, une entrée de base : écrits une fois, jamais modifiés. | Code (`flag: "wx"`). |
 | Seules deux matières sont mutables : le contexte (`update_context`, avec copie dans `contexte/historique/`) et les brouillons (`save_progress`, fusion). La seule suppression est le brouillon à la clôture. | Code. Concurrence non protégée en mono-poste ; empreinte prévue à la porte 2. |
 | Le contexte n'est jamais écrit sans un oui explicite du technicien. | **Prompt seulement** (`remplissage.md`, `cloture.md`, `audit.md`, description de l'outil). Irréductible : il faut un humain. |
+| Une réponse tracée est **ce que le technicien a dit**, jamais une déduction du modèle ; `section` n'est posé que sur une donnée d'entreprise réutilisable. | **Prompt seulement** (descriptions des champs `questions` de `save_progress`/`save_ticket`, `cloture.md`, `triage.md` point 2 — OA3/OA5 du 2026-09-21). Irréductible : le serveur ne sait pas qui a dit quoi. La file des candidats hérite de ce qui est tracé. |
 | Trois points de validation humaine : triage ambigu, plan d'action, publication. Pas de quatrième. | Prompt (`triage.md`, `cloture.md`) + contrat (`publish_kb` distinct de `save_ticket`). `resolu_par` est une **question** à la clôture, pas un quatrième point (E8, prompt seul). |
 | L'IA n'exécute rien : le technicien exécute et rapporte. | Prompt + **l'hôte** : `Bash` et `PowerShell` retirés du contexte du modèle par `.claude/settings.json` (décision 5). Aucun appel MCP n'exécute quoi que ce soit. |
 | Une question, puis j'attends la réponse. | Prompt seulement (`format-skill.md` §6, mot pour mot dans chaque skill ; `valider` contrôle la présence, pas le respect). |

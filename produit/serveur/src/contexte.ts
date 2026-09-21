@@ -262,6 +262,8 @@ export interface EcritureContexte {
   derniereMiseAJour: string | null;
   /** Décision 9 : le contenu était identique — seule la date a changé, pas de copie dans historique/. */
   confirmee: boolean;
+  /** OA2 : la section était vide (squelette) — remplie, pas remplacée ; rien à sauver dans historique/. */
+  depuisVide: boolean;
 }
 
 export function ecrireSection(r: Racines, id: string, contenu: string): EcritureContexte {
@@ -309,6 +311,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
   let nouvelles: string[];
   let sectionAjoutee = false;
   let confirmee = false;
+  let depuisVide = false;
   let aDate: boolean;
   if (debut < 0) {
     if (!gab) {
@@ -318,6 +321,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
     }
     controlerEnTete(gab.squelette);
     // Section prévue par le gabarit mais absente (migration H4) : on l'ajoute en fin de fichier.
+    depuisVide = true;
     aDate = gab.aDate;
     const bloc = [`## ${section} — ${gab.titre}`, "", ...gab.brut.match(/<!--[\s\S]*?-->/g) ?? [], "", propre];
     if (aDate) bloc.push("", `Dernière mise à jour : ${dateDuJour()}`);
@@ -330,6 +334,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
     const ancienPropre = sansCommentaires(ancien).replace(RE_MAJ_LIGNE, "").trim();
     const ancienVide = !ancienPropre || normaliser(ancienPropre) === gab?.contenuNormalise || squeletteSeulement(ancienPropre);
     controlerEnTete(ancienVide ? gab?.squelette ?? "" : ancienPropre);
+    depuisVide = ancienVide;
     aDate = RE_MAJ_LIGNE.test(ancien) || Boolean(gab?.aDate);
     // Décision 9 : « toujours vrai » = le même contenu ; on repose la date, sans copie dans historique/.
     confirmee = normaliser(sansCommentaires(ancien).replace(RE_MAJ_LIGNE, "")) === normaliser(propre);
@@ -341,9 +346,10 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
   }
 
   // Sauvegarde de la version précédente, puis écriture atomique. Une confirmation
-  // (contenu identique) ne change que la date : rien à sauver.
+  // (contenu identique) ne change que la date : rien à sauver. Une section qui
+  // était vide non plus (OA2) : la version précédente est le gabarit livré.
   let sauvegarde: string | null = null;
-  if (!fichierCree && !confirmee) {
+  if (!fichierCree && !confirmee && !depuisVide) {
     const hist = path.join(c.contexte, "historique");
     fs.mkdirSync(hist, { recursive: true });
     sauvegarde = path.join(hist, `${domaine}-${horodatageCompact()}.md`);
@@ -354,7 +360,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
   const tmp = `${fichier}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, nouvelles.join("\n").replace(/\n{3,}/g, "\n\n"), "utf8");
   fs.renameSync(tmp, fichier);
-  return { id, fichier, sauvegarde, fichierCree, sectionAjoutee, derniereMiseAJour: aDate ? dateDuJour() : null, confirmee };
+  return { id, fichier, sauvegarde, fichierCree, sectionAjoutee, derniereMiseAJour: aDate ? dateDuJour() : null, confirmee, depuisVide };
 }
 
 // ---- État de remplissage (CLI, script d'installation, skill remplissage) ----

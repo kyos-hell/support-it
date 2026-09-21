@@ -25,7 +25,10 @@ outil ; c'est voulu.
 
 En-tête (par le serveur) : `id`, `date`, `auteur`, `poste`, `nature`,
 `statut`, `resolu_par`, `reference` (numéro dans l'outil de ticketing,
-donné par le technicien, `null` sinon), `duree_minutes`,
+donné par le technicien, `null` sinon), `duree_minutes` (**active** depuis
+le 2026-09-21, décision 47 : somme des écarts entre points d'étape
+plafonnés à 30 min ; calendaire pour un ticket sans brouillon ou antérieur),
+`duree_calendaire_minutes` (création → clôture, `null` sans brouillon),
 `domaines_proposes`, `domaines_valides`, `escalades`, `signaux`, `tags`,
 `questions` (nombre). La référence est reprise dans le titre du fichier et
 dans les tags ; elle n'entre pas dans le nom du fichier, qui reste
@@ -47,7 +50,11 @@ fusionner), le corps en est dérivé : `id`, `reference`, `cree`,
 `derniere_mise_a_jour`, `technicien`, `poste`, `etape`, `nature`,
 `domaines_proposes`, `domaines_valides`, `escalades`, `skill_charge`,
 `passations[{de, a, date}]`, `symptome_initial`, `prochaine_etape`,
-`signaux`, `verifications`, `questions`, `plan_action`, `actions`, `notes`.
+`signaux`, `verifications`, `questions`, `plan_action`, `actions`, `notes`,
+et, écrits par le serveur depuis 2.4 : `skills_charges`, `sections_servies`,
+`cas_lus`, `recherche_faite`, `actions_par_appel`, `points_etape` (un
+horodatage par `save_progress`, création comprise — la durée active de la
+clôture, décision 47 du 2026-09-21 ; absent sur un brouillon antérieur).
 Corps réduit à `etat` (étape, domaines, skill, **prochaine étape** — ce
 qu'un repreneur lit en premier, compteurs) et `passations` ; le détail est
 dans l'en-tête, `resume_ticket` le rend en clair. Chaque entrée de liste

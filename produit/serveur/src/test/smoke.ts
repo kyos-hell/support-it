@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { ECART_ACTIF_MAX_MINUTES, dureeActiveMinutes } from "../tickets.js";
 
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const produit = process.env.SUPPORT_IT_PRODUIT ?? path.resolve(dist, "..", "..");
@@ -201,12 +202,22 @@ async function main() {
     arguments: { section: "reseau/plan-adressage", contenu: "| VLAN | Nom | Plage | Usage | Site(s) |\n| --- | --- | --- | --- | --- |\n| 10 | VLAN-TEST | PLAGE-TEST | test | SITE-TEST |" },
   });
   assert.ok(!estErreur(maj1), texte(maj1));
-  assert.match(texte(maj1), /section remplacée/);
+  // OA2 (campagne sans jeu de données) : une section vide se remplit, elle n'est pas « remplacée », et le gabarit vierge n'est pas archivé.
+  assert.match(texte(maj1), /section remplie \(était vide\)/, texte(maj1));
+  assert.match(texte(maj1), /version précédente : aucune \(section vide/, texte(maj1));
   assert.match(texte(maj1), /dernière mise à jour : \d{4}-\d{2}-\d{2}/);
   const reseauMd = fs.readFileSync(path.join(installation, "contexte", "reseau.md"), "utf8");
   assert.match(reseauMd, /## plan-adressage — Plan d'adressage et VLAN\n\n<!--[\s\S]*?-->\n\n\| VLAN \| Nom[\s\S]*VLAN-TEST[\s\S]*\nDernière mise à jour : \d{4}-\d{2}-\d{2}\n/, "titre, consigne, contenu, date");
   assert.doesNotMatch(reseauMd, /<numéro> \| <nom>/, "le squelette de la section a été remplacé");
   assert.match(reseauMd, /## wifi — Wifi/, "les autres sections sont intactes");
+  assert.ok(!fs.existsSync(path.join(installation, "contexte", "historique")) || fs.readdirSync(path.join(installation, "contexte", "historique")).length === 0, "pas de copie pour une section qui était vide");
+  // Une vraie modification (une ligne de plus) : « remplacée », avec copie de la version précédente.
+  const maj1bis = await client.callTool({
+    name: "update_context",
+    arguments: { section: "reseau/plan-adressage", contenu: "| VLAN | Nom | Plage | Usage | Site(s) |\n| --- | --- | --- | --- | --- |\n| 10 | VLAN-TEST | PLAGE-TEST | test | SITE-TEST |\n| 20 | VLAN-TEST-2 | PLAGE-TEST-2 | test | SITE-TEST |" },
+  });
+  assert.ok(!estErreur(maj1bis), texte(maj1bis));
+  assert.match(texte(maj1bis), /section remplacée/);
   const hist = fs.readdirSync(path.join(installation, "contexte", "historique"));
   assert.equal(hist.length, 1, "une sauvegarde de la version précédente");
   assert.match(hist[0], /^reseau-\d{8}-\d{6}\.md$/);
@@ -216,7 +227,7 @@ async function main() {
   // Décision 9 : le même contenu = « toujours vrai » — re-datée, pas de copie dans historique/.
   const confirmee = await client.callTool({
     name: "update_context",
-    arguments: { section: "reseau/plan-adressage", contenu: "| VLAN | Nom | Plage | Usage | Site(s) |\n| --- | --- | --- | --- | --- |\n| 10 | VLAN-TEST | PLAGE-TEST | test | SITE-TEST |" },
+    arguments: { section: "reseau/plan-adressage", contenu: "| VLAN | Nom | Plage | Usage | Site(s) |\n| --- | --- | --- | --- | --- |\n| 10 | VLAN-TEST | PLAGE-TEST | test | SITE-TEST |\n| 20 | VLAN-TEST-2 | PLAGE-TEST-2 | test | SITE-TEST |" },
   });
   assert.ok(!estErreur(confirmee) && /confirmée, re-datée/.test(texte(confirmee)), texte(confirmee));
   assert.equal(fs.readdirSync(path.join(installation, "contexte", "historique")).length, 1, "une confirmation ne copie rien dans historique/");
@@ -406,6 +417,7 @@ async function main() {
   const brouillon = fs.readFileSync(path.join(installation, "en-cours", `${pid}.md`), "utf8");
   assert.match(brouillon, /^etape: pause$/m);
   assert.match(brouillon, /^reference: INC-PAUSE-1$/m, "la casse d'origine de la référence est conservée");
+  assert.ok(((brouillon.match(/^points_etape:\n((?:  - \S+\n)+)/m) ?? [])[1] ?? "").split("\n").filter(Boolean).length >= 3, "O8 : un horodatage par point d'étape, écrit par le serveur — " + brouillon.slice(0, 600));
   assert.equal((brouillon.match(/disque plein 100 %/g) ?? []).length, 1, "vérification dédoublonnée à la clé normalisée (A2), et le corps ne répète pas l'en-tête");
   assert.match(brouillon, /## etat — Où en est le ticket[\s\S]*escalade : identite[\s\S]*libérer de l'espace puis cran 3/);
   assert.doesNotMatch(brouillon, /## verifications —/, "le corps du fichier est réduit à l'état");
@@ -473,6 +485,16 @@ async function main() {
   assert.match(final, /^resolu_par: null$/m, "resolu_par omis → null, jamais « outil » par défaut");
   assert.match(final, /^duree_minutes: \d+$/m, "durée calculée par le serveur (création → clôture), pas la valeur donnée");
   assert.doesNotMatch(final, /^duree_minutes: 999$/m);
+  // O8 (campagne 0.3.0-beta) : durée active (points d'étape, écarts plafonnés) et calendaire côte à côte.
+  assert.match(final, /^duree_calendaire_minutes: \d+$/m, "la durée calendaire est écrite à côté de l'active");
+  assert.match(texte(clot), /durée : \d+ min \(active, calculée des points d'étape[^\n]*calendaire : \d+ min/, "la réponse dit l'active et la calendaire — " + texte(clot));
+  {
+    const t0 = Date.parse("2026-09-21T08:00:00.000Z");
+    const iso = (min: number) => new Date(t0 + min * 60000).toISOString();
+    assert.equal(dureeActiveMinutes([iso(0), iso(5), iso(60)], new Date(t0 + 62 * 60000)), 5 + ECART_ACTIF_MAX_MINUTES + 2, "un écart de 55 min compte pour le plafond");
+    assert.equal(dureeActiveMinutes([iso(0)], new Date(t0 + 1500 * 60000)), ECART_ACTIF_MAX_MINUTES, "une nuit de session perdue compte pour le plafond");
+    assert.equal(dureeActiveMinutes([], new Date()), undefined, "brouillon antérieur sans points : la calendaire sert");
+  }
   assert.match(final, /Libérer de l'espace/, "plan d'action du brouillon");
   assert.match(final, /Quel serveur porte le partage/, "questions du brouillon reprises");
   assert.match(final, /## contradictions — Contexte contredit par le terrain[\s\S]*`systeme\/serveurs` : le partage est sur SRV-AUTRE/, "contradictions reprises dans le ticket");
@@ -642,6 +664,8 @@ async function main() {
   const ta = texte(auditSkill);
   assert.match(ta, /# Audit de l'installation/);
   assert.match(ta, /Rapport écrit dans [^\n]*audits/);
+  // OA1 (campagne sans jeu de données) : le remplissage en information dans le volet contexte, hors constats.
+  assert.match(ta, /## contexte — Volet contexte\n\n_\d+ section\(s\) vide\(s\) sur \d+ — information, pas un constat/, "sections vides annoncées en information");
   assert.equal(fs.readdirSync(path.join(installation, "audits")).length, 1, "un rapport écrit, daté");
   const depuis = (titre: string) => ta.slice(ta.indexOf(titre));
   assert.ok(/^- `\S+` \(INC-VIEUX\) : 2\d\d j/m.test(depuis("Brouillons anciens")), "brouillon de plus de 30 jours proposé à la clôture");

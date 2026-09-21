@@ -11,7 +11,7 @@ import { ErreurKb, lireCas, publier, rechercher, rendreCas, rendreRecherche } fr
 import { bibliotheque, identifiantsSignaux, lireManifeste } from "./manifeste.js";
 import { casInstruit, noterCas, noterSection, noterSkill, nouvelleSession, oublierSection, reconstruire, vider } from "./session.js";
 import { ErreurSkill, chargerSkills } from "./skills.js";
-import { enregistrerTicket } from "./tickets.js";
+import { ECART_ACTIF_MAX_MINUTES, enregistrerTicket } from "./tickets.js";
 
 const r = racines();
 const version = lireVersion(r);
@@ -180,9 +180,9 @@ server.registerTool(
       questions: z
         .array(
           z.object({
-            question: z.string().min(1),
-            reponse: z.string(),
-            section: SECTION.optional().describe("Section de contexte que la réponse pourrait remplir"),
+            question: z.string().min(1).describe("Une question réellement posée au technicien"),
+            reponse: z.string().describe("Ce que le technicien a répondu, tel quel — jamais une déduction du modèle (une convention repérée, un outil supposé vont dans notes)"),
+            section: SECTION.optional().describe("Seulement si la réponse est une donnée d'entreprise réutilisable (un nom, une adresse, un prestataire, un groupe) — pas un constat oui/non"),
           }),
         )
         .optional()
@@ -203,7 +203,13 @@ server.registerTool(
       const t = enregistrerTicket(r, entree, session, biblio);
       vider(session);
       return texte(
-        `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n- durée : ${t.duree.minutes === null ? "non renseignée" : `${t.duree.minutes} min`}${t.duree.calculee ? ` (calculée du brouillon à la clôture${t.duree.fournie_ignoree ? " ; la valeur fournie a été ignorée" : ""})` : ""}\n\n` +
+        `Ticket enregistré : ${t.id}\n- fichier : ${t.fichier}\n- journal : ${t.journal.fichier ? `${t.journal.fichier} (${t.journal.questions} question(s))` : "aucun (pas de question posée)"}\n- brouillon en cours : ${t.brouillon_retire ? "retiré (clôturé)" : "aucun"}\n- durée : ${t.duree.minutes === null ? "non renseignée" : `${t.duree.minutes} min`}${
+          t.duree.calculee
+            ? t.duree.active
+              ? ` (active, calculée des points d'étape — un écart de plus de ${ECART_ACTIF_MAX_MINUTES} min compte pour ${ECART_ACTIF_MAX_MINUTES} ; calendaire : ${t.duree.calendaire ?? "?"} min${t.duree.fournie_ignoree ? " ; la valeur fournie a été ignorée" : ""})`
+              : ` (calculée du brouillon à la clôture${t.duree.fournie_ignoree ? " ; la valeur fournie a été ignorée" : ""})`
+            : ""
+        }\n\n` +
           `La publication en base de connaissances est une étape distincte, après validation du technicien : publish_kb(ticket_id="${t.id}").`,
       );
     } catch (e) {
@@ -255,7 +261,16 @@ server.registerTool(
       prochaine_etape: z.string().optional().describe(`Une ligne (≤ ${LIMITES.prochaine_etape} car.) : ce qu'on fait en premier à la reprise`),
       signaux: z.array(SIGNAL).optional().describe("Les signaux du manifeste COCHÉS au triage, avec pour chacun l'extrait du ticket qui le montre. Un constat de diagnostic n'est pas un signal : il va dans verifications — ajoutés, dédoublonnés sur l'id"),
       verifications: z.array(z.string()).optional().describe(`Un constat vérifié par entrée — « cran N : commande → résultat », ou la lecture d'un portail ou d'un journal — une ligne (≤ ${LIMITES.verification} car.) qu'un repreneur peut utiliser sans relire la conversation. Le raisonnement et les fausses pistes n'y vont pas (→ notes) — ajoutés`),
-      questions: z.array(z.object({ question: z.string(), reponse: z.string(), section: SECTION.optional() })).optional().describe(`Une DÉCISION du technicien : question et réponse courtes (≤ ${LIMITES.question} car. chacune). La référence du ticket a son champ, elle n'est pas une question — ajoutées`),
+      questions: z
+        .array(
+          z.object({
+            question: z.string().describe("Une question réellement posée au technicien"),
+            reponse: z.string().describe("Ce qu'il a répondu, tel quel — jamais une déduction du modèle (celle-ci va dans notes)"),
+            section: SECTION.optional().describe("Seulement si la réponse est une donnée d'entreprise réutilisable (nom, adresse, prestataire, groupe) — pas un constat oui/non"),
+          }),
+        )
+        .optional()
+        .describe(`Une DÉCISION du technicien : question et réponse courtes (≤ ${LIMITES.question} car. chacune). La référence du ticket a son champ, elle n'est pas une question — ajoutées`),
       plan_action: z.string().optional().describe("Le plan TEL QUE PROPOSÉ au technicien, sinon vide. Seul champ long. Les éléments déjà arrêtés avant le plan sont des verifications — remplace"),
       actions: z.array(z.string()).optional().describe(`Ce que le technicien a exécuté et le résultat, une ligne (≤ ${LIMITES.action} car.) — ajoutées`),
       notes: z.array(z.string()).optional().describe(`Un PIÈGE ou une fausse piste à ne pas refaire, une ligne (≤ ${LIMITES.note} car.) — ajoutées`),
@@ -333,8 +348,14 @@ server.registerTool(
       const lignes = [
         e.confirmee ? `Section confirmée, re-datée : ${e.id} (contenu identique, rien d'autre ne change)` : `Section écrite : ${e.id}`,
         `- fichier : ${e.fichier}${e.fichierCree ? " (créé depuis le gabarit)" : ""}`,
-        e.confirmee ? "- contenu inchangé" : e.sectionAjoutee ? "- section ajoutée en fin de fichier (elle manquait)" : "- section remplacée",
-        `- version précédente : ${e.sauvegarde ?? (e.confirmee ? "aucune (rien n'a changé, pas de copie dans historique/)" : "aucune (fichier nouveau)")}`,
+        e.confirmee
+          ? "- contenu inchangé"
+          : e.sectionAjoutee
+            ? "- section ajoutée en fin de fichier (elle manquait)"
+            : e.depuisVide
+              ? "- section remplie (était vide)"
+              : "- section remplacée",
+        `- version précédente : ${e.sauvegarde ?? (e.confirmee ? "aucune (rien n'a changé, pas de copie dans historique/)" : e.fichierCree ? "aucune (fichier nouveau)" : "aucune (section vide, pas de copie dans historique/)")}`,
         e.derniereMiseAJour ? `- dernière mise à jour : ${e.derniereMiseAJour}` : "- section sans date de péremption",
       ];
       return texte(lignes.join("\n"));

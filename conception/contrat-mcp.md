@@ -178,7 +178,7 @@ ce qui garde « un fichier écrit une fois » vrai sur un partage.
 | --- | --- |
 | Entrée | `section` : identifiant `domaine/section` ; `contenu` : le corps de la section au format du gabarit, sans titre `##` ni ligne de date. |
 | Lit | `installation/contexte/<domaine>.md` et le gabarit livré du domaine. |
-| Écrit | `installation/contexte/<domaine>.md` (une section), et une copie de la version précédente dans `installation/contexte/historique/<domaine>-<horodatage>.md`. |
+| Écrit | `installation/contexte/<domaine>.md` (une section), et une copie de la version précédente dans `installation/contexte/historique/<domaine>-<horodatage>.md` — sauf confirmation à l'identique (décision 9) et section qui était **vide** (décision 48, 2026-09-21 : « remplie (était vide) », le gabarit livré n'est pas archivé). |
 
 **Pourquoi il existe.** `plan.md` §4 le prévoyait « si le copier-coller
 devient une friction » ; la friction arrive dès le premier ticket joué sur
@@ -329,9 +329,13 @@ référence, domaines proposés, **domaines validés** (union avec ceux de la
 clôture, jamais de retrait — sauf `hors-domaines-couverts`, où la clôture
 peut n'en valider aucun ; E5, 2026-09-20), plan d'action, questions,
 signaux — ce que la clôture fournit ne sert que là où le brouillon n'a rien,
-les listes s'ajoutent. La durée est calculée (création → clôture) et la
-réponse la dit, avec « la valeur fournie a été ignorée » le cas échéant
-(O9) ; `resolu_par` vaut `null` s'il n'est pas dit ; `plan_action` est
+les listes s'ajoutent. La durée est calculée — **active** depuis le
+2026-09-21 (décision 47, O8) : somme des écarts entre les points d'étape du
+brouillon (`points_etape`, un horodatage par `save_progress`, création
+comprise) et la clôture, chaque écart plafonné à 30 min ; la calendaire
+(création → clôture) est écrite à côté dans `duree_calendaire_minutes` ; un
+brouillon antérieur sans points garde la calendaire — et la réponse dit les
+deux, avec « la valeur fournie a été ignorée » le cas échéant (O9) ; `resolu_par` vaut `null` s'il n'est pas dit ; `plan_action` est
 obligatoire pour un ticket résolu ; **un `resolu` sans aucun skill de
 domaine chargé est refusé** (E15 : une baseline suit le même flux). Les **escalades sont dérivées** des skills chargés (brouillon ∪
 session) : tout domaine chargé après le premier appel de domaine. Puis le
