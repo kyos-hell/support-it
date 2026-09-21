@@ -90,14 +90,19 @@ signal fautif dans les deux jeux de test du triage ; définition de l'écart
 corrigée (OA6) ; `un-service-touche` et `un-seul-poste` resserrés,
 identifiants inchangés.
 
+**Rejeux du 2026-09-21 après-midi** (journal §5) : durée active
+plafonnée en vrai (EX-3104 : 32 min actives pour 40 calendaires), section
+vide « remplie » sans copie, audit « 0 écart » et ligne d'information,
+triages nets système et poste de travail sur les libellés resserrés.
+
+**`0.3.0` sortie le 2026-09-21** (`fin-de-projet.md` §13) :
+`produit/VERSION`, `package.json`, `package-lock.json`, `README.md`.
+
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Rejouer sur l'env de test : la reprise d'EX-3104 après une pause de
-   plus de 30 min (durée active < calendaire) ; un incident système et un
-   incident poste de travail (libellés retouchés) ; observer OA5 et E9.
-2. **`0.3.0` sans `-beta`** : `produit/VERSION`, note de version (ce qui
-   a changé depuis `0.2.0-beta`, décisions 42–49), tag git, archive de
-   `produit/`. Les rejeux R0–R4 (T6, T4, T3, T9) et R-EA1–R-EA3 sont faits.
+1. Tag git `v0.3.0` et archive de `produit/` (H5) ; sur l'env de test,
+   `install.ps1` doit annoncer `MISE À JOUR 0.3.0-beta → 0.3.0` — jamais
+   vu en vrai.
 4. Pendant les tests, observer le cycle de vie du processus serveur dans
    Claude Code (`/clear`, `--resume`, reconnexion) : si l'état de session
    est perdu plus souvent que « une session = un ticket », la

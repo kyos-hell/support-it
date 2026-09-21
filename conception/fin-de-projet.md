@@ -374,3 +374,39 @@ skills inchangés ; smoke : une quatrième session avec un ticket sans signal
 proposition ambiguë de lui-même), O1, O2, O7 (laissés pour 0.3.0), E3 (2
 occurrences atténuées en 3 tickets), E9 (5 questions composées), dates
 calculées par le modèle, une phrase en anglais, vouvoiement.
+
+## 13. Version 0.3.0 — 2026-09-21
+
+Sortie de bêta après deux campagnes (§11, §12), leurs corrections (E1–E18
+sauf O1–O3/O7 ; EA1–EA3 ; OA1–OA6), la passe sur le manifeste (décision 49)
+et les rejeux sur un vrai clone. `produit/VERSION` = `0.3.0`.
+
+**Ce qui change pour un technicien depuis `0.2.0-beta`** (le détail est
+en §10–§12) :
+
+- Le modèle n'a plus de choix sur la mécanique : signaux, tags, domaines et
+  sections sont des enums ; le brouillon est la source du ticket ; l'ordre
+  des appels est tenu par le serveur ; les colonnes d'un tableau de contexte
+  sont celles du gabarit (décision 45).
+- `.claude/settings.json` déposé par l'installateur : le modèle ne peut ni
+  exécuter une commande, ni écrire dans `installation/`, ni lire `kb/`.
+- Enregistrement MCP en portée projet (`.mcp.json`) : plusieurs
+  installations coexistent sur un poste (décision 44).
+- `read_kb`, la file des candidats, l'audit (CLI et skill), la péremption
+  du contexte, les contradictions en ticket.
+- Une question, une commande, puis attendre — mot pour mot dans les treize
+  fichiers de contenu ; « une réponse = les mots du technicien ».
+- La durée d'un ticket est active (pauses plafonnées à 30 min), la
+  calendaire à côté (décision 47).
+- Un signal de demande par domaine (`objet-…`) et un domaine
+  `hors-perimetre` : plus de routage forcé.
+
+**Ce que ça exige d'une installation existante** : remplacer `produit/`,
+relancer `install.*` — `init` annonce `MISE À JOUR 0.3.0-beta → 0.3.0`,
+ne touche à rien d'autre. Les brouillons antérieurs à O8 (sans
+`points_etape`) gardent une durée calendaire à la clôture.
+
+**Ce qui reste pour la suite** (`etat-d-avancement.md` §1) : le schéma
+d'architecture v4, la porte 2 (partage réseau, empreinte optimiste,
+compatibilité produit / installation), O1, O2, O3, O7, et l'observation
+des règles tenues par le prompt seul (OA5, E3, E9, registre).

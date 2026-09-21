@@ -136,7 +136,7 @@ observation — before anything is changed in `produit/`.
 
 ## Status
 
-`0.3.0-beta`, on the `v0.3.0-beta` branch. Two test campaigns have been played and their
-corrections applied (`conception/campagne-test-0.3.0-beta*.md`): eleven tickets on a
-generated dataset, then a fresh install with an empty context. Next: a domain-by-domain pass
-on the manifest, then `0.3.0`.
+`0.3.0` (2026-09-21). Two test campaigns have been played and their corrections applied
+(`conception/campagne-test-0.3.0-beta*.md`): eleven tickets on a generated dataset, then a
+fresh install with an empty context, then a pass on the manifest. Next: the multi-user
+"gate 2" (network share, concurrent drafts) and a redrawn architecture diagram.
