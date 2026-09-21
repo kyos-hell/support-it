@@ -113,9 +113,15 @@ triages nets système et poste de travail sur les libellés resserrés.
    `architecture/schema/routage_support_v4.svg` (neuf appels, `read_kb`,
    étape et escalades dérivées, refus hors séquence, audit et file des
    candidats, hôte, durée active). La v3 est gardée pour l'historique.
-6. Porte 2 (collègues, partage réseau) : l'empreinte optimiste sur le
-   contexte et les brouillons (`D-serveur-mcp.md` §8), et ce que la
-   décision 7 a explicitement remis à plus tard.
+6. **Porte 2 = `0.4.0`, plusieurs entreprises dans une installation** —
+   plan rédigé le 2026-09-21 : `plan-0.4.0-multi-entreprise.md` (enum
+   d'entreprises créées par le référent, paramètre sur les appels qui
+   ouvrent une session, données par entreprise, option mono, migration
+   avec sauvegarde et retour arrière). Rien n'est codé ; quatre questions
+   à trancher (§4 du plan).
+7. Porte 3 (ex-porte 2 : collègues, partage réseau) : l'empreinte
+   optimiste sur le contexte et les brouillons (`D-serveur-mcp.md` §8), et
+   ce que la décision 7 a explicitement remis à plus tard.
 
 ## 2. Carte du dépôt — quoi lire pour quoi
 
@@ -127,6 +133,7 @@ triages nets système et poste de travail sur les libellés resserrés.
 | Le contrat des neuf appels MCP, dans le détail | `conception/contrat-mcp.md` |
 | Comment le serveur est construit, ses cas limites | `architecture/D-serveur-mcp.md` |
 | Le flux en image | `architecture/schema/routage_support_v4.svg` (0.3.0, 2026-09-21 ; v3 et v2 gardées pour l'historique) |
+| La prochaine release | `conception/plan-0.4.0-multi-entreprise.md` — porte 2, plusieurs entreprises |
 | Ce qu'un skill contient et ne contient pas | `conception/format-skill.md` |
 | Ce qu'un contexte contient, et surtout ce qu'il ne contient pas | `conception/format-contexte.md` (§4.1 : la taxonomie) |
 | Comment le triage décide, l'escalade, la reprise | `conception/triage.md` et le texte livré `produit/contenu/general/triage.md` |
