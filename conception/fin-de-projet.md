@@ -137,6 +137,7 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 45 | **Les colonnes d'un tableau de contexte ne se choisissent pas** : `update_context` refuse un en-tête différent de celui attendu (le squelette du gabarit si la section est vide ou absente, les colonnes en place sinon) ; la clôture dit « section jamais servie → `get_context` d'abord » — décidé avec toi le 2026-09-21 (EA2) | §12, contexte.ts, cloture.md | Campagne sans jeu de données, V1 : `systeme/serveurs`, jamais servie dans la session, écrite avec `Serveur \| Rôle \| Adresse \| Site` au lieu des six colonnes du gabarit, et rien ne le détectait. Sur un contexte vide c'est le cas courant. Principe du 2026-09-14 : la forme est dérivable, donc au serveur. Contrepartie : changer les colonnes d'une section se fait à la main par le référent, pas par l'outil. |
 | 46 | **Un candidat au contexte est « déjà appliqué » seulement s'il est contenu en entier** dans la section (normalisé), plus un préfixe de 60 caractères — décidé seul le 2026-09-21 (EA3) | §12, audit.ts | V3 : la mise à jour d'EX-3002 pour `reseau/acces-distant` reprenait la section et y ajoutait une IP et un piège ; même début → écartée, l'ajout perdu pour `remplissage` et `audit`. C'est le fonctionnement normal d'une installation qui grandit ticket après ticket. |
 | 47 | **La durée d'un ticket est la durée active** : somme des écarts entre points d'étape consécutifs (création → clôture), chacun plafonné à 30 min ; la calendaire est écrite à côté (`duree_calendaire_minutes`) ; le brouillon note l'horodatage de chaque `save_progress` (`points_etape`) — décidé avec toi le 2026-09-21 (O8) | §12, encours.ts, tickets.ts | T5 comptait sa pause (18 min), T8 sa nuit de session perdue (1 506 min), EX-3102 47 min pour 8 tours : la mesure T-P7 « durée » était fausse dès qu'un ticket attendait. Un brouillon antérieur, sans points, garde la calendaire. |
+| 49 | **Passe sur le manifeste après les deux campagnes** : le manifeste tient (aucun cas où les signaux cochés mènent à un domaine contredit par le technicien) ; deux libellés resserrés, identifiants inchangés (`un-service-touche` « depuis partout », `un-seul-poste` « depuis un poste voisin ») ; et l'**écart** du jeu de test du triage redéfini : le premier domaine calculé n'est pas parmi les validés — un triage ambigu résolu ou une escalade réussie n'en sont plus (OA6) — décidé avec toi le 2026-09-21 | §12, manifeste.yaml, audit.ts | Les « six écarts » d'hier et celui d'aujourd'hui étaient tous des faux positifs de la définition (proposés ≠ validés, ou escalade), pas des signaux fautifs. Les deux libellés étaient cochés trop facilement (« Internet fonctionne » → `un-service-touche` ; égalités systématiques avec `un-seul-poste`). |
 | 48 | **Une section vide se remplit, elle n'est pas remplacée** : `update_context` sur un squelette n'archive rien dans `historique/` et répond « remplie (était vide) » — décidé avec toi le 2026-09-21 (OA2) | §12, contexte.ts | Chaque première écriture archivait le gabarit livré ; l'audit comptait ces copies. Même logique que la confirmation à l'identique (décision 9) : rien à sauver. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
@@ -362,7 +363,14 @@ demande sur deux domaines).
 | O6 (hier) — « vérifier `/mcp` » | Rappel final des deux scripts : « taper `/support` : le premier appel prouve que le serveur répond » | scripts |
 | O8 (hier) — durée calendaire | Décision 47 : durée active, calendaire à côté, `points_etape` dans le brouillon, T-P7 « Durée active » | code, smoke |
 
+**Passe sur le manifeste, le 2026-09-21** (décision 49) : bilan des deux
+jeux de test du triage — aucun signal fautif, sept faux positifs de la
+définition de l'écart (OA6, corrigée : premier calculé ∉ validés) ; deux
+libellés resserrés (`un-service-touche`, `un-seul-poste`), identifiants et
+skills inchangés ; smoke : une quatrième session avec un ticket sans signal
+(pas d'écart) et un ticket dont les signaux mènent ailleurs (écart).
+
 **Non corrigé, à observer** : O3 (au rejeu, le modèle a enregistré la
 proposition ambiguë de lui-même), O1, O2, O7 (laissés pour 0.3.0), E3 (2
 occurrences atténuées en 3 tickets), E9 (5 questions composées), dates
-calculées par le modèle, une phrase en anglais.
+calculées par le modèle, une phrase en anglais, vouvoiement.

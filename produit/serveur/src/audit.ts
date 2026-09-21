@@ -220,7 +220,12 @@ export function calculerAudit(r: Racines): Audit {
   const lisibles = tickets.filter((t) => !t.illisible);
   const triage: LigneTriage[] = lisibles.map((t) => {
     const calcules = t.signaux.length ? classerDomaines(m, t.signaux).map((x) => x.domaine) : [];
-    const memes = t.domaines_proposes.length === t.domaines_valides.length && t.domaines_proposes.every((d) => t.domaines_valides.includes(d));
+    // OA6 (passe manifeste, 2026-09-21) : un écart = les signaux cochés ne mènent
+    // pas au domaine validé — le premier du classement calculé n'est pas parmi les
+    // validés (escalade comprise). Un triage ambigu résolu par une question, ou une
+    // escalade dont les signaux du diagnostic mènent au bon domaine, n'en sont pas.
+    // Sans signal coché (ticket antérieur aux identifiants) : rien à comparer.
+    const ecart = calcules.length > 0 && t.domaines_valides.length > 0 && !t.domaines_valides.includes(calcules[0]);
     return {
       ticket: t.id,
       reference: t.reference,
@@ -229,7 +234,7 @@ export function calculerAudit(r: Racines): Audit {
       proposes: t.domaines_proposes,
       valides: t.domaines_valides,
       escalades: t.escalades,
-      ecart: !memes || t.escalades.length > 0,
+      ecart,
     };
   });
   const enCours = lireEnCours(r);
@@ -374,7 +379,7 @@ export function rendreAudit(a: Audit): string {
     for (const l of a.triage) {
       out.push(`| ${l.ticket}${l.reference ? ` (${l.reference})` : ""} | ${l.signaux.join(", ") || "—"} | ${l.calcules.join(" > ") || "—"} | ${l.proposes.join(", ") || "—"} | ${l.valides.join(", ") || "—"} | ${l.escalades.join(" → ") || "—"} | ${l.ecart ? "**oui**" : "non"} |`);
     }
-    out.push("", `${a.triage.filter((l) => l.ecart).length} écart(s). Un écart désigne un signal du manifeste à revoir — à lire par le référent, jamais corrigé en cours de ticket. Les tickets sans signaux cochés sont antérieurs aux identifiants : à lire à la main.`);
+    out.push("", `${a.triage.filter((l) => l.ecart).length} écart(s). Un écart = le premier domaine calculé par les signaux n'est pas parmi les validés : un signal du manifeste à revoir — à lire par le référent, jamais corrigé en cours de ticket. Un triage ambigu résolu par une question ou une escalade réussie n'en sont pas. Les tickets sans signaux cochés sont antérieurs aux identifiants : à lire à la main.`);
   }
   out.push("", "### Brouillons anciens — à clôturer en `non-resolu` sur oui, un par un (`save_ticket`)", "");
   out.push(puce(a.brouillonsAnciens.map((b) => `\`${b.id}\` (${b.reference}) : ${b.age} j, étape ${b.etape}, prochaine étape : ${b.prochaine_etape}`)));

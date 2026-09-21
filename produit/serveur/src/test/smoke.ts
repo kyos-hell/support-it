@@ -653,6 +653,18 @@ async function main() {
   const finalC = fs.readFileSync(path.join(installation, "tickets", `${pid2}.md`), "utf8");
   assert.match(finalC, /^escalades:\n  - systeme$/m, "escalade dérivée à travers un redémarrage du serveur");
   assert.match(finalC, new RegExp(`^cas_lus:\n  - ${id}$`, "m"), "le cas lu est noté dans le ticket");
+  // 8a bis. Deux tickets pour le jeu de test du triage (OA6) : sans signal (rien à comparer),
+  // et signaux menant ailleurs que le domaine validé (le seul vrai écart). Session à part, sans brouillon.
+  const clientD = await ouvrir("smoke-triage", produit);
+  assert.ok(!estErreur(await clientD.callTool({ name: "load_skill", arguments: { domaines: ["cloture"] } })));
+  const ticketSansSignal = await clientD.callTool({ name: "save_ticket", arguments: { symptome_initial: "Test : ticket sans signal", nature: "incident", domaines_proposes: ["reseau"], domaines_valides: ["reseau"], conclusion: "x", statut: "non-resolu" } });
+  assert.ok(!estErreur(ticketSansSignal), texte(ticketSansSignal));
+  const vraiEcart = await clientD.callTool({
+    name: "save_ticket",
+    arguments: { symptome_initial: "Test : signaux matériel, validé réseau", nature: "incident", signaux: [{ id: "symptomes-physiques", preuve: "rien ne s'allume" }], domaines_proposes: ["materiel"], domaines_valides: ["reseau"], conclusion: "x", statut: "non-resolu" },
+  });
+  assert.ok(!estErreur(vraiEcart), texte(vraiEcart));
+  await clientD.close();
   // 8b. L'audit (décision 8) : un brouillon antidaté, un titre cassé dans le contexte, puis le rapport — calculé, écrit, injecté.
   const pAudit = await clientC.callTool({ name: "save_progress", arguments: { reference: "INC-VIEUX", symptome_initial: "Test : brouillon abandonné", nature: "incident" } });
   const idVieux = texte(pAudit).match(/Brouillon créé : (\S+) ·/)![1];
@@ -673,7 +685,11 @@ async function main() {
   assert.match(depuis("Santé des fichiers"), /contexte\/general\.md[^\n]*titre\(s\) sans identifiant[^\n]*## Sites/, "titre mal formé signalé");
   assert.ok(depuis("plusieurs actions").includes(`\`${pid}\` : 2 action`), "save_progress à deux actions signalé (décision 10) — " + depuis("plusieurs actions").slice(0, 300));
   assert.ok(depuis("Cas lus").includes(`\`${pid2}\` a lu \`${id}\``), "cas lu et suite donnée");
-  assert.match(depuis("Jeu de test du triage"), /un-service-touche, independant-du-chemin, population-lieu-lien \| systeme > reseau \| systeme, reseau \| systeme, materiel \| identite \| \*\*oui\*\*/, "signaux cochés → calculés → validés, écart désigné");
+  // OA6 (passe manifeste, 2026-09-21) : proposés ≠ validés et une escalade ne font plus un écart —
+  // le premier calculé (systeme) est parmi les validés, donc « non ».
+  assert.match(depuis("Jeu de test du triage"), /un-service-touche, independant-du-chemin, population-lieu-lien \| systeme > reseau \| systeme, reseau \| systeme, materiel \| identite \| non/, "signaux cochés → calculés → validés ; ambigu résolu + escalade ≠ écart");
+  assert.match(depuis("Jeu de test du triage"), /\| — \| — \| reseau \| reseau \| — \| non \|/, "ticket sans signal coché : rien à comparer, pas d'écart");
+  assert.match(depuis("Jeu de test du triage"), /\| symptomes-physiques \| materiel \| materiel \| reseau \| — \| \*\*oui\*\* \|/, "signaux menant ailleurs que le validé → écart");
   assert.match(depuis("Sections périmées"), /`reseau\/plan-adressage` : datée du 2020-01-01/, "section périmée proposée à confirmation");
   assert.match(depuis("Mesures (T-P7)"), /INC-TEST-42[^\n]*\| incident \| reseau \| 1 \| 3 \| — \| resolu/, "T-P7 rempli");
   fs.rmSync(fVieux);
@@ -711,7 +727,7 @@ async function main() {
   assert.deepEqual(ecrits.sort(), ["audits", "contexte", "en-cours", "journal", "kb", "tags.yaml", "tickets"]);
 
   fs.rmSync(installation, { recursive: true, force: true });
-  console.log("smoke : OK — neuf appels, six domaines, un domaine décrit synthétique, trois sessions ; ticket", id);
+  console.log("smoke : OK — neuf appels, six domaines, un domaine décrit synthétique, quatre sessions ; ticket", id);
 }
 
 main().catch((e) => {

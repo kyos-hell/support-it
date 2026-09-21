@@ -9,6 +9,9 @@
 # un signal de DEMANDE (« objet-… » : sur quoi porte l'état cible), et le
 # domaine hors-perimetre, décrit sans dossier, donne ses signaux à ce qui
 # n'est pas du support IT — le serveur exige un signal pour toute nature.
+# Passe du 2026-09-21 (après les deux campagnes) : deux libellés resserrés,
+# identifiants inchangés — un-service-touche (« depuis partout ») et
+# un-seul-poste (« depuis un poste voisin ») étaient cochés trop facilement.
 version: 1
 
 natures:
@@ -49,7 +52,7 @@ domaines:
     suit: un service partagé, quel que soit le chemin
     signaux:
       - id: un-service-touche
-        libelle: un service précis touché, les autres vont bien
+        libelle: un service précis touché depuis partout (le chemin n'explique rien), les autres services vont bien
       - id: independant-du-chemin
         libelle: indépendant du chemin d'accès (mêmes symptômes en VPN, sur site, depuis tout poste)
       - id: tous-utilisateurs-du-service
@@ -68,7 +71,7 @@ domaines:
       - id: suit-la-machine
         libelle: suit la machine (même utilisateur sur un autre poste, pas de problème)
       - id: un-seul-poste
-        libelle: un seul poste touché, services et réseau sains pour les autres
+        libelle: un seul poste touché ; depuis un poste voisin, mêmes services et même réseau sains
       - id: os-repond
         libelle: le poste démarre et l'OS répond, mais quelque chose s'y comporte mal
       - id: objet-poste

@@ -9,3 +9,7 @@ produit/serveur/dist/
 # Permissions Claude Code déposées par « node dist/cli.js hote » dans le dossier de lancement
 # (ici la racine du dépôt) : propres au poste, jamais versionnées — et elles coupent Bash à l'assistant.
 .claude/
+
+# Enregistrement MCP en portée projet, écrit par « enregistrer » (décision 44) : chemins propres au poste.
+.mcp.json
+.mcp.json.support-it.bak

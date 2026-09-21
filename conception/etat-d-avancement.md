@@ -48,9 +48,10 @@ déjà, le test manuel de l'hôte est T-H5 ; `PowerShell` est interdit avec
 
 État des contrôles : `npm run build` propre, `node dist/cli.js valider`
 zéro erreur (six avertissements de longueur acceptés, tous ≤ 110 lignes),
-`npm test` vert sur les neuf appels, les six domaines et trois sessions
+`npm test` vert sur les neuf appels, les six domaines et quatre sessions
 serveur (catalogue, séquence complète avec les refus, reprise après
-redémarrage).
+redémarrage, tickets du jeu de test du triage — la quatrième depuis OA6, le
+2026-09-21).
 
 **Campagne de test 0.3.0-beta jouée les 2026-09-19/20** (journal :
 `campagne-test-0.3.0-beta.md` ; report dans `validation.md` §7 et
@@ -84,16 +85,19 @@ triage), OA4 (exécution reportée = pause), O6 (rappel `/support` au lieu de
 `/mcp`), O8 (durée active, `points_etape`, calendaire à côté). Laissés
 pour 0.3.0 : O1, O2, O3, O7.
 
+**Passe sur le manifeste faite le 2026-09-21** (décision 49) : aucun
+signal fautif dans les deux jeux de test du triage ; définition de l'écart
+corrigée (OA6) ; `un-service-touche` et `un-seul-poste` resserrés,
+identifiants inchangés.
+
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Rejouer le second lot sur l'env de test (un ticket avec pause puis
-   clôture : durée active < calendaire ; une section vide écrite : pas de
-   copie) ; observer OA5 et E9.
-2. **Un ticket par domaine retouché** (le manifeste a changé : signaux
-   `objet-…`, `hors-perimetre`), puis `0.3.0` sans `-beta`. Le testeur
-   rejoue en particulier T6 (attendu : signaux `hors-perimetre` cochés →
-   clôture `hors-domaines-couverts`), T4 (signal `objet-poste`), T3
-   (`domaines_valides: [poste-de-travail, identite]`), T9 (refus sans skill).
+1. Rejouer sur l'env de test : la reprise d'EX-3104 après une pause de
+   plus de 30 min (durée active < calendaire) ; un incident système et un
+   incident poste de travail (libellés retouchés) ; observer OA5 et E9.
+2. **`0.3.0` sans `-beta`** : `produit/VERSION`, note de version (ce qui
+   a changé depuis `0.2.0-beta`, décisions 42–49), tag git, archive de
+   `produit/`. Les rejeux R0–R4 (T6, T4, T3, T9) et R-EA1–R-EA3 sont faits.
 4. Pendant les tests, observer le cycle de vie du processus serveur dans
    Claude Code (`/clear`, `--resume`, reconnexion) : si l'état de session
    est perdu plus souvent que « une session = un ticket », la
