@@ -230,7 +230,7 @@ async function main() {
 
   const maj2 = await client.callTool({
     name: "update_context",
-    arguments: { section: "systeme/serveurs", contenu: "| Serveur | Rôle |\n| --- | --- |\n| SRVTEST | fichiers |" },
+    arguments: { section: "systeme/serveurs", contenu: "| Serveur | Rôle | Site | Physique / VM | OS | Administration |\n| --- | --- | --- | --- | --- | --- |\n| SRVTEST | fichiers | SITE-TEST | VM | OS-TEST | console |" },
   });
   assert.ok(!estErreur(maj2), texte(maj2));
   assert.match(texte(maj2), /créé depuis le gabarit/);
@@ -244,21 +244,33 @@ async function main() {
 
   const majV2 = await client.callTool({
     name: "update_context",
-    arguments: { section: "identite/annuaires", contenu: "| Annuaire | Type |\n| --- | --- |\n| ANNUAIRE-TEST | domaine interne |" },
+    arguments: { section: "identite/annuaires", contenu: "| Annuaire | Type | Fait autorité pour | Conventions de nommage | Administration |\n| --- | --- | --- | --- | --- |\n| ANNUAIRE-TEST | domaine interne | comptes | prenom.nom | console |" },
   });
   assert.ok(!estErreur(majV2), texte(majV2));
   assert.match(texte(majV2), /créé depuis le gabarit/);
   assert.match(fs.readFileSync(path.join(installation, "contexte", "identite.md"), "utf8"), /ANNUAIRE-TEST[\s\S]*## comptes-service — Comptes de service/);
 
   // C2 : une section qui ne contient que le squelette (en-tête de table + placeholders), même
-  // reformulé par rapport au gabarit livré, reste « vide ».
-  const majSquelette = await client.callTool({
-    name: "update_context",
-    arguments: { section: "reseau/wifi", contenu: "| SSID | Usage | Authentification |\n| --- | --- | --- |\n| <nom du réseau> | <qui> | <comment> |" },
-  });
-  assert.ok(!estErreur(majSquelette), texte(majSquelette));
+  // reformulé par rapport au gabarit livré (gabarit plus ancien chez le client), reste « vide ».
+  // Écrit à la main dans le fichier : update_context refuse un en-tête différent (EA2).
+  const reseauMdC2 = fs.readFileSync(path.join(installation, "contexte", "reseau.md"), "utf8");
+  fs.writeFileSync(
+    path.join(installation, "contexte", "reseau.md"),
+    reseauMdC2.replace(/(## wifi — Wifi\n\n<!--[\s\S]*?-->\n\n)[\s\S]*?(?=\n## )/, "$1| SSID | Usage | Authentification |\n| --- | --- | --- |\n| <nom du réseau> | <qui> | <comment> |\n"),
+    "utf8",
+  );
   const wifiVide = await client.callTool({ name: "get_context", arguments: { sections: ["reseau/wifi"] } });
   assert.match(texte(wifiVide), /reseau\/wifi[^\n]*· vide/, "C2 : squelette seul = vide, quel que soit le gabarit");
+  // EA2 (campagne sans jeu de données) : un tableau aux colonnes inventées est refusé — celles du
+  // squelette si la section est vide, celles déjà en place sinon ; la prose sur une section tabulaire aussi.
+  const majColonnes = await client.callTool({ name: "update_context", arguments: { section: "reseau/wifi", contenu: "| SSID | Usage | Authentification |\n| --- | --- | --- |\n| WIFI-TEST | employés | certificat |" } });
+  assert.ok(estErreur(majColonnes) && /en-tête du tableau ne correspond pas[^\n]*attendu « \| ssid \| population \| authentification \| accès \| »[^\n]*reçu « \| ssid \| usage \| authentification \| »/.test(texte(majColonnes)), "EA2 : section vide → colonnes du gabarit — " + texte(majColonnes));
+  const majProse = await client.callTool({ name: "update_context", arguments: { section: "reseau/wifi", contenu: "Un seul SSID pour tout le monde." } });
+  assert.ok(estErreur(majProse) && /reçu « aucun tableau »/.test(texte(majProse)), "EA2 : prose sur une section tabulaire — " + texte(majProse));
+  const majServeursAutre = await client.callTool({ name: "update_context", arguments: { section: "systeme/serveurs", contenu: "| Serveur | Rôle | Adresse | Site |\n| --- | --- | --- | --- |\n| SRVTEST | fichiers | ADRESSE-TEST | SITE-TEST |" } });
+  assert.ok(estErreur(majServeursAutre) && /attendu « \| serveur \| rôle \| site \| physique \/ vm \| os \| administration \| »/.test(texte(majServeursAutre)), "EA2 : section remplie → colonnes en place — " + texte(majServeursAutre));
+  const majBonnesColonnes = await client.callTool({ name: "update_context", arguments: { section: "reseau/wifi", contenu: "|  SSID | Population | AUTHENTIFICATION | Accès |\n| --- | --- | --- | --- |\n| WIFI-TEST | employés | certificat | tout |" } });
+  assert.ok(!estErreur(majBonnesColonnes), "EA2 : mêmes colonnes à la casse et aux espaces près → accepté — " + texte(majBonnesColonnes));
   const majInconnue = await client.callTool({ name: "update_context", arguments: { section: "reseau/nexiste-pas", contenu: "x" } });
   assert.ok(estErreur(majInconnue) && /inconnue du fichier/.test(texte(majInconnue)));
   const majDomaine = await client.callTool({ name: "update_context", arguments: { section: "cloud/parc", contenu: "x" } });
@@ -271,6 +283,11 @@ async function main() {
   // 5. Base vide, hors ticket : aucun refus sans brouillon courant.
   const vide = await client.callTool({ name: "search_kb", arguments: { tags: ["reseau", "vpn"] } });
   assert.match(texte(vide), /Base de connaissances vide/);
+  // EA1 (campagne sans jeu de données) : un domaine ou une nature du manifeste est connu même sans aucun cas en base.
+  assert.doesNotMatch(texte(vide), /Tag inconnu/, "EA1 : « reseau » connu par le manifeste, pas seulement par les cas — " + texte(vide));
+  const videNature = await client.callTool({ name: "search_kb", arguments: { tags: ["incident", "hors-perimetre", "inconnu-xyz"] } });
+  assert.doesNotMatch(texte(videNature), /Tag inconnu de la bibliothèque : « (incident|hors-perimetre) »/, texte(videNature));
+  assert.match(texte(videNature), /Tag inconnu de la bibliothèque : « inconnu-xyz »/, "un mot-clé libre reste signalé");
 
   // 5b. Le brouillon : création avec symptôme obligatoire ; A6, A3 ; B1 (liste plafonnée).
   const sansSymptome = await client.callTool({ name: "save_progress", arguments: {} });
@@ -494,7 +511,8 @@ async function main() {
       conclusion: "Test : concentrateur VPN saturé",
       plan_action: "Test : rien",
       questions: [{ question: "Quelle est la passerelle du site ?", reponse: "TEST", section: "reseau/topologie" }],
-      mises_a_jour_contexte: [{ section: "reseau/acces-distant", contenu: "TEST" }],
+      // EA3 : un candidat de plus de 60 caractères, dont le début sera écrit seul plus loin (8b).
+      mises_a_jour_contexte: [{ section: "reseau/acces-distant", contenu: "TEST — la section entière reprise par le ticket, puis complétée : un piège connu de plus" }],
       statut: "resolu",
       tags: ["vpn", "vpn-site-a-site", "m365"],
       duree_minutes: 3,
@@ -638,8 +656,18 @@ async function main() {
   const remplissageC = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["remplissage"] } });
   assert.match(texte(remplissageC), /Candidats au remplissage/);
   assert.match(texte(remplissageC), /`reseau\/topologie` \| question \|[^\n]*\| TEST \|/, "question journalisée sur une section vide → candidat");
-  assert.match(texte(remplissageC), /`reseau\/acces-distant` \| mise-a-jour \|[^\n]*\| TEST \|/, "mise à jour proposée jamais appliquée → candidat");
+  assert.match(texte(remplissageC), /`reseau\/acces-distant` \| mise-a-jour \|[^\n]*\| TEST — la section entière reprise par le ticket, puis complétée : un piège connu de plus \|/, "mise à jour proposée jamais appliquée → candidat, en entier (O11)");
   assert.match(texte(remplissageC), /`systeme\/serveurs` \| contradiction \|/, "contradiction notée → candidat");
+  // EA3 (campagne sans jeu de données) : la section écrite avec le **début** du candidat (plus de 60 caractères)
+  // ne le fait pas disparaître — c'est le candidat entier qui compte, pas un préfixe.
+  const majDebut = await clientC.callTool({ name: "update_context", arguments: { section: "reseau/acces-distant", contenu: "TEST — la section entière reprise par le ticket, puis complétée" } });
+  assert.ok(!estErreur(majDebut), texte(majDebut));
+  const remplissageD = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["remplissage"] } });
+  assert.match(texte(remplissageD), /`reseau\/acces-distant` \| mise-a-jour \|/, "EA3 : le candidat qui étend la section reste proposé");
+  const majEntier = await clientC.callTool({ name: "update_context", arguments: { section: "reseau/acces-distant", contenu: "TEST — la section entière reprise par le ticket, puis complétée : un piège connu de plus" } });
+  assert.ok(!estErreur(majEntier), texte(majEntier));
+  const remplissageE = await clientC.callTool({ name: "load_skill", arguments: { domaines: ["remplissage"] } });
+  assert.doesNotMatch(texte(remplissageE), /`reseau\/acces-distant` \| mise-a-jour \|/, "candidat appliqué en entier → plus proposé");
   await clientC.close();
 
   // 8. Domaine décrit, hors bêta : refusé par load_skill, affiché tel quel au triage (produit temporaire).

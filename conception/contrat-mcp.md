@@ -188,7 +188,12 @@ et à la clôture (écrire les sections candidates d'un ticket).
 
 **Comportement.** Le serveur retire du contenu les commentaires et toute
 ligne de date que le modèle aurait mis ; refuse un contenu vide ou contenant
-un titre `##` (une section à la fois). Puis : crée le fichier depuis le
+un titre `##` (une section à la fois) ; **refuse un tableau dont l'en-tête
+diffère de celui attendu** — le squelette du gabarit si la section est vide
+ou absente, les colonnes en place sinon, à la casse et aux espaces près —
+et une prose sur une section tabulaire (décision 45, 2026-09-21, EA2 :
+les colonnes ne se choisissent pas ; le refus cite les deux en-têtes et
+renvoie à `get_context`). Puis : crée le fichier depuis le
 gabarit s'il n'existe pas ; localise la section par son titre ; **conserve
 le titre et les consignes en commentaire** ; remplace le corps ; pose
 `Dernière mise à jour : <date du jour>` si la section en avait une ou si le

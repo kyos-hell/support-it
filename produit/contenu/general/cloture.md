@@ -34,6 +34,8 @@ seulement pour celui-là.
 - Les **mises à jour de contexte** : quand le terrain a complété le
   contexte, formuler la **section entière prête à coller** (le tableau
   complet, pas la ligne qui change : `update_context` remplace tout).
+  Une section **jamais servie** dans cette session : `get_context` d'abord,
+  pour son squelette — le serveur refuse un tableau aux colonnes inventées.
   Les **contradictions** notées en cours de ticket (`contradictions` de
   `save_progress`) sont déjà reprises par le serveur : ne pas les redire.
   **Trier avant de proposer** : le contexte reçoit ce que l'entreprise

@@ -134,6 +134,8 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 42 | **Domaines validés : union, jamais de retrait** après le premier skill de domaine ; `save_ticket` les prend du brouillon — décidé avec toi le 2026-09-20 (E5) | §11, contrat-mcp §5 ter | T3 : le ticket final disait `domaines_valides = escalades = [identite]`, poste-de-travail perdu, jeu de test du triage faussé. |
 | 43 | **Un signal par domaine proposé, demandes comprises**, signal `objet-…` par domaine et domaine `hors-perimetre` décrit au manifeste — décidé avec toi le 2026-09-20 (E10) | §11, manifeste, triage | T6 : devis de câblage routé en réseau ; « hors des domaines couverts » n'était tenu par rien pour une demande, et aucun domaine non couvert n'existait. |
 | 44 | **Enregistrement MCP en portée projet** (`.mcp.json` dans le dossier de lancement) — décidé avec toi le 2026-09-20 (E18) | §11, deploiement §3 | D5 : `install.sh` sur un dossier temporaire a réécrit `~/.claude.json` et détourné l'installation de test. Une machine = plusieurs installations possibles ; approbation du `.mcp.json` au premier lancement à documenter. |
+| 45 | **Les colonnes d'un tableau de contexte ne se choisissent pas** : `update_context` refuse un en-tête différent de celui attendu (le squelette du gabarit si la section est vide ou absente, les colonnes en place sinon) ; la clôture dit « section jamais servie → `get_context` d'abord » — décidé avec toi le 2026-09-21 (EA2) | §12, contexte.ts, cloture.md | Campagne sans jeu de données, V1 : `systeme/serveurs`, jamais servie dans la session, écrite avec `Serveur \| Rôle \| Adresse \| Site` au lieu des six colonnes du gabarit, et rien ne le détectait. Sur un contexte vide c'est le cas courant. Principe du 2026-09-14 : la forme est dérivable, donc au serveur. Contrepartie : changer les colonnes d'une section se fait à la main par le référent, pas par l'outil. |
+| 46 | **Un candidat au contexte est « déjà appliqué » seulement s'il est contenu en entier** dans la section (normalisé), plus un préfixe de 60 caractères — décidé seul le 2026-09-21 (EA3) | §12, audit.ts | V3 : la mise à jour d'EX-3002 pour `reseau/acces-distant` reprenait la section et y ajoutait une IP et un piège ; même début → écartée, l'ajout perdu pour `remplissage` et `audit`. C'est le fonctionnement normal d'une installation qui grandit ticket après ticket. |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -320,3 +322,31 @@ l'écriture), O3 (la proposition ambiguë du triage n'est jamais
 enregistrée), O5 (signaux et demandes — traité en partie par `objet-…`),
 O6 (`/mcp` dans l'app), O7 (état écrit au point suivant), O8 (durée
 calendaire), E9 (questions composées, à observer).
+
+## 12. Campagne sans jeu de données — 2026-09-21, et ses corrections
+
+**Ce qui a été joué** (`campagne-test-0.3.0-beta-sans-jeu-de-donnees.md`,
+`859ffec`, env `C:\Projet-IT\support-it-test`) : le parcours d'un client —
+`install.ps1` sans option sur un dossier sans `installation/`, mode
+INITIALISER, 45 sections vides, base à 0 cas ; puis le remplissage depuis
+rien (V0), trois tickets sur contexte vide (V1 réseau résolu et publié, V2
+réseau en `escalade-externe`, V5 demande poste de travail non résolue), le
+remplissage avec candidats (V3), l'audit skill et CLI (V4), trois refus
+serveur (V6). Verdict : **la première installation fonctionne de bout en
+bout** ; sur un contexte vide, chaque nom, adresse, équipement, contact et
+source d'installeur a été demandé, jamais inventé dans une commande. E18
+confirmé en vrai (deux installations sur le poste, la portée projet gagne).
+Trois écarts, tous côté serveur/skills, corrigés le 2026-09-21 :
+
+| Écart | Correction (2026-09-21) | Tenu par |
+| --- | --- | --- |
+| EA1 — E2 revient sur une base vide : les tags structurels étaient déduits des cas publiés, donc « tag inconnu : reseau » au premier ticket d'un client | `rendreRecherche` connaît toujours les natures et les identifiants de domaines de la bibliothèque (manifeste), en plus des références des cas en base | code (`kb.ts`), smoke |
+| EA2 — mise à jour de contexte au format inventé pour une section jamais servie ; le serveur écrivait tel quel | Décision 45 : `update_context` compare l'en-tête du tableau à celui attendu (gabarit si vide, colonnes en place sinon) et refuse avec les deux en-têtes et le rappel `get_context` ; `cloture.md` : « section jamais servie → `get_context` d'abord » | code (`contexte.ts`) + prompt, smoke |
+| EA3 — file des candidats : comparaison par préfixe de 60 caractères, une mise à jour qui étend une section était perdue | Décision 46 : inclusion du candidat entier normalisé | code (`audit.ts`), smoke |
+
+**Non corrigé, à trancher** (§1 du journal) : OA1 (l'audit ne dit pas que
+le contexte est vide), OA2 (copie `historique/` d'un gabarit vierge,
+message « remplacée »), OA3 (`section:` sur une réponse oui/non — prompt),
+OA4 (conseil « relance le ticket clôturé » — une demande reportée se met
+en pause, prompt). Toujours à observer : E3 (2 occurrences atténuées en 3
+tickets), E9 (5 questions composées), dates calculées par le modèle.

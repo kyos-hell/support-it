@@ -319,7 +319,8 @@ server.registerTool(
     description:
       "Écrit une section du contexte entreprise (installation/contexte/<domaine>.md), une section à la fois. " +
       "N'APPELER QU'APRÈS UN OUI EXPLICITE DU TECHNICIEN sur le contenu montré : le contexte est pris pour vérité terrain par tous les diagnostics suivants. " +
-      "Le serveur conserve les consignes du gabarit, pose la date de mise à jour, sauvegarde la version précédente dans contexte/historique/ et crée le fichier depuis le gabarit s'il n'existe pas.",
+      "Le serveur conserve les consignes du gabarit, pose la date de mise à jour, sauvegarde la version précédente dans contexte/historique/ et crée le fichier depuis le gabarit s'il n'existe pas. " +
+      "Un tableau garde les colonnes attendues (le squelette servi par get_context si la section est vide, les colonnes en place sinon) : un en-tête différent est refusé.",
     inputSchema: {
       section: z.string().regex(/^[a-z0-9-]+\/[a-z0-9-]+$/).describe("Identifiant domaine/section (ex. reseau/topologie, general/sites)"),
       contenu: z.string().min(1).describe("Le contenu de la section, au format du gabarit (tableau ou prose), sans le titre « ## » ni la ligne de date"),

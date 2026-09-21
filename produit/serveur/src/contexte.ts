@@ -123,6 +123,24 @@ export function squeletteSeulement(contenu: string): boolean {
   return true;
 }
 
+/**
+ * La ligne d'en-tête du premier tableau d'un contenu (cellules normalisées),
+ * ou null s'il n'y a pas de tableau. EA2 (campagne sans jeu de données) : le
+ * modèle a écrit une section jamais servie avec des colonnes inventées ; le
+ * serveur compare l'en-tête à celui attendu avant d'écrire.
+ */
+export function enTeteTableau(contenu: string): string | null {
+  const lignes = contenu.split("\n").map((l) => l.trim()).filter(Boolean);
+  const separateur = (l: string) => /^\|?[\s|:\-]+\|?$/.test(l) && l.includes("-");
+  for (let i = 0; i + 1 < lignes.length; i++) {
+    if (lignes[i].startsWith("|") && separateur(lignes[i + 1])) {
+      const cellules = lignes[i].replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => normaliser(c).toLowerCase());
+      return `| ${cellules.join(" | ")} |`;
+    }
+  }
+  return null;
+}
+
 /** Sections d'un fichier de contexte rempli, avec « vide » calculé contre le gabarit et contre le squelette. */
 export function sectionsRemplies(r: Racines, domaine: string): Section[] | null {
   const secs = lireSections(path.join(chemins(r).contexte, `${domaine}.md`));
@@ -274,6 +292,20 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
   const debut = lignes.findIndex((l) => reTitre.test(l));
   const gab = sectionsGabarit(r, domaine).get(section);
 
+  // EA2 : un tableau se remplit avec les colonnes attendues — celles du
+  // squelette si la section est vide ou absente, celles déjà en place sinon.
+  // Le modèle ne choisit pas la forme : get_context la lui donne.
+  const controlerEnTete = (reference: string) => {
+    const attendu = enTeteTableau(reference);
+    if (attendu === null) return;
+    const recu = enTeteTableau(propre);
+    if (recu !== attendu) {
+      throw new ErreurContexte(
+        `l'en-tête du tableau ne correspond pas à celui attendu pour « ${id} » : attendu « ${attendu} », reçu « ${recu ?? "aucun tableau"} ». Reprendre le squelette servi par get_context(["${id}"]) ; les colonnes ne se changent pas par cet appel.`,
+      );
+    }
+  };
+
   let nouvelles: string[];
   let sectionAjoutee = false;
   let confirmee = false;
@@ -284,6 +316,7 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
         `section « ${section} » inconnue du fichier ${domaine}.md et du gabarit : vérifier l'identifiant, ou ajouter la section au gabarit d'abord.`,
       );
     }
+    controlerEnTete(gab.squelette);
     // Section prévue par le gabarit mais absente (migration H4) : on l'ajoute en fin de fichier.
     aDate = gab.aDate;
     const bloc = [`## ${section} — ${gab.titre}`, "", ...gab.brut.match(/<!--[\s\S]*?-->/g) ?? [], "", propre];
@@ -294,6 +327,9 @@ export function ecrireSection(r: Racines, id: string, contenu: string): Ecriture
     let fin = lignes.findIndex((l, i) => i > debut && l.startsWith("## "));
     if (fin < 0) fin = lignes.length;
     const ancien = lignes.slice(debut + 1, fin).join("\n");
+    const ancienPropre = sansCommentaires(ancien).replace(RE_MAJ_LIGNE, "").trim();
+    const ancienVide = !ancienPropre || normaliser(ancienPropre) === gab?.contenuNormalise || squeletteSeulement(ancienPropre);
+    controlerEnTete(ancienVide ? gab?.squelette ?? "" : ancienPropre);
     aDate = RE_MAJ_LIGNE.test(ancien) || Boolean(gab?.aDate);
     // Décision 9 : « toujours vrai » = le même contenu ; on repose la date, sans copie dans historique/.
     confirmee = normaliser(sansCommentaires(ancien).replace(RE_MAJ_LIGNE, "")) === normaliser(propre);

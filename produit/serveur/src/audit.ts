@@ -86,7 +86,9 @@ export function candidats(r: Racines): Map<string, Candidat[]> {
     const s = etats.get(x.section);
     if (!s) return true;
     if (x.source === "question") return s.etat !== "ok";
-    if (x.source === "mise-a-jour") return s.etat !== "ok" || !normaliser(s.contenu ?? "").includes(normaliser(x.contenu).slice(0, 60));
+    // EA3 (campagne sans jeu de données) : le candidat **entier**, pas un préfixe —
+    // une mise à jour qui reprend la section et y ajoute commence comme elle.
+    if (x.source === "mise-a-jour") return s.etat !== "ok" || !normaliser(s.contenu ?? "").includes(normaliser(x.contenu));
     return true; // une contradiction reste à traiter tant qu'un humain ne l'a pas tranchée
   });
   const parSection = new Map<string, Candidat[]>();

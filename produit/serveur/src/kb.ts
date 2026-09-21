@@ -92,7 +92,10 @@ export function rendreRecherche(tags: string[], res: { total: number; correspond
   // Décision 1 : un tag inconnu de la bibliothèque est signalé avec les tags proches, pas ignoré en silence.
   // E2 (campagne 0.3.0-beta) : les tags que le serveur ajoute lui-même (nature,
   // domaines, références des cas en base) sont connus par construction.
-  const structurels = res.structurels ?? new Set<string>();
+  // EA1 (campagne sans jeu de données) : sur une base vide, aucun cas ne porte
+  // ces tags — les natures et les domaines viennent donc de la bibliothèque
+  // (le manifeste), pas seulement des cas déjà publiés.
+  const structurels = new Set<string>([...(res.structurels ?? []), "incident", "demande", ...(biblio ? biblio.parDomaine.keys() : [])]);
   const inconnus = biblio ? normaliser(tags).filter((t) => !biblio.tous.includes(t) && !structurels.has(t)) : [];
   const avert = inconnus.length
     ? inconnus.map((t) => {

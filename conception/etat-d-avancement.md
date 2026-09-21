@@ -65,9 +65,22 @@ MCP en portée projet `.mcp.json` (E18), résolu refusé sans skill de domaine
 dédoublonnage en base (E2/E7), audit enrichi (O10/O11), générateur corrigé
 (E6/E17). Restent à trancher : O1, O2, O3, O7, O8 (voir le journal §1).
 
+**Campagne sans jeu de données jouée le 2026-09-21** (journal :
+`campagne-test-0.3.0-beta-sans-jeu-de-donnees.md`, sur `859ffec`) : le
+parcours d'un client — `install.ps1` sans option, mode INITIALISER, 45
+sections vides, base à 0 cas, puis remplissage depuis rien, trois tickets
+sur contexte vide, remplissage avec candidats, audit, refus. Verdict : la
+première installation fonctionne de bout en bout ; sur un contexte vide le
+modèle demande, il n'invente pas. **Corrections faites le 2026-09-21**
+(`fin-de-projet.md` §12, décisions 45–46) : structurels de `search_kb`
+depuis le manifeste (EA1), en-tête de tableau contrôlé par `update_context`
+(EA2), candidat comparé en entier (EA3). Restent à trancher : OA1–OA4.
+
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Trancher les observations O1–O3, O7, O8 du journal de campagne.
+1. Trancher les observations O1–O3, O7, O8 et OA1–OA4 des journaux de
+   campagne ; rejouer EA1–EA3 sur l'env de test (`support-it-test`, `git
+   pull` + `install.ps1` REJOINDRE).
 2. **Un ticket par domaine retouché** (le manifeste a changé : signaux
    `objet-…`, `hors-perimetre`), puis `0.3.0` sans `-beta`. Le testeur
    rejoue en particulier T6 (attendu : signaux `hors-perimetre` cochés →
@@ -116,7 +129,7 @@ il est fragile et il faut le savoir.
 | --- | --- |
 | Le serveur ne raisonne jamais ; l'intelligence est dans `contenu/`, le déterminisme dans `serveur/`. | Architecture : aucun appel ne prend une décision qu'un skill pourrait prendre. |
 | Le modèle ne fabrique jamais un chemin, un identifiant, une date. | Contrat : aucun appel n'a de paramètre de chemin ; le serveur fabrique tout (`ids.ts`). Une référence fabriquée est refusée (A6). |
-| **Le modèle n'a pas de choix sur la mécanique** (principe du 2026-09-14) : domaines, signaux, tags, sections sont des enums ; le symptôme, les domaines proposés, le plan, les questions viennent du brouillon ; l'étape, les escalades, les cas lus, la durée sont dérivés ; l'ordre du flux est tenu par l'état de session. | **Code** : schémas construits au démarrage (`index.ts`), `session.ts`, `encours.ts`, `tickets.ts`. Il reste au modèle : net ou ambigu, la question, la conclusion, le plan, les preuves des signaux, le constat d'une contradiction. |
+| **Le modèle n'a pas de choix sur la mécanique** (principe du 2026-09-14) : domaines, signaux, tags, sections sont des enums ; le symptôme, les domaines proposés, le plan, les questions viennent du brouillon ; l'étape, les escalades, les cas lus, la durée sont dérivés ; l'ordre du flux est tenu par l'état de session ; **les colonnes d'un tableau de contexte** sont celles du gabarit ou celles en place (décision 45, 2026-09-21). | **Code** : schémas construits au démarrage (`index.ts`), `session.ts`, `encours.ts`, `tickets.ts`, `contexte.ts` (`enTeteTableau`). Il reste au modèle : net ou ambigu, la question, la conclusion, le plan, les preuves des signaux, le constat d'une contradiction. |
 | Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5) ; prompt : règle explicite dans triage et clôture depuis E14. Exception assumée : `install` écrit `.mcp.json` et `.claude/settings.json` dans le dossier de lancement (décision 44). |
 | Aucune donnée d'entreprise dans `produit/contenu/`, même en exemple. | `valider` (regex IP, UNC, mail, domaine interne, nom d'hôte plausible). Placeholders `<...>` uniquement. |
 | Un ticket clôturé, un journal, une entrée de base : écrits une fois, jamais modifiés. | Code (`flag: "wx"`). |
@@ -283,6 +296,17 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
   d'où le domaine synthétique.
 - Un heredoc bash long avec du markdown français passé au shell : tronqué
   ou mal fermé. Écrire le script de patch dans un fichier, puis l'exécuter.
+- Une correction vérifiée seulement sur une base pleine (E2 : structurels
+  déduits des cas publiés) revenait telle quelle sur une base vide (EA1).
+  Ce qui vient du manifeste se lit dans le manifeste, pas dans les données.
+- Comparer un contenu par son **préfixe** (60 caractères, file des
+  candidats) perd tout ce qui l'étend : une section reprise et complétée
+  commence comme l'original (EA3). Comparer en entier.
+- Le smoke écrivait des tableaux de contexte avec des colonnes qui ne sont
+  pas celles des gabarits — ça passait parce que rien ne les contrôlait.
+  Depuis la décision 45, un tableau se teste avec les colonnes du gabarit ;
+  un squelette « d'un gabarit plus ancien » (C2) s'écrit à la main dans le
+  fichier, pas par `update_context`.
 
 ## 6. Conventions de rédaction
 
