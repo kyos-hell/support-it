@@ -119,9 +119,24 @@ triages nets système et poste de travail sur les libellés resserrés.
    ouvrent une session, données par entreprise, option mono, migration
    avec sauvegarde et retour arrière). Rien n'est codé ; quatre questions
    à trancher (§4 du plan).
-7. Porte 3 (ex-porte 2 : collègues, partage réseau) : l'empreinte
+7. **CI sur les merges vers `release`** (idée du 2026-09-21, plus tard) :
+   un workflow GitHub Actions sur les PR vers `release` — `npm run build`,
+   `valider`, `npm test`, puis `install.sh` sur un dossier temporaire
+   (Ubuntu) et `install.ps1` (Windows). Les campagnes (hôte, modèle)
+   restent manuelles.
+8. Porte 3 (ex-porte 2 : collègues, partage réseau) : l'empreinte
    optimiste sur le contexte et les brouillons (`D-serveur-mcp.md` §8), et
    ce que la décision 7 a explicitement remis à plus tard.
+
+**Branches (convention du 2026-09-21).** `release` = ce qu'un client
+clone ; elle ne bouge que pour livrer (merge d'une branche de version
+testée + tag `vX.Y.Z`) — `0.3.0`, tag `v0.3.0`. Une branche par version en
+cours (`v0.4.0`), un commit par chantier ; le tag ne se pose qu'à la
+livraison. Un correctif sur une version livrée : branche depuis `release`,
+tag `vX.Y.Z+1`, merge dans `release` et dans la version en cours.
+`v0.3.0-beta` est **figée** (tag `v0.3.0-beta-fin`) : historique de la bêta,
+on n'y commite plus. `main` a été supprimée. L'env de test
+(`C:\Projet-IT\it-support-test\support-it`) suit la branche qu'on teste.
 
 ## 2. Carte du dépôt — quoi lire pour quoi
 
