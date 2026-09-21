@@ -100,9 +100,10 @@ triages nets système et poste de travail sur les libellés resserrés.
 
 **Ce qui reste à faire**, dans l'ordre :
 
-1. Tag git `v0.3.0` et archive de `produit/` (H5) ; sur l'env de test,
-   `install.ps1` doit annoncer `MISE À JOUR 0.3.0-beta → 0.3.0` — jamais
-   vu en vrai.
+1. ~~Tag git `v0.3.0`~~ fait (branche `release`, tag `v0.3.0`, mise à
+   jour `0.3.0-beta → 0.3.0` vue sur l'env de test). Reste l'archive zip de
+   `produit/` pour un client sans Git (H5), et la branche par défaut du
+   dépôt à passer sur `release`.
 4. Pendant les tests, observer le cycle de vie du processus serveur dans
    Claude Code (`/clear`, `--resume`, reconnexion) : si l'état de session
    est perdu plus souvent que « une session = un ticket », la
