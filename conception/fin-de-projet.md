@@ -31,10 +31,11 @@ technicien ──/support──▶ Claude Code ──stdio──▶ serveur supp
                    skills en contexte
 ```
 
-Le schéma complet du flux, avec la reprise, les points d'étape, la pause,
-l'écriture du contexte et la branche de remplissage, est dans
-`architecture/schema/routage_support_v3.svg` (la v2 est gardée pour
-l'historique).
+Le schéma complet du flux — neuf appels, reprise, points d'étape, pause,
+lecture d'un cas, clôture, écriture du contexte, branches de remplissage
+et d'audit, file des candidats, hôte — est dans
+`architecture/schema/routage_support_v4.svg` (0.3.0, 2026-09-21 ; la v3 et
+la v2 sont gardées pour l'historique).
 
 **Le point d'entrée** `~/.claude/skills/support/SKILL.md` fait dix lignes :
 « appelle `load_skill(["triage"])` et suis ce qu'il renvoie ». Toute
@@ -285,7 +286,7 @@ passe côté serveur ou côté hôte.
   installation neuve.
 - La passe sur le manifeste (signaux) : **après** les dix tickets.
 - Le schéma SVG v4 (le v3 ne montre ni `read_kb`, ni l'étape dérivée, ni
-  l'audit).
+  l'audit) — fait le 2026-09-21, avec `0.3.0`.
 - Tout ce que la décision 7 remet à plus tard.
 
 **Pour une installation existante** : remplacer `produit/`, relancer

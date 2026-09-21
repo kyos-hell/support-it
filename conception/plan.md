@@ -42,7 +42,7 @@ l'**assistance**, pas l'automatisation.
 
 ### 0.3 — Le flux, en toutes lettres
 
-Ce projet a un schéma de routage (`architecture/schema/routage_support_v3.svg`, mis à jour le 2026-09-10 ; la v2 est conservée pour l'historique). Voici son contenu sous forme textuelle.
+Ce projet a un schéma de routage (`architecture/schema/routage_support_v4.svg`, mis à jour le 2026-09-21 pour `0.3.0` ; la v3 du 2026-09-10 et la v2 sont conservées pour l'historique). Voici son contenu sous forme textuelle — celui de la v3 ; la v4 y ajoute `read_kb` après la recherche, l'audit hors ticket, la file des candidats, l'étape et les escalades dérivées par le serveur, les refus hors séquence et l'hôte.
 
 1. **`/support`** — le technicien décrit son problème. C'est l'unique porte
    d'entrée humaine.

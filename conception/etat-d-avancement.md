@@ -109,9 +109,10 @@ triages nets système et poste de travail sur les libellés resserrés.
    est perdu plus souvent que « une session = un ticket », la
    reconstruction par `resume_ticket` devient la voie principale
    (`D-serveur-mcp.md` §5).
-5. Le schéma `architecture/schema/routage_support_v3.svg` est antérieur au
-   lot : `read_kb`, l'étape dérivée et l'audit n'y sont pas. À redessiner
-   (v4) une fois les tests passés.
+5. ~~Le schéma v4~~ fait le 2026-09-21 :
+   `architecture/schema/routage_support_v4.svg` (neuf appels, `read_kb`,
+   étape et escalades dérivées, refus hors séquence, audit et file des
+   candidats, hôte, durée active). La v3 est gardée pour l'historique.
 6. Porte 2 (collègues, partage réseau) : l'empreinte optimiste sur le
    contexte et les brouillons (`D-serveur-mcp.md` §8), et ce que la
    décision 7 a explicitement remis à plus tard.
@@ -125,7 +126,7 @@ triages nets système et poste de travail sur les libellés resserrés.
 | Les dix décisions du lot déterminisme, le plan d'implémentation, le plan de test | `conception/plan-after-beta.md` |
 | Le contrat des neuf appels MCP, dans le détail | `conception/contrat-mcp.md` |
 | Comment le serveur est construit, ses cas limites | `architecture/D-serveur-mcp.md` |
-| Le flux en image | `architecture/schema/routage_support_v3.svg` (antérieur au lot du 2026-09-18 : v4 à faire) |
+| Le flux en image | `architecture/schema/routage_support_v4.svg` (0.3.0, 2026-09-21 ; v3 et v2 gardées pour l'historique) |
 | Ce qu'un skill contient et ne contient pas | `conception/format-skill.md` |
 | Ce qu'un contexte contient, et surtout ce qu'il ne contient pas | `conception/format-contexte.md` (§4.1 : la taxonomie) |
 | Comment le triage décide, l'escalade, la reprise | `conception/triage.md` et le texte livré `produit/contenu/general/triage.md` |
