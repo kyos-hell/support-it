@@ -148,6 +148,15 @@ if ($SansClaude) {
   if ($LASTEXITCODE -ne 0) { Echec "enregistrement du serveur MCP en échec" }
   & node $Cli entree
   if ($LASTEXITCODE -ne 0) { Echec "installation du point d'entrée en échec" }
+  # Décision 50 : /support en portée projet, et aucun skill « support » global qui le masque.
+  $EntreeProjet = Join-Path (Split-Path $Produit -Parent) ".claude\skills\support\SKILL.md"
+  if (-not (Test-Path $EntreeProjet)) { Echec "point d'entrée absent après installation : $EntreeProjet" }
+  $EntreeGlobale = Join-Path $HOME ".claude\skills\support\SKILL.md"
+  if (Test-Path $EntreeGlobale) {
+    Write-Host "  ATTENTION : $EntreeGlobale existe encore. Claude Code le fait passer avant celui du projet, et il se charge hors du dossier support-it : le renommer ou le retirer à la main." -ForegroundColor Yellow
+  } else {
+    Write-Host "  vérifié : /support en portée projet seulement ($EntreeProjet), aucun skill « support » global"
+  }
   & node $Cli hote
   if ($LASTEXITCODE -ne 0) { Echec "dépôt des permissions Claude Code (.claude/settings.json) en échec" }
 }
@@ -163,6 +172,9 @@ Write-Host "  - Remplir le contexte : $Installation\contexte\*.md (recommandé, 
 Write-Host "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
 Write-Host "  - Redémarrer Claude Code, puis taper /support : le premier appel (triage) prouve que le serveur répond."
 Write-Host "    (/mcp est peu lisible dans l'app desktop : il mêle ses propres serveurs et ouvre parfois le catalogue.)"
-Write-Host "  - Lancer Claude Code depuis le dossier parent de produit/ : .claude/settings.json y interdit au modèle"
+Write-Host "  - Ouvrir Claude Code DANS le dossier support-it ($(Split-Path $Produit -Parent)), le parent de produit/."
+Write-Host "    Hors de ce dossier, /support et le serveur n'existent pas : c'est voulu."
+Write-Host "    JAMAIS depuis un sous-dossier (produit/…) : /support y marche, mais sans les interdictions ci-dessous."
+Write-Host "    .claude/settings.json y interdit au modèle"
 Write-Host "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
 Write-Host "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."

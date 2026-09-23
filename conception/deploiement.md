@@ -74,6 +74,26 @@ robuste après installation n'est pas `/mcp` (peu lisible dans l'app desktop,
 qui mêle ses propres serveurs et ouvre parfois le catalogue des connecteurs)
 mais le premier appel : `/support` → `load_skill(["triage"])`.
 
+**Le point d'entrée `/support` — portée projet, depuis le 2026-09-23
+(décision 50, `0.3.1`).** `entree` dépose le skill dans `<dossier de
+lancement>/.claude/skills/support/`. Les trois pièces — skill, `.mcp.json`,
+`.claude/settings.json` — vivent dans le dossier `support-it` et nulle part
+ailleurs : hors du dossier, `/support` n'existe pas, et aucun ticket ne peut
+tourner sans les permissions refusées. Raison : en portée utilisateur, une
+session ouverte ailleurs a chargé `/support` (sa description le fait
+déclencher par le modèle) et conduit un ticket avec Bash permis. Vérifié
+dans la documentation Claude Code le 2026-09-23 : un skill **personnel
+passe avant** un skill de projet du même nom — d'où le retrait de l'ancien
+`~/.claude/skills/support/` (s'il appelle `load_skill` de `support-it` ;
+sinon signalé, jamais touché), contrôlé par le script à l'étape 5 et par
+`etat` ; les skills de projet sont cherchés du dossier de lancement jusqu'à
+la **racine du dépôt git**, le `.mcp.json` aussi (vu en vrai), mais **pas**
+`.claude/settings.json` : depuis un sous-dossier d'un clone, un ticket
+tourne avec Bash et PowerShell (T-H6, 2026-09-23 — limite connue, garde
+serveur à l'étude pour `0.3.2`) ; un skill de projet se charge sans
+approbation, alors que `.mcp.json` peut en demander une : d'où la ligne 1 du
+point d'entrée, « sans `load_skill`, dis-le et arrête-toi ».
+
 **Encodage et fins de ligne.** `install.ps1` est enregistré en **UTF-8 avec
 BOM** : Windows PowerShell 5.1 lit un `.ps1` sans BOM dans la page de codes
 ANSI et les guillemets français cassent une chaîne (trouvé au test T-H1).

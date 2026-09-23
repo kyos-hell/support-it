@@ -231,9 +231,21 @@ le mode affiché est « MISE À JOUR 0.1.0-beta → <version> », seul le
 gabarit manquant est copié, le reste est « gardé ».
 
 **T-H3 — Enregistrement.** Après `install.*` complet sur un poste :
-`~/.claude.json` contient `mcpServers.support-it` avec les deux racines,
-`~/.claude/skills/support/SKILL.md` existe, la sauvegarde `.support-it.bak`
-existe, `.claude/settings.json` est déposé dans le dossier de lancement (T-H5), et `/mcp` dans Claude Code liste `support-it` avec neuf outils.
+`<dossier de lancement>/.mcp.json` contient `mcpServers.support-it` avec les deux racines
+(E18), `<dossier de lancement>/.claude/skills/support/SKILL.md` existe et
+`~/.claude/skills/support/` **n'existe pas** (décision 50, `0.3.1`), `.claude/settings.json` est déposé dans le dossier de lancement (T-H5), et `/mcp` dans Claude Code liste `support-it` avec neuf outils.
+
+**T-H6 — Rien de support-it hors du dossier** (décision 50, 2026-09-23).
+Sur un poste qui avait `~/.claude/skills/support/` (0.3.0) : `install.*`
+le retire (sauvegarde `~/.claude/support-it-entree.bak.md`), l'étape 5
+affiche « vérifié : /support en portée projet seulement », `etat` affiche
+« Point d'entrée /support : OK ». Puis trois sessions Claude Code : dans
+`support-it` → `/support` lance le triage ; dans un autre dossier → `/support`
+inconnu, et une demande « ma VM ne démarre plus » ne charge aucun skill
+support ; depuis un sous-dossier (`support-it/produit/`) → noter le
+résultat, clone git et archive hors git séparément. Variante : un autre
+skill `support` global (texte sans `load_skill`) → non touché, ATTENTION à
+l'étape 5 et dans `etat`. Rouge si un ticket démarre hors du dossier.
 **Non joué par l'auteur** : il modifie la configuration Claude Code du
 poste ; c'est le premier test de la porte 1, à faire par le testeur.
 
@@ -466,4 +478,6 @@ Consignées ici pour ne pas les perdre, hors bêta par décision :
 | 2026-09-21 | corrections OA1, OA2, OA3/OA5, OA4, O6, O8 | vert | `build`, `valider` 0 erreur (BOM d'`install.ps1` intact, `triage.md` ≤ 130), `npm test` vert avec les cas ajoutés : sections vides en information dans l'audit ; section vide « remplie » sans copie `historique/`, vraie modification « remplacée » avec copie ; `points_etape` dans le brouillon ; `duree_minutes` active + `duree_calendaire_minutes`, réponse de `save_ticket` avec les deux ; `dureeActiveMinutes` : 55 min d'écart → 30, nuit → 30, sans points → calendaire |
 | 2026-09-21 | passe manifeste (décision 49) + OA6 | vert | `valider` 0 erreur, `npm test` vert (quatre sessions) : jeu de test du triage — ambigu résolu + escalade → « non », ticket sans signal → « non », signaux matériel / validé réseau → « **oui** ». Deux libellés resserrés, aucun identifiant changé. À rejouer sur l'env de test : un incident système et un incident poste de travail (les deux domaines retouchés) |
 | 2026-09-21 | rejeu second lot + passe manifeste sur l'env de test (`it-support-test`, REJOINDRE) | vert | EX-3104 : pause 32 min → « durée : 32 min (active…) ; calendaire : 40 min », `duree_calendaire_minutes` dans le ticket ; `contacts-escalade` vide → « remplie (était vide) », pas de copie ; audit : ligne « 41 sections vides sur 45 — information », « 0 écart » (OA6) ; rappel `/support` ; EX-3105 net système (3), EX-3106 net poste (3) ; réponses tracées telles quelles, déductions en `notes`, `resolu_par` pris des mots du technicien. Détail : journal §5 |
+| 2026-09-23 | `0.3.1` (décision 50) : `build`, `valider`, `npm test` | vert | `valider` 0 erreur (6 avertissements connus), smoke OK |
+| 2026-09-23 | T-H3, T-H6 sur l'env de test (`d4d923c`, `install.ps1`) | vert / **rouge sous-dossier** | `MISE À JOUR 0.3.0 → 0.3.1` ; skill déposé dans le projet, ancien `~/.claude/skills/support` retiré (sauvegarde), « vérifié » à l'étape 5, `etat` « Point d'entrée : OK ». Hors du dossier : ni skill ni serveur (vert). Racine : triage servi, Bash/PowerShell absents (vert). **`produit\` : `/support` et serveur trouvés, Bash/PowerShell présents** — `settings.json` non appliqué depuis un sous-dossier (limite connue, `retours-beta.md`, `0.3.2`). Hors git : non joué |
 | 2026-09-21 | `0.3.0` : `install.ps1` sur l'env de test après `git checkout release` (H4, jamais vu en vrai) | vert | « == support-it 0.3.0 » ; étape 4 : **`mode : MISE À JOUR 0.3.0-beta → 0.3.0`**, 7 gabarits + `tags.yaml` « gardé », `installation/VERSION` → `0.3.0`, 6 tickets intacts, audit 0 écart / 0 santé, T-P7 6 lignes ; branche `release` + tag `v0.3.0` poussés |
