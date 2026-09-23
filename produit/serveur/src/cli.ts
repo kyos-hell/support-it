@@ -30,7 +30,8 @@ Usage : node dist/cli.js <commande>
   audit        Le rapport d'audit (tickets, base, brouillons, contexte) : affiché et écrit dans installation/audits/ ;
                code 1 si un constat de santé des fichiers (C3) est trouvé. Le même rapport que /support audit.
   enregistrer  Enregistre le serveur MCP dans <dossier de lancement>/.mcp.json (portée projet), avec sauvegarde ; retire l'ancienne entrée utilisateur si elle pointait ici.
-  entree       Installe le point d'entrée /support dans ~/.claude/skills/support/.
+  entree       Installe le point d'entrée /support dans <dossier de lancement>/.claude/skills/support/ (portée projet) ;
+               retire l'ancien ~/.claude/skills/support/ s'il vient de ce produit, le signale sinon.
   hote         Dépose .claude/settings.json dans le dossier de lancement (permissions refusées au modèle), en fusionnant.
 
 Variables : SUPPORT_IT_PRODUIT, SUPPORT_IT_INSTALLATION (défauts : le dossier produit/ du serveur, et installation/ à côté).`);
@@ -133,6 +134,11 @@ function etat(): number {
   }
   for (const b of enCours.zombies) console.log(`  ZOMBIE  ${b.id} : le ticket est déjà clôturé, le brouillon reste dans en-cours/ (ignoré ; supprimer à la main)`);
   for (const f of enCours.orphelins) console.log(`  ORPHELIN  ${f} : pas d'en-tête lisible (ignoré ; supprimer à la main)`);
+  // Décision 50 : le point d'entrée en portée projet, et aucun skill « support » global qui le masque.
+  const e = etatEntree();
+  console.log(`Point d'entrée /support : ${e.projet ? `OK (${entreeProjet()})` : "ABSENT — lancer « entree »"}`);
+  if (e.globale === "la-notre") console.log(`  ATTENTION ancien point d'entrée global ${entreeGlobale()} : actif hors du dossier et prioritaire sur celui du projet — lancer « entree » pour le retirer`);
+  if (e.globale === "autre") console.log(`  ATTENTION un autre skill « support » global (${entreeGlobale()}) masque celui du projet — le renommer ou le retirer à la main`);
   console.log(
     vides === 0
       ? "Contexte complet."
@@ -271,16 +277,57 @@ function hote(): number {
   return 0;
 }
 
+/**
+ * Décision 50 (2026-09-23) : le point d'entrée /support vit dans le dossier
+ * de lancement, comme `.mcp.json` et `.claude/settings.json`. En portée
+ * utilisateur (≤ 0.3.0), il se chargeait dans toute session Claude Code, hors
+ * du dossier, donc sans les permissions refusées de `hote`. Claude Code fait
+ * passer un skill personnel avant un skill de projet du même nom : l'ancien
+ * doit disparaître, sinon il masque le nouveau.
+ */
+const entreeProjet = () => path.join(path.resolve(r.produit, ".."), ".claude", "skills", "support", "SKILL.md");
+const entreeGlobale = () => path.join(os.homedir(), ".claude", "skills", "support", "SKILL.md");
+
+/** « la-notre » : un skill `support` qui appelle `load_skill` du serveur `support-it` — posé par ce produit. */
+function etatEntree(): { projet: boolean; globale: "aucune" | "la-notre" | "autre" } {
+  const projet = fs.existsSync(entreeProjet());
+  if (!fs.existsSync(entreeGlobale())) return { projet, globale: "aucune" };
+  let texte = "";
+  try {
+    texte = fs.readFileSync(entreeGlobale(), "utf8");
+  } catch {
+    return { projet, globale: "autre" };
+  }
+  const notre = /^name:\s*support\s*$/m.test(texte) && texte.includes("load_skill") && texte.includes("support-it");
+  return { projet, globale: notre ? "la-notre" : "autre" };
+}
+
 function entree(): number {
   const source = path.join(r.produit, "entrees", "claude-code", "support", "SKILL.md");
   if (!fs.existsSync(source)) {
     console.error(`point d'entrée absent du produit : ${source}`);
     return 1;
   }
-  const dossier = path.join(os.homedir(), ".claude", "skills", "support");
-  fs.mkdirSync(dossier, { recursive: true });
-  fs.copyFileSync(source, path.join(dossier, "SKILL.md"));
-  console.log(`point d'entrée /support installé : ${path.join(dossier, "SKILL.md")}`);
+  const cible = entreeProjet();
+  fs.mkdirSync(path.dirname(cible), { recursive: true });
+  fs.copyFileSync(source, cible);
+  console.log(`point d'entrée /support installé : ${cible} (portée projet)`);
+  console.log(`  /support n'existe que dans une session Claude Code ouverte dans ${path.resolve(r.produit, "..")}`);
+
+  const globale = entreeGlobale();
+  const e = etatEntree();
+  if (e.globale === "la-notre") {
+    // Sauvegarde hors de skills/ : un dossier renommé dedans serait encore chargé comme skill « support ».
+    const sauvegarde = path.join(os.homedir(), ".claude", "support-it-entree.bak.md");
+    fs.copyFileSync(globale, sauvegarde);
+    fs.rmSync(globale);
+    const dossier = path.dirname(globale);
+    if (fs.readdirSync(dossier).length === 0) fs.rmdirSync(dossier);
+    else console.log(`  ${dossier} contient d'autres fichiers : dossier gardé, à vérifier à la main`);
+    console.log(`  ancien point d'entrée de portée utilisateur retiré : ${globale} (sauvegarde ${sauvegarde})`);
+  } else if (e.globale === "autre") {
+    console.log(`  ATTENTION : ${globale} est un autre skill « support », non touché. Claude Code le fait passer avant celui du projet : /support ne lancera pas support-it tant qu'il est là. Le renommer ou le retirer à la main.`);
+  }
   return 0;
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "support-it-serveur",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Serveur MCP de la boîte à outils IA pour le support IT — huit appels, aucune intelligence.",
   "type": "module",

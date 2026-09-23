@@ -57,6 +57,21 @@ Then **restart Claude Code from the repository folder** (the parent of `produit/
 `/support`. The first call proves the server answers. Fill the company context by
 conversation (`/support remplis le contexte`) or by editing `installation/contexte/*.md`.
 
+> **Always open Claude Code in the `support-it` folder itself** — in the desktop app, pick
+> `support-it` as the session folder; in a terminal, `cd support-it` then `claude`.
+> The three pieces live there and nowhere else: the `/support` skill
+> (`.claude/skills/support/`), the MCP server (`.mcp.json`) and the permission rules
+> (`.claude/settings.json`). Since `0.3.1`:
+>
+> - **Outside that folder**, `/support` and the server do not exist — on purpose: a ticket
+>   must never run without the permission rules.
+> - **From a subfolder** (e.g. `support-it/produit/`): in a git clone, Claude Code looks up
+>   to the repository root and finds the skill; in an install from the zip archive (no git),
+>   this is not guaranteed. Start from `support-it`, not below it.
+> - If an older `~/.claude/skills/support/` exists, the installer removes it (it would
+>   override the project skill and leak outside the folder); `node dist/cli.js etat` warns if
+>   one is still there.
+
 Useful options: `-SansBuild` / `--sans-build`, `-SansTest` / `--sans-test`,
 `-Installation <path>` / `--installation <path>` (e.g. a network share).
 
@@ -136,7 +151,8 @@ observation — before anything is changed in `produit/`.
 
 ## Status
 
-`0.3.0` (2026-09-21). Two test campaigns have been played and their corrections applied
+`0.3.1` (2026-09-23): the `/support` entry point moved to project scope — it no longer
+loads outside the `support-it` folder. `0.3.0` (2026-09-21): two test campaigns have been played and their corrections applied
 (`conception/campagne-test-0.3.0-beta*.md`): eleven tickets on a generated dataset, then a
 fresh install with an empty context, then a pass on the manifest. Next: the multi-user
 "gate 2" (network share, concurrent drafts) and a redrawn architecture diagram.

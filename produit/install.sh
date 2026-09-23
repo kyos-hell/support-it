@@ -144,6 +144,15 @@ if [[ "$SANS_CLAUDE" -eq 1 ]]; then
 else
   node "$CLI" enregistrer || echec "enregistrement du serveur MCP en échec"
   node "$CLI" entree || echec "installation du point d'entrée en échec"
+  # Décision 50 : /support en portée projet, et aucun skill « support » global qui le masque.
+  ENTREE_PROJET="$(dirname "$PRODUIT")/.claude/skills/support/SKILL.md"
+  [[ -f "$ENTREE_PROJET" ]] || echec "point d'entrée absent après installation : $ENTREE_PROJET"
+  ENTREE_GLOBALE="$HOME/.claude/skills/support/SKILL.md"
+  if [[ -f "$ENTREE_GLOBALE" ]]; then
+    echo "  ATTENTION : $ENTREE_GLOBALE existe encore. Claude Code le fait passer avant celui du projet, et il se charge hors du dossier support-it : le renommer ou le retirer à la main."
+  else
+    echo "  vérifié : /support en portée projet seulement ($ENTREE_PROJET), aucun skill « support » global"
+  fi
   node "$CLI" hote || echec "dépôt des permissions Claude Code (.claude/settings.json) en échec"
 fi
 
@@ -157,6 +166,8 @@ echo "  - Remplir le contexte : $INSTALLATION/contexte/*.md (recommandé, pas ob
 echo "    ou laisser l'outil le faire par conversation : /support remplis le contexte."
 echo "  - Redémarrer Claude Code, puis taper /support : le premier appel (triage) prouve que le serveur répond."
 echo "    (/mcp est peu lisible dans l'app desktop : il mêle ses propres serveurs et ouvre parfois le catalogue.)"
-echo "  - Lancer Claude Code depuis le dossier parent de produit/ : .claude/settings.json y interdit au modèle"
+echo "  - Ouvrir Claude Code DANS le dossier support-it ($(dirname "$PRODUIT")), le parent de produit/."
+echo "    Hors de ce dossier, /support et le serveur n'existent pas : c'est voulu."
+echo "    .claude/settings.json y interdit au modèle"
 echo "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
 echo "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."

@@ -116,6 +116,12 @@ triages nets système et poste de travail sur les libellés resserrés.
 6. Porte 2 (collègues, partage réseau) : l'empreinte optimiste sur le
    contexte et les brouillons (`D-serveur-mcp.md` §8), et ce que la
    décision 7 a explicitement remis à plus tard.
+7. **`0.3.1` le 2026-09-23 — le point d'entrée en portée projet**
+   (décision 50, `fin-de-projet.md` §14) : `/support` était installé dans
+   `~/.claude/skills/` et se chargeait hors du dossier, sans les
+   permissions de `hote`. `entree` le dépose dans le dossier de lancement
+   et retire l'ancien ; `etat` et `install.*` le vérifient. À jouer : T-H6
+   sur l'env de test (hors git et sous-dossier compris).
 
 ## 2. Carte du dépôt — quoi lire pour quoi
 
@@ -149,7 +155,8 @@ il est fragile et il faut le savoir.
 | Le serveur ne raisonne jamais ; l'intelligence est dans `contenu/`, le déterminisme dans `serveur/`. | Architecture : aucun appel ne prend une décision qu'un skill pourrait prendre. |
 | Le modèle ne fabrique jamais un chemin, un identifiant, une date. | Contrat : aucun appel n'a de paramètre de chemin ; le serveur fabrique tout (`ids.ts`). Une référence fabriquée est refusée (A6). |
 | **Le modèle n'a pas de choix sur la mécanique** (principe du 2026-09-14) : domaines, signaux, tags, sections sont des enums ; le symptôme, les domaines proposés, le plan, les questions viennent du brouillon ; l'étape, les escalades, les cas lus, la durée sont dérivés ; l'ordre du flux est tenu par l'état de session ; **les colonnes d'un tableau de contexte** sont celles du gabarit ou celles en place (décision 45, 2026-09-21). | **Code** : schémas construits au démarrage (`index.ts`), `session.ts`, `encours.ts`, `tickets.ts`, `contexte.ts` (`enTeteTableau`). Il reste au modèle : net ou ambigu, la question, la conclusion, le plan, les preuves des signaux, le constat d'une contradiction. |
-| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5) ; prompt : règle explicite dans triage et clôture depuis E14. Exception assumée : `install` écrit `.mcp.json` et `.claude/settings.json` dans le dossier de lancement (décision 44). |
+| Rien n'est écrit hors de `installation/` ; `produit/` se remplace en bloc. Et rien n'est écrit dans `installation/` hors des appels. | Code (`config.ts`), scripts d'installation, test de fumée (liste des dossiers créés) ; **l'hôte** : `.claude/settings.json` refuse `Edit`/`Write` sur `installation/**` au modèle (décision 5) ; prompt : règle explicite dans triage et clôture depuis E14. Exception assumée : `install` écrit `.mcp.json`, `.claude/settings.json` et `.claude/skills/support/` dans le dossier de lancement (décisions 44, 50). |
+| **Rien de support-it n'existe hors du dossier `support-it`** : le point d'entrée, le serveur et les permissions refusées ont la même portée, le projet — aucun ticket ne tourne sans les permissions (décision 50, 2026-09-23). | `entree` (portée projet, retrait de l'ancien global), `enregistrer` (E18), vérification à l'étape 5 de `install.*` et dans `etat` ; point d'entrée : sans `load_skill`, il s'arrête. Fragile : un skill `support` global d'un autre auteur, ou un poste non mis à jour — signalés, pas corrigés. |
 | Aucune donnée d'entreprise dans `produit/contenu/`, même en exemple. | `valider` (regex IP, UNC, mail, domaine interne, nom d'hôte plausible). Placeholders `<...>` uniquement. |
 | Un ticket clôturé, un journal, une entrée de base : écrits une fois, jamais modifiés. | Code (`flag: "wx"`). |
 | Seules deux matières sont mutables : le contexte (`update_context`, avec copie dans `contexte/historique/`) et les brouillons (`save_progress`, fusion). La seule suppression est le brouillon à la clôture. | Code. Concurrence non protégée en mono-poste ; empreinte prévue à la porte 2. |
@@ -282,6 +289,13 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
   rechargement du PATH vivent dans les deux scripts, en double. Ne pas la
   « nettoyer » vers le CLI ; garder les deux versions alignées message pour
   message.
+  **Seconde exception, décision 50 (2026-09-23)** : après `entree`,
+  l'étape 5 contre-vérifie par un simple test de fichier que
+  `.claude/skills/support/SKILL.md` existe dans le dossier de lancement
+  (sinon échec) et que `~/.claude/skills/support/SKILL.md` n'existe plus
+  (sinon ATTENTION). Demandée explicitement : une vérification
+  indépendante du CLI qui vient d'écrire. Aucune autre logique ; mêmes
+  messages dans les deux scripts. Ne jamais revenir à `~/.claude/skills/`.
 - `install.ps1` en **UTF-8 avec BOM** (PowerShell 5.1) ; `install.sh` en
   **LF** sans CR et exécutable dans l'index Git ; les deux tenus par
   `.gitattributes` et vérifiés par `valider`. Les écrire avec un outil qui
@@ -327,6 +341,10 @@ pourquoi), et une date **absolue** partout où l'on écrit « aujourd'hui ».
   Depuis la décision 45, un tableau se teste avec les colonnes du gabarit ;
   un squelette « d'un gabarit plus ancien » (C2) s'écrit à la main dans le
   fichier, pas par `update_context`.
+- E18 a passé le serveur en portée projet et laissé le point d'entrée en
+  portée utilisateur : `/support` se chargeait hors du dossier, sans les
+  permissions (décision 50). Quand une pièce change de portée, les trois
+  (skill, `.mcp.json`, `settings.json`) se vérifient ensemble.
 
 ## 6. Conventions de rédaction
 

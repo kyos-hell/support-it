@@ -37,8 +37,10 @@ et d'audit, file des candidats, hôte — est dans
 `architecture/schema/routage_support_v4.svg` (0.3.0, 2026-09-21 ; la v3 et
 la v2 sont gardées pour l'historique).
 
-**Le point d'entrée** `~/.claude/skills/support/SKILL.md` fait dix lignes :
-« appelle `load_skill(["triage"])` et suis ce qu'il renvoie ». Toute
+**Le point d'entrée** `<dossier de lancement>/.claude/skills/support/SKILL.md`
+(portée projet depuis `0.3.1`, décision 50 ; `~/.claude/skills/` avant) fait
+onze lignes : « appelle `load_skill(["triage"])` et suis ce qu'il renvoie ;
+sans `load_skill`, dis-le et arrête-toi ». Toute
 l'intelligence est derrière le serveur, dans des fichiers markdown.
 
 **Les neuf appels**, dans l'ordre d'un ticket (état du 2026-09-11 ; les changements du 2026-09-18 sont en §10) :
@@ -140,6 +142,7 @@ voici la liste pour que tu puisses les contester d'un coup d'œil.
 | 47 | **La durée d'un ticket est la durée active** : somme des écarts entre points d'étape consécutifs (création → clôture), chacun plafonné à 30 min ; la calendaire est écrite à côté (`duree_calendaire_minutes`) ; le brouillon note l'horodatage de chaque `save_progress` (`points_etape`) — décidé avec toi le 2026-09-21 (O8) | §12, encours.ts, tickets.ts | T5 comptait sa pause (18 min), T8 sa nuit de session perdue (1 506 min), EX-3102 47 min pour 8 tours : la mesure T-P7 « durée » était fausse dès qu'un ticket attendait. Un brouillon antérieur, sans points, garde la calendaire. |
 | 49 | **Passe sur le manifeste après les deux campagnes** : le manifeste tient (aucun cas où les signaux cochés mènent à un domaine contredit par le technicien) ; deux libellés resserrés, identifiants inchangés (`un-service-touche` « depuis partout », `un-seul-poste` « depuis un poste voisin ») ; et l'**écart** du jeu de test du triage redéfini : le premier domaine calculé n'est pas parmi les validés — un triage ambigu résolu ou une escalade réussie n'en sont plus (OA6) — décidé avec toi le 2026-09-21 | §12, manifeste.yaml, audit.ts | Les « six écarts » d'hier et celui d'aujourd'hui étaient tous des faux positifs de la définition (proposés ≠ validés, ou escalade), pas des signaux fautifs. Les deux libellés étaient cochés trop facilement (« Internet fonctionne » → `un-service-touche` ; égalités systématiques avec `un-seul-poste`). |
 | 48 | **Une section vide se remplit, elle n'est pas remplacée** : `update_context` sur un squelette n'archive rien dans `historique/` et répond « remplie (était vide) » — décidé avec toi le 2026-09-21 (OA2) | §12, contexte.ts | Chaque première écriture archivait le gabarit livré ; l'audit comptait ces copies. Même logique que la confirmation à l'identique (décision 9) : rien à sauver. |
+| 50 | **Le point d'entrée `/support` en portée projet** : `entree` le dépose dans `<dossier de lancement>/.claude/skills/support/`, à côté de `.mcp.json` et `.claude/settings.json` ; il retire l'ancien `~/.claude/skills/support/` s'il vient de ce produit (sauvegarde `~/.claude/support-it-entree.bak.md`), le signale sinon ; `etat` et `install.*` le vérifient ; le point d'entrée s'arrête si `load_skill` est absent — décidé avec toi le 2026-09-23 (`0.3.1`) | §14, cli.ts, install.*, SKILL.md, README | Constaté en usage réel : une session ouverte hors du dossier a chargé `/support` sur une demande VM et conduit un ticket, **sans** les permissions refusées de `hote` (Bash permis, `installation/` modifiable). E18 avait passé le serveur en portée projet, pas le point d'entrée. Claude Code fait passer un skill personnel avant un skill de projet du même nom : le retrait est obligatoire. Prérequis de la porte 2 (M10, M11 ne tiennent que dans le dossier). |
 | 21 | `produit/` regroupé par nature : `contenu/` (manifeste, `general/`, `domaines/`), `serveur/`, `entrees/`, scripts à la racine — demandé par toi, forme choisie par moi | plan H, deploiement §1 | La racine mélangeait contenu, code, scripts et adaptateurs ; `general` garde le nom de l'identifiant que les skills référencent. |
 
 ## 5. Ce que les tests ont trouvé
@@ -411,3 +414,27 @@ ne touche à rien d'autre. Les brouillons antérieurs à O8 (sans
 d'architecture v4, la porte 2 (partage réseau, empreinte optimiste,
 compatibilité produit / installation), O1, O2, O3, O7, et l'observation
 des règles tenues par le prompt seul (OA5, E3, E9, registre).
+
+## 14. Version 0.3.1 — 2026-09-23 : le point d'entrée en portée projet
+
+Correctif (décision 50, `retours-beta.md` « Après 0.3.0 »). Une session
+Claude Code ouverte hors du dossier `support-it` chargeait `/support` — le
+skill était installé dans `~/.claude/skills/`, et sa description le fait
+déclencher par le modèle — et conduisait un ticket sans les permissions
+refusées de `hote`. `produit/VERSION` = `0.3.1`.
+
+**Ce qui change pour un technicien** : `/support` n'existe que dans une
+session ouverte **dans** le dossier `support-it` (le parent de `produit/`).
+Depuis un sous-dossier : trouvé dans un clone git (Claude Code remonte
+jusqu'à la racine du dépôt), non garanti hors git (archive). Sans le serveur
+(premier lancement, `.mcp.json` pas encore accepté), le point d'entrée le dit
+et s'arrête au lieu d'improviser.
+
+**Ce que ça exige d'une installation existante** : remplacer `produit/`,
+relancer `install.*`. `entree` dépose le skill dans le projet et retire
+l'ancien global s'il vient de ce produit (sauvegarde
+`~/.claude/support-it-entree.bak.md`) ; un autre skill `support` global est
+signalé, jamais touché — il faut le retirer à la main, sinon il masque
+celui du projet. Un poste qui n'est pas mis à jour garde la fuite. Sur un
+poste de développement antérieur à E18, relancer aussi `enregistrer` pour
+retirer l'entrée MCP de `~/.claude.json`.

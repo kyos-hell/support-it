@@ -231,9 +231,21 @@ le mode affiché est « MISE À JOUR 0.1.0-beta → <version> », seul le
 gabarit manquant est copié, le reste est « gardé ».
 
 **T-H3 — Enregistrement.** Après `install.*` complet sur un poste :
-`~/.claude.json` contient `mcpServers.support-it` avec les deux racines,
-`~/.claude/skills/support/SKILL.md` existe, la sauvegarde `.support-it.bak`
-existe, `.claude/settings.json` est déposé dans le dossier de lancement (T-H5), et `/mcp` dans Claude Code liste `support-it` avec neuf outils.
+`<dossier de lancement>/.mcp.json` contient `mcpServers.support-it` avec les deux racines
+(E18), `<dossier de lancement>/.claude/skills/support/SKILL.md` existe et
+`~/.claude/skills/support/` **n'existe pas** (décision 50, `0.3.1`), `.claude/settings.json` est déposé dans le dossier de lancement (T-H5), et `/mcp` dans Claude Code liste `support-it` avec neuf outils.
+
+**T-H6 — Rien de support-it hors du dossier** (décision 50, 2026-09-23).
+Sur un poste qui avait `~/.claude/skills/support/` (0.3.0) : `install.*`
+le retire (sauvegarde `~/.claude/support-it-entree.bak.md`), l'étape 5
+affiche « vérifié : /support en portée projet seulement », `etat` affiche
+« Point d'entrée /support : OK ». Puis trois sessions Claude Code : dans
+`support-it` → `/support` lance le triage ; dans un autre dossier → `/support`
+inconnu, et une demande « ma VM ne démarre plus » ne charge aucun skill
+support ; depuis un sous-dossier (`support-it/produit/`) → noter le
+résultat, clone git et archive hors git séparément. Variante : un autre
+skill `support` global (texte sans `load_skill`) → non touché, ATTENTION à
+l'étape 5 et dans `etat`. Rouge si un ticket démarre hors du dossier.
 **Non joué par l'auteur** : il modifie la configuration Claude Code du
 poste ; c'est le premier test de la porte 1, à faire par le testeur.
 
