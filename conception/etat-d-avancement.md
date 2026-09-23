@@ -120,8 +120,12 @@ triages nets système et poste de travail sur les libellés resserrés.
    (décision 50, `fin-de-projet.md` §14) : `/support` était installé dans
    `~/.claude/skills/` et se chargeait hors du dossier, sans les
    permissions de `hote`. `entree` le dépose dans le dossier de lancement
-   et retire l'ancien ; `etat` et `install.*` le vérifient. À jouer : T-H6
-   sur l'env de test (hors git et sous-dossier compris).
+   et retire l'ancien ; `etat` et `install.*` le vérifient. T-H6 joué le
+   jour même : vert hors du dossier et à la racine ; **depuis un
+   sous-dossier, `settings.json` ne s'applique pas** (Bash revient) alors
+   que `/support` et le serveur y sont trouvés — limite dite dans le README,
+   garde côté serveur à étudier pour `0.3.2` (le `cwd` du processus MCP
+   est-il celui de la session ?).
 
 ## 2. Carte du dépôt — quoi lire pour quoi
 

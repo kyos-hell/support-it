@@ -425,8 +425,12 @@ refusées de `hote`. `produit/VERSION` = `0.3.1`.
 
 **Ce qui change pour un technicien** : `/support` n'existe que dans une
 session ouverte **dans** le dossier `support-it` (le parent de `produit/`).
-Depuis un sous-dossier : trouvé dans un clone git (Claude Code remonte
-jusqu'à la racine du dépôt), non garanti hors git (archive). Sans le serveur
+**Jamais depuis un sous-dossier** : T-H6 (2026-09-23) montre que, dans un
+clone git, `/support` et le serveur y sont trouvés (Claude Code remonte
+jusqu'à la racine du dépôt) mais **pas** `.claude/settings.json` — Bash et
+PowerShell reviennent au modèle. Limite connue de `0.3.1`, déjà présente en
+`0.3.0` ; dite dans le README et les messages de fin ; garde côté serveur à
+l'étude pour `0.3.2`. Sans le serveur
 (premier lancement, `.mcp.json` pas encore accepté), le point d'entrée le dit
 et s'arrête au lieu d'improviser.
 

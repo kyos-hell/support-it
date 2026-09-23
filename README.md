@@ -65,9 +65,10 @@ conversation (`/support remplis le contexte`) or by editing `installation/contex
 >
 > - **Outside that folder**, `/support` and the server do not exist — on purpose: a ticket
 >   must never run without the permission rules.
-> - **From a subfolder** (e.g. `support-it/produit/`): in a git clone, Claude Code looks up
->   to the repository root and finds the skill; in an install from the zip archive (no git),
->   this is not guaranteed. Start from `support-it`, not below it.
+> - **Never from a subfolder** (e.g. `support-it/produit/`). In a git clone, Claude Code
+>   still finds `/support` and the server by looking up to the repository root — but **not**
+>   the permission rules: the model gets `Bash`/`PowerShell` back and could write into
+>   `installation/`. Tested on 2026-09-23; a server-side guard is planned for `0.3.2`.
 > - If an older `~/.claude/skills/support/` exists, the installer removes it (it would
 >   override the project skill and leak outside the folder); `node dist/cli.js etat` warns if
 >   one is still there.

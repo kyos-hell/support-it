@@ -87,8 +87,10 @@ passe avant** un skill de projet du même nom — d'où le retrait de l'ancien
 `~/.claude/skills/support/` (s'il appelle `load_skill` de `support-it` ;
 sinon signalé, jamais touché), contrôlé par le script à l'étape 5 et par
 `etat` ; les skills de projet sont cherchés du dossier de lancement jusqu'à
-la **racine du dépôt git** (un sous-dossier d'un clone fonctionne ; hors
-git, non documenté — T-H6) ; un skill de projet se charge sans
+la **racine du dépôt git**, le `.mcp.json` aussi (vu en vrai), mais **pas**
+`.claude/settings.json` : depuis un sous-dossier d'un clone, un ticket
+tourne avec Bash et PowerShell (T-H6, 2026-09-23 — limite connue, garde
+serveur à l'étude pour `0.3.2`) ; un skill de projet se charge sans
 approbation, alors que `.mcp.json` peut en demander une : d'où la ligne 1 du
 point d'entrée, « sans `load_skill`, dis-le et arrête-toi ».
 

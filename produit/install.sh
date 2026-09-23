@@ -168,6 +168,7 @@ echo "  - Redémarrer Claude Code, puis taper /support : le premier appel (triag
 echo "    (/mcp est peu lisible dans l'app desktop : il mêle ses propres serveurs et ouvre parfois le catalogue.)"
 echo "  - Ouvrir Claude Code DANS le dossier support-it ($(dirname "$PRODUIT")), le parent de produit/."
 echo "    Hors de ce dossier, /support et le serveur n'existent pas : c'est voulu."
+echo "    JAMAIS depuis un sous-dossier (produit/…) : /support y marche, mais sans les interdictions ci-dessous."
 echo "    .claude/settings.json y interdit au modèle"
 echo "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
 echo "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."

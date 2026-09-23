@@ -174,6 +174,7 @@ Write-Host "  - Redémarrer Claude Code, puis taper /support : le premier appel 
 Write-Host "    (/mcp est peu lisible dans l'app desktop : il mêle ses propres serveurs et ouvre parfois le catalogue.)"
 Write-Host "  - Ouvrir Claude Code DANS le dossier support-it ($(Split-Path $Produit -Parent)), le parent de produit/."
 Write-Host "    Hors de ce dossier, /support et le serveur n'existent pas : c'est voulu."
+Write-Host "    JAMAIS depuis un sous-dossier (produit/…) : /support y marche, mais sans les interdictions ci-dessous."
 Write-Host "    .claude/settings.json y interdit au modèle"
 Write-Host "    d'écrire dans installation/, de lire kb/ et en-cours/ directement, et d'exécuter une commande (Bash, PowerShell)."
 Write-Host "    La règle « l'IA n'exécute rien, le technicien exécute » est tenue par ce fichier, pas par le mode de permission."
